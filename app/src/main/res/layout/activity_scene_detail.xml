@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1B1B1B"
+    android:padding="48dp"
+    android:focusable="false"
+    android:descendantFocusability="afterDescendants">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Top section: screenshot left, buttons right -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/detail_screenshot"
+                android:layout_width="400dp"
+                android:layout_height="225dp"
+                android:scaleType="centerCrop"
+                android:background="#333333" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingStart="24dp"
+                android:gravity="start">
+
+                <!-- Row 1: Resume, Play, Favorite -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp">
+
+                    <Button
+                        android:id="@+id/btn_resume"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="160dp"
+                        android:text="▶ Resume"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:background="@drawable/action_button_background"
+                        android:layout_marginEnd="12dp"
+                        android:visibility="gone"
+                        android:focusable="true" />
+
+                    <Button
+                        android:id="@+id/btn_play"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="120dp"
+                        android:text="▶ Play"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:background="@drawable/action_button_background"
+                        android:layout_marginEnd="12dp"
+                        android:focusable="true" />
+
+                    <Button
+                        android:id="@+id/btn_favorite"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="140dp"
+                        android:text="🤍 Favorite"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true" />
+                </LinearLayout>
+
+                <!-- Row 2: Mark Watched, Browse Folder -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="16dp">
+
+                    <Button
+                        android:id="@+id/btn_mark_watched"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="160dp"
+                        android:text="👁️ Mark Watched"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:background="@drawable/action_button_background"
+                        android:layout_marginEnd="12dp"
+                        android:focusable="true" />
+
+                    <Button
+                        android:id="@+id/btn_folder"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="180dp"
+                        android:text="📁 Browse Folder"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true" />
+                </LinearLayout>
+
+                <!-- Filename and info below buttons -->
+                <TextView
+                    android:id="@+id/detail_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@android:color/white"
+                    android:textSize="18sp"
+                    android:maxLines="3"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/detail_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#AAAAAA"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/detail_path"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#777777"
+                    android:textSize="12sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#444444"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/related_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="More from this folder"
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/related_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

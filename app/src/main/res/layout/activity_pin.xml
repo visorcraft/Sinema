@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#FF1B1B1B"
+    android:padding="48dp">
+
+    <TextView
+        android:id="@+id/pin_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Enter PIN"
+        android:textColor="@android:color/white"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp" />
+
+    <LinearLayout
+        android:id="@+id/pin_dots_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="24dp">
+
+        <View
+            android:id="@+id/pin_dot1"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="6dp" />
+
+        <View
+            android:id="@+id/pin_dot2"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="6dp" />
+
+        <View
+            android:id="@+id/pin_dot3"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="6dp" />
+
+        <View
+            android:id="@+id/pin_dot4"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="6dp" />
+
+    </LinearLayout>
+
+    <GridLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:columnCount="3"
+        android:rowCount="4">
+
+        <!-- Row 1: 1, 2, 3 -->
+        <Button
+            android:id="@+id/btn_1"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="1"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_2"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="2"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_3"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="3"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <!-- Row 2: 4, 5, 6 -->
+        <Button
+            android:id="@+id/btn_4"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="4"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_5"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="5"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_6"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="6"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <!-- Row 3: 7, 8, 9 -->
+        <Button
+            android:id="@+id/btn_7"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="7"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_8"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="8"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_9"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="9"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <!-- Row 4: close app, 0, backspace -->
+        <Button
+            android:id="@+id/btn_close_app"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="🔒"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_0"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="0"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+        <Button
+            android:id="@+id/btn_backspace"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="6dp"
+            android:text="⌫"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:background="@drawable/pin_button_background" />
+
+    </GridLayout>
+
+    <TextView
+        android:id="@+id/pin_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#FF5722"
+        android:textSize="18sp"
+        android:layout_marginTop="24dp"
+        android:visibility="gone" />
+
+</LinearLayout>

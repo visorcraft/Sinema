@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Sinema" parent="@style/Theme.Leanback.Browse">
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowBackground">#FF1B1B1B</item>
+        <item name="android:colorBackground">#FF1B1B1B</item>
+        <item name="android:colorPrimary">#FF1B1B1B</item>
+        <item name="defaultBrandColor">#FF1B1B1B</item>
+        <item name="defaultBrandColorDark">#FF121212</item>
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">#AAAAAA</item>
+        <item name="browsePaddingStart">48dp</item>
+        <item name="browsePaddingEnd">48dp</item>
+        <item name="browsePaddingTop">27dp</item>
+        <item name="browsePaddingBottom">27dp</item>
+    </style>
+
+    <style name="Theme.Sinema.Details" parent="@style/Theme.Leanback.Details">
+        <item name="android:windowBackground">#FF1B1B1B</item>
+        <item name="android:colorBackground">#FF1B1B1B</item>
+        <item name="detailsActionButtonStyle">@style/Widget.Leanback.DetailsActionButtonStyle.Custom</item>
+    </style>
+
+    <style name="Widget.Leanback.DetailsActionButtonStyle.Custom" parent="Widget.Leanback.DetailsActionButtonStyle">
+        <item name="android:background">@drawable/action_button_background</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:focusable">true</item>
+        <item name="android:focusableInTouchMode">true</item>
+    </style>
+</resources>
