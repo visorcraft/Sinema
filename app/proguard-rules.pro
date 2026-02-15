@@ -1,0 +1,1 @@
+# StashTV proguard rules

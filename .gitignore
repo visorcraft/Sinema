@@ -1,0 +1,42 @@
+# Build
+*.iml
+.gradle/
+/build/
+/app/build/
+*.apk
+*.aab
+*.dex
+*.class
+
+# IDE
+/.idea/
+*.swp
+*.swo
+*~
+
+# Local config
+/local.properties
+local.properties
+
+# Android
+.externalNativeBuild/
+.cxx/
+/captures
+/app/release/
+
+# Signing
+*.jks
+*.keystore
+signing.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit these
+*.secret
+*.env
+.env
+debug.keystore
+AGENTS.md
+.aider*
