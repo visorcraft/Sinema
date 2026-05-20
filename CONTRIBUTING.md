@@ -234,6 +234,42 @@ provide well-tested domain behavior that should not be maintained
 locally. Pulling in another HTTP client, image loader, or video
 stack alongside the existing one is **not** acceptable.
 
+## Releases
+
+Releases are cut by pushing a `v*` git tag to `main`. The
+`.github/workflows/release.yml` workflow fires automatically on every
+tag push and produces:
+
+| Artefact | Notes |
+| -------- | ----- |
+| `sinema-<version>.apk` | Release-mode APK (debug-signed — see `SECURITY.md`). Sideload with `adb install`. |
+| `sinema-<version>.aab` | Android App Bundle for store distribution. |
+| `lint-results-<version>.html` | Lint report from `./gradlew lintRelease`. |
+| `sha256sums.txt` | Checksums for every artefact above. |
+
+The workflow:
+
+1. Verifies that the tag matches the `versionName` field in
+   `app/build.gradle.kts` (e.g. tag `v1.9.3` ↔ `versionName = "1.9.3"`).
+   The build fails fast if they drift.
+2. Runs `./gradlew lintRelease`.
+3. Builds the release APK + AAB.
+4. Uploads the four artefacts to the GitHub Release with
+   auto-generated release notes.
+
+Steps to cut a release:
+
+1. Bump `versionCode` (monotonically) and `versionName`
+   (`X.Y.Z`) in `app/build.gradle.kts`.
+2. `git commit`, push, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. Watch the **release** workflow under the *Actions* tab. On
+   success it creates the GitHub Release at
+   `https://github.com/visorcraft/Sinema/releases/tag/vX.Y.Z`.
+
+If something fails mid-build, fix it, push the fix, delete the tag
+(`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`), and
+re-tag.
+
 ## Security
 
 Do not report security issues through public issues or pull requests.
