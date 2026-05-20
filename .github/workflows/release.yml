@@ -1,0 +1,130 @@
+# SPDX-FileCopyrightText: 2026 VisorCraft LLC
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Tag-triggered release pipeline. Each push of a `v*` tag verifies
+# that the tag matches `versionName` in app/build.gradle.kts, runs
+# lint, builds the release APK + AAB, generates sha256sums.txt, and
+# attaches everything to a new GitHub Release with auto-generated
+# notes. No `${{ github.event.* }}` interpolations are used: this
+# workflow is safe against injection from PR titles, branch names,
+# or commit messages.
+#
+# Sinema's release build is currently debug-signed (see
+# app/build.gradle.kts and SECURITY.md). The APK still installs via
+# ADB sideload; users who need a verifiable signature should build
+# from source with their own keystore.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g"
+
+jobs:
+  release:
+    name: Build + publish release
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Resolve versionName + verify tag
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          workspace_version="$(awk -F'"' '
+            /^[[:space:]]*versionName[[:space:]]*=/ { print $2; exit }
+          ' app/build.gradle.kts)"
+          tag_version="${TAG#v}"
+          if [[ -z "$workspace_version" ]]; then
+            echo "could not read versionName from app/build.gradle.kts" >&2
+            exit 1
+          fi
+          if [[ "$tag_version" != "$workspace_version" ]]; then
+            echo "tag ${TAG} does not match versionName ${workspace_version}" >&2
+            exit 1
+          fi
+          printf 'version=%s\n' "$workspace_version" >> "$GITHUB_OUTPUT"
+          echo "Building Sinema ${workspace_version} from tag ${TAG}"
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkey -v -keystore debug.keystore \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Run lint (release variant)
+        run: ./gradlew lintRelease --no-daemon
+
+      - name: Assemble release APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Bundle release AAB
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Stage release artifacts + checksums
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk \
+             "dist/sinema-${VERSION}.apk"
+          cp app/build/outputs/bundle/release/app-release.aab \
+             "dist/sinema-${VERSION}.aab"
+          # Lint report path varies slightly across AGP versions;
+          # ship whichever HTML report the lintRelease task wrote.
+          for report in \
+              app/build/reports/lint-results-release.html \
+              app/build/reports/lint-results.html; do
+            if [ -f "$report" ]; then
+              cp "$report" "dist/lint-results-${VERSION}.html"
+              break
+            fi
+          done
+          (cd dist && sha256sum * > sha256sums.txt)
+          echo "Release payload:" && ls -la dist/
+
+      - name: Upload release artifacts (Actions backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --title "Sinema $TAG" \
+            --generate-notes \
+            --verify-tag
