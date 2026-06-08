@@ -3,12 +3,19 @@
 </p>
 
 <p align="center">
-  <em>Your private collection deserves a big screen.</em>
+  <b>Your private collection deserves a big screen.</b>
+  <br />
+  An Android TV client for <a href="https://github.com/stashapp/stash">Stash</a> — the self-hosted media organizer you already know and love.
+  <br />
+  Built for the couch · controlled with a remote · nobody's business but yours.
 </p>
 
 <p align="center">
-  Sinema is an Android TV client for <a href="https://github.com/stashapp/stash">Stash</a> — the self-hosted media organizer you already know and love.<br>
-  Built for the couch, controlled with a remote, and nobody's business but yours.
+  <img src="https://img.shields.io/badge/platform-Android%20TV-3DDC84?logo=android&logoColor=white" alt="Platform: Android TV" />
+  <img src="https://img.shields.io/badge/built%20with-Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Built with Kotlin" />
+  <img src="https://img.shields.io/badge/player-Media3%20ExoPlayer-4285F4" alt="Media3 ExoPlayer" />
+  <img src="https://img.shields.io/badge/backend-Stash%20GraphQL-E10098?logo=graphql&logoColor=white" alt="Stash GraphQL backend" />
+  <img src="https://img.shields.io/badge/license-GPL--3.0--only-blue" alt="License: GPL-3.0-only" />
 </p>
 
 ---
@@ -25,7 +32,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick start
 
 ### Prerequisites
 - A running [Stash](https://github.com/stashapp/stash) server on your network
@@ -57,7 +64,7 @@ adb -s <TV_IP>:5555 install -r app/build/outputs/apk/release/app-release.apk
 adb -s <TV_IP>:5555 shell am start -n com.sinema/.ui.MainActivity
 ```
 
-### First Launch
+### First launch
 1. Open Sinema on your TV
 2. You’ll be guided through a setup wizard with **3 options**:
    - **Sign in to Stash** (username/password) — recommended for most users
@@ -71,7 +78,7 @@ Notes:
 
 ---
 
-## 🔌 Stash Backend Requirements
+## Stash backend requirements
 
 Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
@@ -90,7 +97,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 ---
 
-## ✨ Features
+## Features
 
 - **🏠 Home Screen** — Continue Playing, Recently Played, Recently Added, Favorites.
 - **📁 Folder Browser** — Navigate your library by directory structure.
@@ -104,7 +111,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 ---
 
-## 🏗 Tech Stack
+## Tech stack
 
 - **Kotlin**
 - **AndroidX Leanback** (Android TV UI)
@@ -139,6 +146,19 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 ---
 
-## 📝 License
+## Contribute
 
-Do whatever you want with it. It's your TV. It's your server. It's your business.
+Patches, bug reports, and feedback are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide, and [`SECURITY.md`](SECURITY.md) for reporting security issues privately.
+
+- Branch from `main`, send a PR.
+- Build with Docker or Android Studio — see [Quick start](#quick-start).
+
+---
+
+## License
+
+Licensed under the **GNU General Public License v3.0** (`GPL-3.0-only`) — see [`LICENSE`](LICENSE) for the full text.
+
+© 2026 VisorCraft LLC. This is free software: you are free to use, study, share, and modify it under the terms of the GPL. It is distributed in the hope that it will be useful, but **WITHOUT ANY WARRANTY**, to the extent permitted by law.
+
+Sinema is an independent client and is not affiliated with or endorsed by the Stash project.
