@@ -75,9 +75,13 @@ class FolderCardPresenter : Presenter() {
                     title.text = "\uD83D\uDCC1 ${item.name}"
                     val itemWord = if (item.childCount == 1) "item" else "items"
                     content.text = "${item.childCount} $itemWord"
-                    if (item.firstSceneId != null) {
-                        val url = SinemaApp.instance.api.getScreenshotUrl(item.firstSceneId)
-                        val glideUrl = GlideUrl(url, LazyHeaders.Builder()
+                    val thumbUrl = when {
+                        item.firstSceneId != null -> SinemaApp.instance.api.getScreenshotUrl(item.firstSceneId)
+                        item.firstImageId != null -> SinemaApp.instance.api.getImageThumbnailUrl(item.firstImageId)
+                        else -> null
+                    }
+                    if (thumbUrl != null) {
+                        val glideUrl = GlideUrl(thumbUrl, LazyHeaders.Builder()
                             .addHeader("ApiKey", SinemaApp.instance.prefs.apiKey)
                             .build())
                         Glide.with(view.context)
@@ -91,10 +95,23 @@ class FolderCardPresenter : Presenter() {
                     }
                 } else {
                     title.text = item.name
-                    content.text = item.scene?.formatDuration() ?: ""
-                    if (item.scene != null) {
-                        val url = SinemaApp.instance.api.getScreenshotUrl(item.scene.id)
-                        val glideUrl = GlideUrl(url, LazyHeaders.Builder()
+                    val thumbUrl = when {
+                        item.image != null -> {
+                            content.text = if (item.image.width > 0 && item.image.height > 0)
+                                "${item.image.width} × ${item.image.height}" else "Picture"
+                            SinemaApp.instance.api.getImageThumbnailUrl(item.image.id)
+                        }
+                        item.scene != null -> {
+                            content.text = item.scene.formatDuration()
+                            SinemaApp.instance.api.getScreenshotUrl(item.scene.id)
+                        }
+                        else -> {
+                            content.text = ""
+                            null
+                        }
+                    }
+                    if (thumbUrl != null) {
+                        val glideUrl = GlideUrl(thumbUrl, LazyHeaders.Builder()
                             .addHeader("ApiKey", SinemaApp.instance.prefs.apiKey)
                             .build())
                         Glide.with(view.context)
