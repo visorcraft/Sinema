@@ -45,6 +45,10 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".ui.ImageViewActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ui.SettingsActivity"
             android:screenOrientation="landscape" />
 

@@ -32,12 +32,27 @@ data class Scene(
     }
 }
 
+data class ImageItem(
+    val id: String,
+    val title: String,
+    val path: String,
+    val size: Long = 0L,
+    val width: Int = 0,
+    val height: Int = 0,
+    val rating100: Int? = null
+) {
+    val filename: String get() = path.substringAfterLast('/')
+    val folder: String get() = path.substringBeforeLast('/')
+}
+
 data class FolderItem(
     val name: String,
     val fullPath: String,
     val isFolder: Boolean,
     val scene: Scene? = null,
+    val image: ImageItem? = null,
     val childCount: Int = 0,
     val firstSceneId: String? = null,
+    val firstImageId: String? = null,
     val hasFavorites: Boolean = false
 )

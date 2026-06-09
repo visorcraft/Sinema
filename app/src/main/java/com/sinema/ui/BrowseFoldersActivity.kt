@@ -74,6 +74,15 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
                         val intent = Intent(requireContext(), FolderBrowseActivity::class.java)
                         intent.putExtra("path", item.fullPath)
                         startActivity(intent)
+                    } else if (item.image != null) {
+                        val imageItems = (0 until gridAdapter.size())
+                            .mapNotNull { (gridAdapter.get(it) as? FolderItem)?.image }
+                        val index = imageItems.indexOfFirst { it.id == item.image.id }
+                        val intent = Intent(requireContext(), ImageViewActivity::class.java)
+                        intent.putStringArrayListExtra("image_ids", ArrayList(imageItems.map { it.id }))
+                        intent.putStringArrayListExtra("image_names", ArrayList(imageItems.map { it.filename }))
+                        intent.putExtra("index", index.coerceAtLeast(0))
+                        startActivity(intent)
                     } else if (item.scene != null) {
                         val scene = item.scene
                         val intent = Intent(requireContext(), SceneDetailActivity::class.java)
@@ -105,15 +114,18 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
                 val countJobs = folders.map { (name, fullPath) ->
                     async {
                         val sceneCount = app.api.getSceneCountForPath(fullPath)
+                        val imageCount = app.api.getImageCountForPath(fullPath)
                         val firstSceneId = app.api.getFirstSceneIdForPath(fullPath)
+                        val firstImageId = if (firstSceneId == null) app.api.getFirstImageIdForPath(fullPath) else null
                         val hasFavs = app.api.hasFavoritesInPath(fullPath)
                         FolderItem(
                             name = name,
                             fullPath = fullPath,
                             isFolder = true,
-                            childCount = sceneCount,
+                            childCount = sceneCount + imageCount,
                             scene = null,
                             firstSceneId = firstSceneId,
+                            firstImageId = firstImageId,
                             hasFavorites = hasFavs
                         )
                     }
@@ -134,7 +146,19 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
                     ))
                 }
 
-                val totalItems = folderItems.size + looseFiles.size
+                // Loose pictures directly in /data, listed after videos
+                val (_, looseImages) = app.api.findImagesInFolderDirect("/data", 1, 500)
+                looseImages.forEach { img ->
+                    gridAdapter.add(FolderItem(
+                        name = img.filename,
+                        fullPath = img.path,
+                        isFolder = false,
+                        childCount = 0,
+                        image = img
+                    ))
+                }
+
+                val totalItems = folderItems.size + looseFiles.size + looseImages.size
                 title = "Browse Folders ($totalItems items)"
                 badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
                 if (gridAdapter.size() == 0) {

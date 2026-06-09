@@ -3,6 +3,7 @@ package com.sinema.api
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.sinema.model.ImageItem
 import com.sinema.model.Scene
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,6 +41,13 @@ class SinemaApi(
 
     fun getScreenshotUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/screenshot"
     fun getStreamUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/stream"
+    fun getImageThumbnailUrl(imageId: String): String = "$serverUrl/image/$imageId/thumbnail"
+    fun getImageUrl(imageId: String): String = "$serverUrl/image/$imageId/image"
+
+    // Stash's INCLUDES modifier tokenizes the value on spaces and treats
+    // "-"-prefixed tokens as exclusions, so folder names like "Foo - Bar"
+    // match nothing. Anchored MATCHES_REGEX matches the path literally.
+    private fun pathPrefixRegex(path: String): String = "^${Regex.escape(path.trimEnd('/'))}/"
 
     private suspend fun graphql(query: String, variables: Map<String, Any?> = emptyMap()): JsonObject {
         return withContext(Dispatchers.IO) {
@@ -160,13 +168,114 @@ class SinemaApi(
         """.trimIndent()
         val variables = mapOf(
             "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
-            "scene_filter" to mapOf("path" to mapOf("value" to pathPrefix, "modifier" to "INCLUDES"))
+            "scene_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
         )
         val result = graphql(query, variables)
         val data = result.getAsJsonObject("data").getAsJsonObject("findScenes")
         val count = data.get("count").asInt
         val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
         return Pair(count, scenes)
+    }
+
+    suspend fun findImagesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<ImageItem>> {
+        val query = """
+            query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
+                findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
+                    count
+                    images {
+                        id title rating100
+                        visual_files {
+                            ... on ImageFile { path size width height }
+                            ... on VideoFile { path size width height }
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
+        val variables = mapOf(
+            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
+            "image_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+        )
+        val result = graphql(query, variables)
+        val data = result.getAsJsonObject("data").getAsJsonObject("findImages")
+        val count = data.get("count").asInt
+        val images = data.getAsJsonArray("images").map { parseImage(it.asJsonObject) }
+        return Pair(count, images)
+    }
+
+    suspend fun getImageCountForPath(pathPrefix: String): Int {
+        val query = """
+            query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
+                findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
+                    count
+                }
+            }
+        """.trimIndent()
+        val variables = mapOf(
+            "filter" to mapOf("per_page" to 0),
+            "image_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+        )
+        val result = graphql(query, variables)
+        return result.getAsJsonObject("data")?.getAsJsonObject("findImages")?.get("count")?.asInt ?: 0
+    }
+
+    suspend fun getFirstImageIdForPath(pathPrefix: String): String? {
+        val query = """
+            query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
+                findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
+                    images { id }
+                }
+            }
+        """.trimIndent()
+        val variables = mapOf(
+            "filter" to mapOf("per_page" to 1, "sort" to "random"),
+            "image_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+        )
+        val result = graphql(query, variables)
+        return result.getAsJsonObject("data")
+            ?.getAsJsonObject("findImages")
+            ?.getAsJsonArray("images")
+            ?.firstOrNull()?.asJsonObject?.get("id")?.asString
+    }
+
+    suspend fun findImagesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<ImageItem>> {
+        val query = """
+            query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
+                findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
+                    count
+                    images {
+                        id title rating100
+                        visual_files {
+                            ... on ImageFile { path size width height }
+                            ... on VideoFile { path size width height }
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
+        val variables = mapOf(
+            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
+            "image_filter" to mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath.trimEnd('/'))}/[^/]+$", "modifier" to "MATCHES_REGEX"))
+        )
+        val result = graphql(query, variables)
+        val data = result.getAsJsonObject("data")?.getAsJsonObject("findImages") ?: return Pair(0, emptyList())
+        val count = data.get("count").asInt
+        val images = data.getAsJsonArray("images").map { parseImage(it.asJsonObject) }
+        return Pair(count, images)
+    }
+
+    private fun parseImage(obj: JsonObject): ImageItem {
+        val files = obj.getAsJsonArray("visual_files")
+        val file = if (files != null && files.size() > 0) files[0].asJsonObject else null
+        return ImageItem(
+            id = obj.get("id").asString,
+            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            path = file?.get("path")?.asString ?: "",
+            size = file?.get("size")?.asLong ?: 0L,
+            width = file?.get("width")?.asInt ?: 0,
+            height = file?.get("height")?.asInt ?: 0,
+            rating100 = if (obj.has("rating100") && !obj.get("rating100").isJsonNull) obj.get("rating100").asInt else null
+        )
     }
 
     suspend fun searchScenes(searchTerm: String, page: Int = 1, perPage: Int = 40): Pair<Int, List<Scene>> {
@@ -440,7 +549,7 @@ class SinemaApi(
         val variables = mapOf(
             "filter" to mapOf("per_page" to 0),
             "scene_filter" to mapOf(
-                "path" to mapOf("value" to "$pathPrefix/", "modifier" to "INCLUDES"),
+                "path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"),
                 "rating100" to mapOf("value" to 1, "modifier" to "GREATER_THAN")
             )
         )
@@ -459,7 +568,7 @@ class SinemaApi(
         """.trimIndent()
         val variables = mapOf(
             "filter" to mapOf("per_page" to 1, "sort" to "random"),
-            "scene_filter" to mapOf("path" to mapOf("value" to "$pathPrefix/", "modifier" to "INCLUDES"))
+            "scene_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
         )
         val result = graphql(query, variables)
         return result.getAsJsonObject("data")
@@ -478,7 +587,7 @@ class SinemaApi(
         """.trimIndent()
         val variables = mapOf(
             "filter" to mapOf("per_page" to 0),
-            "scene_filter" to mapOf("path" to mapOf("value" to "$pathPrefix/", "modifier" to "INCLUDES"))
+            "scene_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
         )
         val result = graphql(query, variables)
         return result.getAsJsonObject("data")?.getAsJsonObject("findScenes")?.get("count")?.asInt ?: 0

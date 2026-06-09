@@ -13,6 +13,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
 import com.sinema.util.FolderHelper
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 class FolderBrowseActivity : FragmentActivity() {
@@ -78,6 +79,8 @@ class FolderGridFragment : VerticalGridSupportFragment() {
                         val intent = Intent(requireContext(), FolderBrowseActivity::class.java)
                         intent.putExtra("path", item.fullPath)
                         startActivity(intent)
+                    } else if (item.image != null) {
+                        openImageViewer(item)
                     } else if (item.scene != null) {
                         val scene = item.scene
                         val intent = Intent(requireContext(), SceneDetailActivity::class.java)
@@ -99,11 +102,25 @@ class FolderGridFragment : VerticalGridSupportFragment() {
         loadFolder()
     }
 
+    private fun openImageViewer(item: FolderItem) {
+        val imageItems = (0 until gridAdapter.size())
+            .mapNotNull { (gridAdapter.get(it) as? FolderItem)?.image }
+        val index = imageItems.indexOfFirst { it.id == item.image?.id }
+        val intent = Intent(requireContext(), ImageViewActivity::class.java)
+        intent.putStringArrayListExtra("image_ids", ArrayList(imageItems.map { it.id }))
+        intent.putStringArrayListExtra("image_names", ArrayList(imageItems.map { it.filename }))
+        intent.putExtra("index", index.coerceAtLeast(0))
+        startActivity(intent)
+    }
+
     private fun loadFolder() {
         lifecycleScope.launch {
             try {
-                val (_, scenes) = app.api.findScenesByPath(currentPath, 1, 1000)
-                val items = FolderHelper.buildFolderContents(scenes, currentPath)
+                val scenesJob = async { app.api.findScenesByPath(currentPath, 1, 1000) }
+                val imagesJob = async { app.api.findImagesByPath(currentPath, 1, 1000) }
+                val (_, scenes) = scenesJob.await()
+                val (_, images) = imagesJob.await()
+                val items = FolderHelper.buildFolderContents(scenes, images, currentPath)
                 gridAdapter.clear()
                 items.forEach { gridAdapter.add(it) }
                 if (items.isEmpty()) {
