@@ -615,7 +615,10 @@ class SinemaApi(
             rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt,
             date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
             studio = studioObj?.let { s ->
-                StudioRef(id = s.get("id").asString, name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+                StudioRef(
+                    id = s.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+                    name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                )
             },
             tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
             performers = (obj.get("performers") as? JsonArray)?.let(::parsePerformerRefs) ?: emptyList(),
