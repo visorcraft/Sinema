@@ -23,6 +23,13 @@ class SinemaApi(
     private var authMode: String = "apikey"
 ) {
 
+    companion object {
+        // Single source of truth for scene list payloads. Extended fields
+        // (tags/performers/etc.) will live in SCENE_FIELDS_FULL — see findSceneFull (planned, PLAN.md Task 1.4).
+        internal const val SCENE_FIELDS =
+            "id title play_count rating100 files { path size duration width height }"
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -64,6 +71,35 @@ class SinemaApi(
     // "-"-prefixed tokens as exclusions, so folder names like "Foo - Bar"
     // match nothing. Anchored MATCHES_REGEX matches the path literally.
     private fun pathPrefixRegex(path: String): String = "^${Regex.escape(path.trimEnd('/'))}/"
+
+    private suspend fun findScenesInternal(
+        page: Int = 1,
+        perPage: Int = 100,
+        sort: String = "path",
+        direction: String = "ASC",
+        searchTerm: String? = null,
+        sceneFilter: Map<String, Any?>? = null,
+        fields: String = SCENE_FIELDS
+    ): Pair<Int, List<Scene>> {
+        val query = """
+            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
+                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
+                    count
+                    scenes { $fields }
+                }
+            }
+        """.trimIndent()
+        val filter = mutableMapOf<String, Any?>(
+            "page" to page, "per_page" to perPage, "sort" to sort, "direction" to direction
+        )
+        if (searchTerm != null) filter["q"] = searchTerm
+        val result = graphql(query, mapOf("filter" to filter, "scene_filter" to sceneFilter))
+        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes")
+            ?: return Pair(0, emptyList())
+        val count = data.get("count").asInt
+        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+        return Pair(count, scenes)
+    }
 
     private suspend fun graphql(query: String, variables: Map<String, Any?> = emptyMap()): JsonObject {
         return withContext(Dispatchers.IO) {
@@ -148,50 +184,15 @@ class SinemaApi(
         }
     }
 
-    suspend fun findAllScenes(page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> {
-        val query = """
-            query(${"$"}filter: FindFilterType) {
-                findScenes(filter: ${"$"}filter) {
-                    count
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC")
-        )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data").getAsJsonObject("findScenes")
-        val count = data.get("count").asInt
-        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
-        return Pair(count, scenes)
-    }
+    suspend fun findAllScenes(page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
+        findScenesInternal(page = page, perPage = perPage)
 
-    suspend fun findScenesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> {
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
-                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
-                    count
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
-            "scene_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+    suspend fun findScenesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
+        findScenesInternal(
+            page = page,
+            perPage = perPage,
+            sceneFilter = mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
         )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data").getAsJsonObject("findScenes")
-        val count = data.get("count").asInt
-        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
-        return Pair(count, scenes)
-    }
 
     suspend fun findImagesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<ImageItem>> {
         val query = """
@@ -294,27 +295,8 @@ class SinemaApi(
         )
     }
 
-    suspend fun searchScenes(searchTerm: String, page: Int = 1, perPage: Int = 40): Pair<Int, List<Scene>> {
-        val query = """
-            query(${"$"}filter: FindFilterType) {
-                findScenes(filter: ${"$"}filter) {
-                    count
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("q" to searchTerm, "page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC")
-        )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data").getAsJsonObject("findScenes")
-        val count = data.get("count").asInt
-        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
-        return Pair(count, scenes)
-    }
+    suspend fun searchScenes(searchTerm: String, page: Int = 1, perPage: Int = 40): Pair<Int, List<Scene>> =
+        findScenesInternal(page = page, perPage = perPage, searchTerm = searchTerm)
 
     suspend fun setSceneRating(sceneId: String, rating: Int?): Boolean {
         val query = """
@@ -339,45 +321,16 @@ class SinemaApi(
         return if (scene.get("rating100")?.isJsonNull != false) null else scene.get("rating100").asInt
     }
 
-    suspend fun findFavoriteScenes(): List<Scene> {
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
-                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
-                    count
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("per_page" to 100, "sort" to "updated_at", "direction" to "DESC"),
-            "scene_filter" to mapOf("rating100" to mapOf("value" to 1, "modifier" to "GREATER_THAN"))
-        )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
-        return data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
-    }
+    suspend fun findFavoriteScenes(): List<Scene> =
+        findScenesInternal(
+            perPage = 100,
+            sort = "updated_at",
+            direction = "DESC",
+            sceneFilter = mapOf("rating100" to mapOf("value" to 1, "modifier" to "GREATER_THAN"))
+        ).second
 
-    suspend fun findRecentScenes(perPage: Int = 25): List<Scene> {
-        val query = """
-            query(${"$"}filter: FindFilterType) {
-                findScenes(filter: ${"$"}filter) {
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("per_page" to perPage, "sort" to "created_at", "direction" to "DESC")
-        )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
-        return data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
-    }
+    suspend fun findRecentScenes(perPage: Int = 25): List<Scene> =
+        findScenesInternal(perPage = perPage, sort = "created_at", direction = "DESC").second
 
     suspend fun findTopLevelFolders(): List<Pair<String, String>> {
         val idQuery = """
@@ -463,10 +416,7 @@ class SinemaApi(
         val query = """
             query(${"$"}ids: [Int!]) {
                 findScenes(scene_ids: ${"$"}ids, filter: { per_page: ${intIds.size} }) {
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
+                    scenes { $SCENE_FIELDS }
                 }
             }
         """.trimIndent()
@@ -507,37 +457,22 @@ class SinemaApi(
         graphql(query, mapOf("id" to sceneId))
     }
 
-    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> {
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
-                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
-                    scenes {
-                        id title play_count last_played_at resume_time rating100
-                        files { path size duration width height }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("per_page" to perPage, "sort" to "last_played_at", "direction" to "DESC"),
-            "scene_filter" to mapOf(
+    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> =
+        findScenesInternal(
+            perPage = perPage,
+            sort = "last_played_at",
+            direction = "DESC",
+            sceneFilter = mapOf(
                 "play_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN"),
                 "resume_time" to mapOf("value" to 0, "modifier" to "EQUALS")
             )
-        )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
-        return data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
-    }
+        ).second
 
     suspend fun findContinuePlaying(): List<Pair<Scene, Double>> {
         val query = """
             query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
                 findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
-                    scenes {
-                        id title resume_time play_count rating100
-                        files { path size duration width height }
-                    }
+                    scenes { $SCENE_FIELDS resume_time }
                 }
             }
         """.trimIndent()
@@ -609,28 +544,12 @@ class SinemaApi(
         return result.getAsJsonObject("data")?.getAsJsonObject("findScenes")?.get("count")?.asInt ?: 0
     }
 
-    suspend fun findScenesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<Scene>> {
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
-                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
-                    count
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
-            "scene_filter" to mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
+    suspend fun findScenesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<Scene>> =
+        findScenesInternal(
+            page = page,
+            perPage = perPage,
+            sceneFilter = mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
         )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return Pair(0, emptyList())
-        val count = data.get("count").asInt
-        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
-        return Pair(count, scenes)
-    }
 
     private fun parseScene(obj: JsonObject): Scene {
         val id = obj.get("id").asString
