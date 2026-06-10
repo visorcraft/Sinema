@@ -17,15 +17,8 @@ class FavoritesActivity : FragmentActivity() {
         }
     }
 
-    // MENU-key opens the sort picker; on-device fallback (remotes lacking MENU) is deferred.
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SceneGridFragment)
-                ?.showSortDialog()
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
+        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 }
 
 class FavoritesGridFragment : SceneGridFragment() {

@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * Shared vertical-grid screen: overscan padding, card presenter, click-to-detail,
  * and error handling. Subclasses provide a title and an item loader.
  */
-abstract class SceneGridFragment : VerticalGridSupportFragment() {
+abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen {
     protected val app get() = SinemaApp.instance
     protected lateinit var gridAdapter: ArrayObjectAdapter
 
@@ -38,7 +38,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment() {
     protected val randomSeed: Int = (0..99_999_999).random()
     private var loadJob: Job? = null
 
-    fun showSortDialog() {
+    override fun showSortDialog() {
         val key = sortScreenKey ?: return
         SortDialog.show(requireContext(), sort) { chosen ->
             sort = chosen
