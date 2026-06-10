@@ -702,7 +702,7 @@ override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
 **Files:**
 - Modify: `app/src/main/java/com/sinema/ui/CardPresenter.kt`
 
-- [ ] **Step 1: Read `CardPresenter.kt` fully first** (it already renders `Scene`, and folder items). Add an `is EntityItem ->` branch in `onBindViewHolder`: title = `item.name`, content = `"${item.sceneCount} scenes"`, image = `item.imagePath` loaded through the existing authenticated Glide path (`GlideAuth.url(api, item.imagePath)`) with a neutral placeholder drawable when `imagePath == null`. Follow the file's existing binding style exactly.
+- [ ] **Step 1: Read `CardPresenter.kt` fully first** (it already renders `Scene`, and folder items). Add an `is EntityItem ->` branch in `onBindViewHolder`: title = `item.name`, content = `"${item.sceneCount} scene(s)"` (pluralized like the folder-card counts), image = `item.imagePath` loaded through the existing authenticated Glide path (`GlideAuth.url(api, item.imagePath)`) with a neutral placeholder drawable when `imagePath == null`. Follow the file's existing binding style exactly.
 
 - [ ] **Step 2: Build green. Commit** — `feat: render tag/performer/studio cards in CardPresenter`
 

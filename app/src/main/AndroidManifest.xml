@@ -80,5 +80,13 @@
             android:screenOrientation="landscape"
             android:theme="@style/Theme.Sinema" />
 
+        <activity
+            android:name=".ui.EntityGridActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.EntityScenesActivity"
+            android:screenOrientation="landscape" />
+
     </application>
 </manifest>

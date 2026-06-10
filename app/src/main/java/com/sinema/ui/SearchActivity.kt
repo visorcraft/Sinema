@@ -29,18 +29,11 @@ class SearchActivity : FragmentActivity() {
         }
     }
 
-    // MENU-key opens the sort picker; on-device fallback (remotes lacking MENU) is deferred.
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SinemaSearchFragment)
-                ?.showSortDialog()
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
+        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 }
 
-class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.SearchResultProvider {
+class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.SearchResultProvider, SortableScreen {
     private val app get() = SinemaApp.instance
     private lateinit var rowsAdapter: ArrayObjectAdapter
     private var searchJob: Job? = null
@@ -49,7 +42,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private val randomSeed: Int = (0..99_999_999).random()
     private var currentQuery: String = ""
 
-    fun showSortDialog() {
+    override fun showSortDialog() {
         SortDialog.show(requireContext(), sort) { chosen ->
             sort = chosen
             app.prefs.setSortFor("search", chosen.name)
