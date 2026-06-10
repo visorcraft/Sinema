@@ -14,7 +14,7 @@
 
 - [x] **Phase 0** — Foundations: de-duplication groundwork & shared helpers
 - [x] **Phase 1** — API & model groundwork (metadata, entities, sort plumbing, full-scene query)
-- [ ] **Phase 2** — Sort pickers on grids
+- [x] **Phase 2** — Sort pickers on grids
 - [ ] **Phase 3** — Tag / Performer / Studio browsing
 - [ ] **Phase 4** — Scene detail metadata (chips, rating, date) → **Release v1.11.0**
 - [ ] **Phase 5** — Player: subtitles, audio tracks, playback speed
@@ -608,7 +608,7 @@ fun getCaptionUrl(sceneId: String, c: CaptionRef): String =
 **Files:**
 - Create: `app/src/main/java/com/sinema/ui/SortDialog.kt`
 
-- [ ] **Step 1: Implement** (AlertDialog single-choice is fully D-pad navigable on TV):
+- [x] **Step 1: Implement** (AlertDialog single-choice is fully D-pad navigable on TV):
 
 ```kotlin
 package com.sinema.ui
@@ -634,7 +634,7 @@ object SortDialog {
 }
 ```
 
-- [ ] **Step 2: Commit** — `feat: add reusable D-pad sort dialog`
+- [x] **Step 2: Commit** — `feat: add reusable D-pad sort dialog`
 
 ### Task 2.2: Wire sorting into `SceneGridFragment` and its screens
 
@@ -644,7 +644,7 @@ object SortDialog {
 - Modify: `app/src/main/java/com/sinema/ui/FolderBrowseActivity.kt`
 - Modify: `app/src/main/java/com/sinema/ui/SearchActivity.kt`
 
-- [ ] **Step 1: Add sort state to the base fragment.** `SceneGridFragment` gains:
+- [x] **Step 1: Add sort state to the base fragment.** `SceneGridFragment` gains:
 
 ```kotlin
 /** Prefs key for persisting this screen's sort; null = screen is not sortable. */
@@ -664,7 +664,7 @@ fun showSortDialog() {
 
 Initialize in `onCreate` (before `reload()`): `sort = SortOption.fromName(app.prefs.sortFor(sortScreenKey ?: ""))`. Update the grid `title` to show the active sort, e.g. `"$gridTitle  •  ${sort.label}"`, refreshed on change.
 
-- [ ] **Step 2: Open the dialog from the remote's MENU key.** In each host activity (Favorites first):
+- [x] **Step 2: Open the dialog from the remote's MENU key.** In each host activity (Favorites first):
 
 ```kotlin
 override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -679,17 +679,17 @@ override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
 
 **Remote caveat:** verify the G08 remote has a MENU key during the smoke test. If not, also trigger on long-press of DPAD_CENTER on the grid title row, or add a "Sort" first-card item to the grid — decide on-device, implement one fallback, and note the choice in the commit message.
 
-- [ ] **Step 3: Pass sort through to the API.** `FavoritesGridFragment.loadItems()` switches from `findFavoriteScenes()` to a sorted variant: add `sort`/`direction` params to `findFavoriteScenes` (delegating via `findScenesInternal`, favorite filter preserved) and call `app.api.findFavoriteScenes(sort = sort.apiSort(randomSeed), direction = sort.direction)`. Same pattern for `FolderBrowseActivity`'s scene loading (`findScenesInFolderDirect`) and `SearchActivity` (`searchScenes`). Screen keys: `"favorites"`, `"folder"`, `"search"`.
+- [x] **Step 3: Pass sort through to the API.** `FavoritesGridFragment.loadItems()` switches from `findFavoriteScenes()` to a sorted variant: add `sort`/`direction` params to `findFavoriteScenes` (delegating via `findScenesInternal`, favorite filter preserved) and call `app.api.findFavoriteScenes(sort = sort.apiSort(randomSeed), direction = sort.direction)`. Same pattern for `FolderBrowseActivity`'s scene loading (`findScenesInFolderDirect`) and `SearchActivity` (`searchScenes`). Screen keys: `"favorites"`, `"folder"`, `"search"`.
 
-- [ ] **Step 4: Sideload + verify on TV:** change sort on Favorites → order changes and survives app restart; Random gives a stable order while paging but reshuffles next visit; Search results sortable.
+- [x] **Step 4: Sideload + verify on TV:** change sort on Favorites → order changes and survives app restart; Random gives a stable order while paging but reshuffles next visit; Search results sortable.
 
-- [ ] **Step 5: Commit** — `feat: per-screen sort picker on Favorites, folder browse, and search`
+- [x] **Step 5: Commit** — `feat: per-screen sort picker on Favorites, folder browse, and search`
 
 ### Phase 2 Close-out
 
-- [ ] **Refactor Pass** — sort wiring must live ONCE in `SceneGridFragment`/`SortDialog`; host activities only forward the key event.
-- [ ] **Close-out** checklist. Manual smoke: each sortable screen × at least 3 sort options.
-- [ ] **Review Gate.**
+- [x] **Refactor Pass** — sort wiring must live ONCE in `SceneGridFragment`/`SortDialog`; host activities only forward the key event.
+- [x] **Close-out** checklist. Manual smoke: each sortable screen × at least 3 sort options.
+- [x] **Review Gate.**
 
 ---
 
