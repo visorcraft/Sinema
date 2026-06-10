@@ -9,10 +9,12 @@
 # workflow is safe against injection from PR titles, branch names,
 # or commit messages.
 #
-# Sinema's release build is currently debug-signed (see
-# app/build.gradle.kts and SECURITY.md). The APK still installs via
-# ADB sideload; users who need a verifiable signature should build
-# from source with their own keystore.
+# Sinema's release build is debug-signed (see app/build.gradle.kts and
+# SECURITY.md). The signing keystore is held as a stable repository
+# secret (SINEMA_KEYSTORE_B64) so every release shares one signature —
+# this lets users update in place (adb install -r / the in-app updater)
+# without uninstalling. Users who need a verifiable signature should
+# build from source with their own keystore.
 
 name: release
 
@@ -73,12 +75,20 @@ jobs:
           printf 'version=%s\n' "$workspace_version" >> "$GITHUB_OUTPUT"
           echo "Building Sinema ${workspace_version} from tag ${TAG}"
 
-      - name: Generate debug keystore
+      - name: Restore signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.SINEMA_KEYSTORE_B64 }}
         run: |
-          keytool -genkey -v -keystore debug.keystore \
-            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US"
+          if [[ -z "$KEYSTORE_B64" ]]; then
+            echo "SINEMA_KEYSTORE_B64 secret is not set" >&2
+            exit 1
+          fi
+          # Stable keystore (storepass/keypass = android, alias
+          # androiddebugkey) shared by every release so installs update
+          # in place. See app/build.gradle.kts signingConfigs.debug.
+          printf '%s' "$KEYSTORE_B64" | base64 -d > debug.keystore
+          keytool -list -keystore debug.keystore -storepass android \
+            -alias androiddebugkey >/dev/null
 
       - name: Run lint (release variant)
         run: ./gradlew lintRelease --no-daemon
