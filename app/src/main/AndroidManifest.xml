@@ -88,6 +88,15 @@
             android:name=".ui.EntityScenesActivity"
             android:screenOrientation="landscape" />
 
+        <receiver
+            android:name=".util.TvChannelInitReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="androidx.tvprovider.media.tv.INITIALIZE_PROGRAMS" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".ui.DeepLinkActivity"
             android:exported="true"

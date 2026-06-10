@@ -221,6 +221,12 @@ class MainFragment : RowsSupportFragment() {
 
                 Log.d("Sinema", "Rows loaded: ${rowsAdapter.size()}")
 
+                // Sync TV channels (fire-and-forget on appScope)
+                app.appScope.launch {
+                    com.sinema.util.TvChannels.syncWatchNext(requireContext(), continuePairs)
+                    com.sinema.util.TvChannels.syncRecentlyAdded(requireContext(), recentScenes)
+                }
+
             } catch (e: Exception) {
                 Log.e("Sinema", "loadContent failed", e)
                 val message = e.message ?: "Unknown error"

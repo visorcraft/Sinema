@@ -29,6 +29,12 @@ class DeepLinkActivity : ComponentActivity() {
         val app = SinemaApp.instance
         val prefs = app.prefs
 
+        if (!prefs.isConfigured) {
+            startActivity(Intent(this, SetupActivity::class.java))
+            finish()
+            return
+        }
+
         if (prefs.hasPinSet() && !app.pinVerifiedThisSession) {
             pinLauncher.launch(Intent(this, PinActivity::class.java))
             return
