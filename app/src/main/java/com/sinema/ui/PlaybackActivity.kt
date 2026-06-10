@@ -96,6 +96,11 @@ class PlaybackActivity : FragmentActivity() {
                 if (shouldIncrement) {
                     app.api.incrementPlayCount(sceneId)
                 }
+                // Refresh Watch Next after saving playback state
+                if (resumeTimeSec > 0) {
+                    val continuePairs = app.api.findContinuePlaying()
+                    com.sinema.util.TvChannels.syncWatchNext(this@PlaybackActivity, continuePairs)
+                }
             } catch (e: Exception) {
                 android.util.Log.e("Sinema", "Failed to save playback state", e)
             }

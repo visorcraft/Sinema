@@ -2,30 +2,71 @@
 > build · k2p6
 [0m
 [0m→ [0mRead _review_diff.txt
-[0m→ [0mRead app/src/main/java/com/sinema/ui/DeepLinkActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/TvChannels.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/TvChannelInitReceiver.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/MainActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/PlaybackActivity.kt
 [0m→ [0mRead app/src/main/java/com/sinema/ui/SettingsActivity.kt
-[0m→ [0mRead app/src/main/java/com/sinema/util/Prefs.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/DeepLinkActivity.kt
 [0m→ [0mRead app/src/main/AndroidManifest.xml
-[0m→ [0mRead app/build.gradle.kts
-**Code Review Findings:**
+[0m✱ [0mGrep "class SinemaApp|object SinemaApp"[90m 1 match[0m
+[0m✱ [0mGrep "class Prefs|object Prefs|data class Prefs"[90m 1 match[0m
+[0m✱ [0mGrep "class PinActivity"[90m 1 match[0m
+[0m✱ [0mGrep "class SceneIntents|object SceneIntents"[90m 1 match[0m
+[0m→ [0mRead app/src/main/java/com/sinema/SinemaApp.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/Prefs.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/PinActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/SceneIntents.kt
+[0m✱ [0mGrep "class SinemaApi|object SinemaApi|fun getStreamUrl|fun getCaptionUrl|fun getScreenshotUrl|fun artworkUri"[90m 6 matches[0m
+[0m→ [0mRead app/src/main/java/com/sinema/api/SinemaApi.kt[90m [limit=100][0m
+[0m→ [0mRead app/src/main/java/com/sinema/api/SinemaApi.kt[90m [offset=720, limit=30][0m
+## Review Findings
 
-1. **build.gradle.kts:31** — `signingConfig = signingConfigs.getByName("debug")` in the release build type. Release APKs are signed with the debug keystore, which is a security issue and prevents Play Store distribution.
+### Security
 
-2. **build.gradle.kts:29** — `isMinifyEnabled = false` in release builds. Anti-pattern; release builds should enable code shrinking for security (harder to reverse engineer) and smaller APK size.
+1. **API key leaked in TV provider artwork URI** — `TvChannels.kt:163`
+   - `artworkUri()` appends `?apikey=${app.prefs.apiKey}` to the screenshot URL and passes it to `setPosterArtUri()`. The URI is persisted in the Android TV provider database and consumed by the system launcher. System logs, crash dumps, or any app with `READ_TV_LISTINGS` can observe this URI and extract the API key. **Fix:** download the bitmap inside the app and publish a local `content://` URI, or use a custom ContentProvider that injects auth headers dynamically.
 
-3. **DeepLinkActivity.kt:93-94** — `details != null` is checked but `details.scene` is not null-checked before passing to `SceneIntents.detail()`. Potential NPE if the API returns a details object with a null scene.
+2. **Exported receiver triggers network requests without sender validation** — `AndroidManifest.xml:91-98`, `TvChannelInitReceiver.kt:15`
+   - `TvChannelInitReceiver` is `exported="true"` and performs authenticated API calls (`findContinuePlaying`, `findRecentScenes`) when any app sends `INITIALIZE_PROGRAMS`. This allows third-party apps to force network egress to the user's Stash server and potentially observe timing side-channels. **Fix:** verify the broadcast sender is the system/package installer, or use `android:permission` on the receiver.
 
-4. **DeepLinkActivity.kt:96-105** — Toasts are used for error feedback on Android TV. Toasts are poor TV UX (small text, may overlap with system UI, easily missed). Consider a dialog, Snackbar, or silent failure with logging.
+### Bugs
 
-5. **SettingsActivity.kt:206-225** — The "Android TV Channels" toggle only persists a boolean preference and shows a Toast. It never actually calls `TvContract` or `androidx.tvprovider` APIs to create/remove channels. The added `tvprovider` dependency is unused; the feature is non-functional.
+3. **Settings loses API key if field is hidden before saving** — `SettingsActivity.kt:240-242`
+   - `app.prefs.apiKey` is only updated when `apiKeyEdit.visibility == View.VISIBLE`. If a user reveals the field, edits the key, clicks "Hide API Key" (sets visibility `GONE`), then taps "Save Settings", the new key is discarded. **Fix:** always save the EditText value regardless of visibility.
 
-6. **AndroidManifest.xml:92-102** — `DeepLinkActivity` uses `Theme.NoDisplay` as a trampoline but lacks `android:noHistory="true"`. If the process dies before `finish()` executes (crash, low memory), the invisible activity could remain in the back stack.
+4. **WatchNextProgram uses wrong builder method for type** — `TvChannels.kt:41`
+   - `WatchNextProgram.Builder.setType(0)` sets the *content* type, not the *watch-next* type. The correct call is `setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)`. Without this, the home screen may not categorize the item correctly.
 
-7. **SettingsActivity.kt:218** — Toast used for channel toggle feedback. Same TV UX concern as #4.
+5. **Unfiltered deletion of all Watch Next entries** — `TvChannels.kt:31-35`, `TvChannels.kt:100-109`
+   - `syncWatchNext()` and `clearAll()` query `WatchNextPrograms.CONTENT_URI` with no `selection` filter, then delete every row returned. While the TV provider typically restricts deletion to the owning app, relying on system-side enforcement is fragile and non-idiomatic. **Fix:** filter by `COLUMN_INTERNAL_PROVIDER_ID` or a app-specific flag.
 
-**Minor:**
-- `Prefs.kt:45-47` — `channelsEnabled` is clean Kotlin but unused outside the preference layer.
-- `DeepLinkActivity.kt:44` — Good use of `removePrefix` + `takeIf` idiom.
-- `Prefs.kt:14` — Correct use of `applicationContext` to prevent memory leaks.
+6. **DeepLinkActivity fails cryptically when app is unconfigured** — `DeepLinkActivity.kt:29-38`
+   - If the app has never been set up (`!prefs.isConfigured`), `resolveDeepLink()` still fires a network request that will 401/IO fail. It should redirect to `SetupActivity` instead.
 
-VERDICT approved issues=7
+### Anti-patterns / Android Best Practices
+
+7. **Magic numbers for program type constants** — `TvChannels.kt:41`, `TvChannels.kt:84`
+   - Uses `setType(0)` with comments instead of `TvContractCompat.PreviewProgramColumns.TYPE_MOVIE` and `TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE`.
+
+8. **BroadcastReceiver long-running I/O without `goAsync()`** — `TvChannelInitReceiver.kt:19`
+   - On API 26+, `onReceive` must return quickly. Background coroutines are started, but the framework may kill the process before they complete. Use `goAsync()` (and its `PendingResult`) to keep the process alive.
+
+9. **Redundant `savePlayback()` on playback end** — `PlaybackActivity.kt:51`, `PlaybackActivity.kt:149`
+   - `onPause()` calls `savePlayback()`. When the video ends, `onPlaybackStateChanged(STATE_ENDED)` also calls it. `playCountSent` prevents double-counting, but the scene activity is still saved twice.
+
+### TV UX / Missing Edge Cases
+
+10. **No artwork for session-based authentication** — `TvChannels.kt:162-167`
+    - `artworkUri()` returns `null` when `authMode != "apikey"`. Session-auth users see no thumbnails in channels. There is no mechanism to pass cookies through the TV provider URI.
+
+11. **Bitmap decoded at full resolution without scaling** — `TvChannels.kt:146`
+    - `BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)` loads the full drawable. On low-memory TV devices this could OOM if the launcher icon is large. **Fix:** use `BitmapFactory.Options` with `inSampleSize` or target size.
+
+### PIN-bypass Surface Check
+- `MainActivity.kt:39-43` correctly gates on `hasPinSet() && !pinVerifiedThisSession`.
+- `DeepLinkActivity.kt:32-35` correctly enforces PIN before resolving.
+- `PinActivity.kt:214-221` correctly blocks back-button bypass in `VERIFY` mode.
+- Channel deep links route through `DeepLinkActivity`, so no PIN bypass was found in the reviewed code.
+
+VERDICT approved issues=11

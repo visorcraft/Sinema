@@ -215,6 +215,9 @@ class SettingsFragment : Fragment() {
                     val newState = !app.prefs.channelsEnabled
                     app.prefs.channelsEnabled = newState
                     this.text = if (newState) "Android TV Channels: ON" else "Android TV Channels: OFF"
+                    if (!newState) {
+                        com.sinema.util.TvChannels.clearAll(ctx)
+                    }
                     Toast.makeText(ctx, "Channels ${if (newState) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
                 }
             }

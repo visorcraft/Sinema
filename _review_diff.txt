@@ -1,162 +1,200 @@
-app/build.gradle.kts                               |  1 +
- app/src/main/AndroidManifest.xml                   | 13 ++++
- .../main/java/com/sinema/ui/DeepLinkActivity.kt    | 73 ++++++++++++++++++++++
- .../main/java/com/sinema/ui/SettingsActivity.kt    | 23 +++++++
- app/src/main/java/com/sinema/util/Prefs.kt         |  9 ++-
- 5 files changed, 117 insertions(+), 2 deletions(-)
+app/src/main/AndroidManifest.xml                   |   9 ++
+ app/src/main/java/com/sinema/ui/MainActivity.kt    |   6 +
+ .../main/java/com/sinema/ui/PlaybackActivity.kt    |   5 +
+ .../main/java/com/sinema/ui/SettingsActivity.kt    |   3 +
+ .../java/com/sinema/util/TvChannelInitReceiver.kt  |  30 ++++
+ app/src/main/java/com/sinema/util/TvChannels.kt    | 169 +++++++++++++++++++++
+ 6 files changed, 222 insertions(+)
 
 --- Changes ---
 
-app/build.gradle.kts
-  @@ -69,6 +69,7 @@ dependencies {
-  +    implementation("androidx.tvprovider:tvprovider:1.0.0")
-   
-       testImplementation("junit:junit:4.13.2")
-   }
-  +1 -0
-
 app/src/main/AndroidManifest.xml
-  @@ -88,5 +88,18 @@
-  +        <activity
-  +            android:name=".ui.DeepLinkActivity"
+  @@ -88,6 +88,15 @@
+  +        <receiver
+  +            android:name=".util.TvChannelInitReceiver"
   +            android:exported="true"
-  +            android:screenOrientation="landscape"
-  +            android:theme="@android:style/Theme.NoDisplay" >
+  +            android:enabled="true">
   +            <intent-filter>
-  +                <action android:name="android.intent.action.VIEW" />
-  +                <category android:name="android.intent.category.DEFAULT" />
-  +                <category android:name="android.intent.category.BROWSABLE" />
-  +                <data android:scheme="com.sinema" android:host="app" android:pathPrefix="/scene/" />
+  +                <action android:name="androidx.tvprovider.media.tv.INITIALIZE_PROGRAMS" />
   +            </intent-filter>
-  +        </activity>
+  +        </receiver>
   +
-       </application>
-   </manifest>
-  +13 -0
+           <activity
+               android:name=".ui.DeepLinkActivity"
+               android:exported="true"
+  +9 -0
 
-app/src/main/java/com/sinema/ui/DeepLinkActivity.kt
-  @@ -0,0 +1,73 @@
-  +package com.sinema.ui
+app/src/main/java/com/sinema/ui/MainActivity.kt
+  @@ -221,6 +221,12 @@ class MainFragment : RowsSupportFragment() {
+  +                // Sync TV channels (fire-and-forget on appScope)
+  +                app.appScope.launch {
+  +                    com.sinema.util.TvChannels.syncWatchNext(requireContext(), continuePairs)
+  +                    com.sinema.util.TvChannels.syncRecentlyAdded(requireContext(), recentScenes)
+  +                }
   +
-  +import android.app.Activity
+               } catch (e: Exception) {
+                   Log.e("Sinema", "loadContent failed", e)
+                   val message = e.message ?: "Unknown error"
+  +6 -0
+
+app/src/main/java/com/sinema/ui/PlaybackActivity.kt
+  @@ -96,6 +96,11 @@ class PlaybackActivity : FragmentActivity() {
+  +                // Refresh Watch Next after saving playback state
+  +                if (resumeTimeSec > 0) {
+  +                    val continuePairs = app.api.findContinuePlaying()
+  +                    com.sinema.util.TvChannels.syncWatchNext(this@PlaybackActivity, continuePairs)
+  +                }
+               } catch (e: Exception) {
+                   android.util.Log.e("Sinema", "Failed to save playback state", e)
+               }
+  +5 -0
+
+app/src/main/java/com/sinema/ui/SettingsActivity.kt
+  @@ -215,6 +215,9 @@ class SettingsFragment : Fragment() {
+  +                    if (!newState) {
+  +                        com.sinema.util.TvChannels.clearAll(ctx)
+  +                    }
+                       Toast.makeText(ctx, "Channels ${if (newState) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
+                   }
+               }
+  +3 -0
+
+app/src/main/java/com/sinema/util/TvChannelInitReceiver.kt
+  @@ -0,0 +1,30 @@
+  +package com.sinema.util
+  +
+  +import android.content.BroadcastReceiver
+  +import android.content.Context
   +import android.content.Intent
-  +import android.os.Bundle
-  +import android.util.Log
-  +import android.widget.Toast
-  +import androidx.activity.ComponentActivity
-  +import androidx.activity.result.contract.ActivityResultContracts
-  +import androidx.lifecycle.lifecycleScope
   +import com.sinema.SinemaApp
-  +import com.sinema.util.SceneIntents
-  +import kotlinx.coroutines.CancellationException
+  +import kotlinx.coroutines.CoroutineScope
+  +import kotlinx.coroutines.Dispatchers
+  +import kotlinx.coroutines.SupervisorJob
   +import kotlinx.coroutines.launch
   +
-  +class DeepLinkActivity : ComponentActivity() {
-  +    private val pinLauncher = registerForActivityResult(
-  +        ActivityResultContracts.StartActivityForResult()
-  +    ) { result ->
-  +        if (result.resultCode == Activity.RESULT_OK) {
-  +            resolveDeepLink()
-  +        } else {
-  +            finish()
-  +        }
-  +    }
+  +class TvChannelInitReceiver : BroadcastReceiver() {
+  +    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   +
-  +    override fun onCreate(savedInstanceState: Bundle?) {
-  +        super.onCreate(savedInstanceState)
+  +    override fun onReceive(context: Context, intent: Intent?) {
+  +        if (intent?.action != androidx.tvprovider.media.tv.TvContractCompat.ACTION_INITIALIZE_PROGRAMS) return
   +        val app = SinemaApp.instance
-  +        val prefs = app.prefs
-  +
-  +        if (prefs.hasPinSet() && !app.pinVerifiedThisSession) {
-  +            pinLauncher.launch(Intent(this, PinActivity::class.java))
-  +            return
-  +        }
-  +
-  +        resolveDeepLink()
-  +    }
-  +
-  +    private fun resolveDeepLink() {
-  +        if (isFinishing) return
-  +
-  +        val path = intent?.data?.path
-  +        val sceneId = path?.removePrefix("/scene/")?.takeIf { it.isNotBlank() && "/" !in it }
-  +        if (sceneId.isNullOrBlank()) {
-  +            finish()
-  +            return
-  +        }
-  +
-  +        lifecycleScope.launch {
-  +            if (isFinishing || isDestroyed) return@launch
+  +        if (!app.prefs.channelsEnabled) return
+  +        scope.launch {
   +            try {
-  +                val details = SinemaApp.instance.api.findSceneFull(sceneId)
-  +                if (isFinishing || isDestroyed) return@launch
-  +                if (details != null) {
-  +                    startActivity(SceneIntents.detail(this@DeepLinkActivity, details.scene))
-  +                } else {
-  +                    Toast.makeText(this@DeepLinkActivity, "Scene not found", Toast.LENGTH_SHORT).show()
-  +                }
-  +            } catch (e: java.io.IOException) {
-  +                Log.e("Sinema", "Deep link network error", e)
-  +                Toast.makeText(this@DeepLinkActivity, "Network error", Toast.LENGTH_SHORT).show()
-  +            } catch (e: CancellationException) {
-  +                throw e
+  +                val continuePairs = app.api.findContinuePlaying()
+  +                TvChannels.syncWatchNext(context, continuePairs)
+  +                val recentScenes = app.api.findRecentScenes(20)
+  +                TvChannels.syncRecentlyAdded(context, recentScenes)
   +            } catch (e: Exception) {
-  +                Log.e("Sinema", "Deep link failed", e)
-  +                Toast.makeText(this@DeepLinkActivity, "Error loading scene", Toast.LENGTH_SHORT).show()
-  +            } finally {
-  +                finish()
+  +                android.util.Log.e("Sinema", "TV channel init sync failed", e)
   +            }
   +        }
   +    }
   +}
-  +73 -0
+  +30 -0
 
-app/src/main/java/com/sinema/ui/SettingsActivity.kt
-  @@ -201,6 +201,29 @@ class SettingsFragment : Fragment() {
-  +        val pm = ctx.packageManager
-  +        if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
-  +            val channelsToggle = Button(ctx).apply {
-  +                text = if (app.prefs.channelsEnabled) "Android TV Channels: ON" else "Android TV Channels: OFF"
-  +                isFocusable = true
-  +                setBackgroundColor(0xFF333333.toInt())
-  +                setTextColor(0xFFFFFFFF.toInt())
-  +                setOnFocusChangeListener { _, hasFocus ->
-  +                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-  +                }
-  +                setOnClickListener {
-  +                    val newState = !app.prefs.channelsEnabled
-  +                    app.prefs.channelsEnabled = newState
-  +                    this.text = if (newState) "Android TV Channels: ON" else "Android TV Channels: OFF"
-  +                    Toast.makeText(ctx, "Channels ${if (newState) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
+app/src/main/java/com/sinema/util/TvChannels.kt
+  @@ -0,0 +1,169 @@
+  +package com.sinema.util
+  +
+  +import android.content.ContentUris
+  +import android.content.Context
+  +import android.database.Cursor
+  +import android.graphics.BitmapFactory
+  +import android.net.Uri
+  +import android.provider.BaseColumns
+  +import android.util.Log
+  +import androidx.tvprovider.media.tv.PreviewChannel
+  +import androidx.tvprovider.media.tv.PreviewChannelHelper
+  +import androidx.tvprovider.media.tv.PreviewProgram
+  +import androidx.tvprovider.media.tv.TvContractCompat
+  +import androidx.tvprovider.media.tv.WatchNextProgram
+  +import com.sinema.R
+  +import com.sinema.SinemaApp
+  +import com.sinema.model.Scene
+  +
+  +object TvChannels {
+  +    private const val CHANNEL_NAME = "Sinema — Recently Added"
+  +    private const val MAX_WATCH_NEXT = 10
+  +    private const val MAX_RECENT = 20
+  +
+  +    fun syncWatchNext(context: Context, continuePairs: List<Pair<Scene, Double>>) {
+  +        val app = SinemaApp.instance
+  +        if (!app.prefs.channelsEnabled) return
+  +        try {
+  +            val helper = PreviewChannelHelper(context)
+  +            val resolver = context.contentResolver
+  +            val uri = TvContractCompat.WatchNextPrograms.CONTENT_URI
+  +            resolver.query(uri, null, null, null, null)?.use { c: Cursor ->
+  +                while (c.moveToNext()) {
+  +                    val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
+  +                    resolver.delete(ContentUris.withAppendedId(uri, id), null, null)
   +                }
   +            }
-  +            layout.addView(channelsToggle, LinearLayout.LayoutParams(
-  +                LinearLayout.LayoutParams.MATCH_PARENT,
-  +                LinearLayout.LayoutParams.WRAP_CONTENT
-  +            ).apply { topMargin = 16 })
+  +
+  +            continuePairs.take(MAX_WATCH_NEXT).forEach { (scene, resumeSec) ->
+  +                val intentUri = Uri.parse("com.sinema://app/scene/${scene.id}")
+  +                val builder = WatchNextProgram.Builder()
+  +                    .setType(0) // WATCH_NEXT_TYPE_CONTINUE
+  +                    .setTitle(scene.title)
+  +                    .setDurationMillis((scene.duration * 1000).toInt())
+  +                    .setLastPlaybackPositionMillis((resumeSec * 1000).toInt())
+  +                    .setIntentUri(intentUri)
+  +                    .setInternalProviderId(scene.id)
+  +
+  +                val artwork = artworkUri(app, scene)
+  +                if (artwork != null) builder.setPosterArtUri(artwork)
+  +
+  +                helper.publishWatchNextProgram(builder.build())
+  +            }
+  +        } catch (e: Exception) {
+  +            Log.e("Sinema", "Failed to sync Watch Next", e)
   +        }
+  +    }
   +
-           val saveBtn = Button(ctx).apply {
-               text = "Save Settings"
-               isFocusable = true
-  +23 -0
-
-app/src/main/java/com/sinema/util/Prefs.kt
-  @@ -11,8 +11,9 @@ import java.security.MessageDigest
-  -    private val prefs: SharedPreferences = context.getSharedPreferences("sinema", Context.MODE_PRIVATE)
-  -    private val securePrefs: SharedPreferences? = createSecurePrefs(context)
-  +    private val appContext = context.applicationContext
-  +    private val prefs: SharedPreferences = appContext.getSharedPreferences("sinema", Context.MODE_PRIVATE)
-  +    private val securePrefs: SharedPreferences? = createSecurePrefs(appContext)
-       private val gson = Gson()
-   
-       var serverUrl: String
-  @@ -41,6 +42,10 @@ class Prefs(context: Context) {
-  +    var channelsEnabled: Boolean
-  +        get() = prefs.getBoolean("channels_enabled", false)
-  +        set(value) = prefs.edit().putBoolean("channels_enabled", value).apply()
+  +    fun syncRecentlyAdded(context: Context, scenes: List<Scene>) {
+  +        val app = SinemaApp.instance
+  +        if (!app.prefs.channelsEnabled) return
+  +        try {
+  +            val helper = PreviewChannelHelper(context)
+  +            val channelUri = findOrCreateChannel(context, helper)
+  +            if (channelUri == null) {
+  +                Log.w("Sinema", "Could not create/find channel")
+  +                return
+  +            }
   +
-       val isConfigured: Boolean
-           get() = apiKey.isNotBlank() || sessionCookie.isNotBlank()
-   
-  +7 -2
+  +            val channelId = ContentUris.parseId(channelUri)
+  +            val resolver = context.contentResolver
+  +            val programsUri = TvContractCompat.buildPreviewProgramsUriForChannel(channelId)
+  +
+  +            resolver.query(programsUri, null, null, null, null)?.use { c: Cursor ->
+  +                while (c.moveToNext()) {
+  +                    val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
+  +                    resolver.delete(ContentUris.withAppendedId(programsUri, id), null, null)
+  +                }
+  +            }
+  +
+  +            scenes.take(MAX_RECENT).forEach { scene ->
+  +                val intentUri = Uri.parse("com.sinema://app/scene/${scene.id}")
+  +                val builder = PreviewProgram.Builder()
+  +                    .setChannelId(channelId)
+  +                    .setType(0) // TYPE_MOVIE
+  +                    .setTitle(scene.title)
+  +                    .setDurationMillis((scene.duration * 1000).toInt())
+  +                    .setIntentUri(intentUri)
+  +                    .setInternalProviderId(scene.id)
+  +
+  +                val artwork = artworkUri(app, scene)
+  +                if (artwork != null) builder.setPosterArtUri(artwork)
+  +
+  +                helper.publishPreviewProgram(builder.build())
+  +            }
+  +        } catch (e: Exception) {
+  +            Log.e("Sinema", "Failed to sync Recently Added channel", e)
+  +        }
+  +    }
+  +
+  +    fun clearAll(context: Context) {
+  ... (69 lines truncated)
+  +169 -0
+[full diff: rtk git diff --no-compact]
