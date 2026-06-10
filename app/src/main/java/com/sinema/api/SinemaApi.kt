@@ -7,6 +7,7 @@ import com.sinema.model.ImageItem
 import com.sinema.model.Scene
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Dispatcher
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -25,6 +26,12 @@ class SinemaApi(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        // Folder browsing fans out many small queries; the default
+        // per-host cap of 5 serializes them into a long stall.
+        .dispatcher(Dispatcher().apply {
+            maxRequests = 24
+            maxRequestsPerHost = 12
+        })
         .build()
     private val gson = Gson()
 
