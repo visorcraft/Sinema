@@ -13,7 +13,7 @@
 ## Progress Overview
 
 - [x] **Phase 0** — Foundations: de-duplication groundwork & shared helpers
-- [ ] **Phase 1** — API & model groundwork (metadata, entities, sort plumbing, full-scene query)
+- [x] **Phase 1** — API & model groundwork (metadata, entities, sort plumbing, full-scene query)
 - [ ] **Phase 2** — Sort pickers on grids
 - [ ] **Phase 3** — Tag / Performer / Studio browsing
 - [ ] **Phase 4** — Scene detail metadata (chips, rating, date) → **Release v1.11.0**
@@ -362,7 +362,7 @@ private suspend fun findScenesInternal(
 **Files:**
 - Modify: `app/src/main/java/com/sinema/model/Models.kt`
 
-- [ ] **Step 1: Add reference types and extend `Scene` with defaulted fields** (no call-site breakage):
+- [x] **Step 1: Add reference types and extend `Scene` with defaulted fields** (no call-site breakage):
 
 ```kotlin
 data class TagRef(val id: String, val name: String)
@@ -392,7 +392,7 @@ data class SceneDetails(
 
 `Scene` gains (all defaulted): `val date: String? = null`, `val studio: StudioRef? = null`, `val tags: List<TagRef> = emptyList()`, `val performers: List<PerformerRef> = emptyList()`, `val captions: List<CaptionRef> = emptyList()`.
 
-- [ ] **Step 2: Build + tests green. Commit** — `feat: add metadata models (tags, performers, studios, captions, markers)`
+- [x] **Step 2: Build + tests green. Commit** — `feat: add metadata models (tags, performers, studios, captions, markers)`
 
 ### Task 1.2: `SortOption` + persisted per-screen sort
 
@@ -401,7 +401,7 @@ data class SceneDetails(
 - Modify: `app/src/main/java/com/sinema/util/Prefs.kt`
 - Test: `app/src/test/java/com/sinema/model/SortOptionTest.kt`
 
-- [ ] **Step 1: Write the failing test first:**
+- [x] **Step 1: Write the failing test first:**
 
 ```kotlin
 package com.sinema.model
@@ -429,7 +429,7 @@ class SortOptionTest {
 
 Run: `./gradlew :app:testDebugUnitTest` — expect FAIL (class missing).
 
-- [ ] **Step 2: Implement:**
+- [x] **Step 2: Implement:**
 
 ```kotlin
 package com.sinema.model
@@ -455,7 +455,7 @@ enum class SortOption(val label: String, val field: String, val direction: Strin
 }
 ```
 
-- [ ] **Step 3: Tests pass.** Add persistence to `Prefs.kt`:
+- [x] **Step 3: Tests pass.** Add persistence to `Prefs.kt`:
 
 ```kotlin
 fun sortFor(screen: String): String =
@@ -465,14 +465,14 @@ fun setSortFor(screen: String, optionName: String) =
     prefs.edit().putString("sort_$screen", optionName).apply()
 ```
 
-- [ ] **Step 4: Commit** — `feat: add SortOption enum with persisted per-screen sort`
+- [x] **Step 4: Commit** — `feat: add SortOption enum with persisted per-screen sort`
 
 ### Task 1.3: Entity queries (tags / performers / studios)
 
 **Files:**
 - Modify: `app/src/main/java/com/sinema/api/SinemaApi.kt`
 
-- [ ] **Step 1: Add one query per entity kind plus a parser.** All three follow this shape (shown for tags; performers use `findPerformers`/`performers`, studios use `findStudios`/`studios` — same selection set `id name scene_count image_path`):
+- [x] **Step 1: Add one query per entity kind plus a parser.** All three follow this shape (shown for tags; performers use `findPerformers`/`performers`, studios use `findStudios`/`studios` — same selection set `id name scene_count image_path`):
 
 ```kotlin
 suspend fun findEntities(kind: EntityItem.Kind, page: Int = 1, perPage: Int = 100): Pair<Int, List<EntityItem>> {
@@ -509,7 +509,7 @@ suspend fun findEntities(kind: EntityItem.Kind, page: Int = 1, perPage: Int = 10
 }
 ```
 
-- [ ] **Step 2: Add entity-filtered scene query** (delegates to `findScenesInternal` from Task 0.3):
+- [x] **Step 2: Add entity-filtered scene query** (delegates to `findScenesInternal` from Task 0.3):
 
 ```kotlin
 suspend fun findScenesForEntity(
@@ -529,9 +529,9 @@ suspend fun findScenesForEntity(
 }
 ```
 
-- [ ] **Step 3: Add sort passthrough to path/search queries.** `findScenesByPath`, `searchScenes`, and `findScenesInFolderDirect` gain `sort: String = "path", direction: String = "ASC"` parameters forwarded to `findScenesInternal`. Existing callers compile unchanged (defaults).
+- [x] **Step 3: Add sort passthrough to path/search queries.** `findScenesByPath`, `searchScenes`, and `findScenesInFolderDirect` gain `sort: String = "path", direction: String = "ASC"` parameters forwarded to `findScenesInternal`. Existing callers compile unchanged (defaults).
 
-- [ ] **Step 4: Manual API verification against the live server** (Stash at http://192.168.68.129:6969) — quickest via curl before wiring UI:
+- [x] **Step 4: Manual API verification against the live server** (Stash at http://192.168.68.129:6969) — quickest via curl before wiring UI:
 
 ```bash
 curl -s -H "ApiKey: $STASH_KEY" -H "Content-Type: application/json" \
@@ -541,14 +541,14 @@ curl -s -H "ApiKey: $STASH_KEY" -H "Content-Type: application/json" \
 
 Expect `count` and three tags. Repeat mentally for performers/studios (same shape). If `scenes_count` is rejected as a sort field by this Stash version, fall back to `"name"`/`ASC` and note it.
 
-- [ ] **Step 5: Commit** — `feat: add tag/performer/studio entity queries and entity-filtered scenes`
+- [x] **Step 5: Commit** — `feat: add tag/performer/studio entity queries and entity-filtered scenes`
 
 ### Task 1.4: `findSceneFull` — single-scene metadata payload
 
 **Files:**
 - Modify: `app/src/main/java/com/sinema/api/SinemaApi.kt`
 
-- [ ] **Step 1: Implement query + extended parser.** Extend `parseScene` to read the optional fields when present (`date`, `studio`, `tags`, `performers`, `captions`) — all guarded with null/`isJsonNull` checks so lean list queries keep working. Then:
+- [x] **Step 1: Implement query + extended parser.** Extend `parseScene` to read the optional fields when present (`date`, `studio`, `tags`, `performers`, `captions`) — all guarded with null/`isJsonNull` checks so lean list queries keep working. Then:
 
 ```kotlin
 suspend fun findSceneFull(sceneId: String): SceneDetails? {
@@ -587,15 +587,15 @@ fun getCaptionUrl(sceneId: String, c: CaptionRef): String =
     "$serverUrl/scene/$sceneId/caption?lang=${c.languageCode}&type=${c.captionType}"
 ```
 
-- [ ] **Step 2: Curl-verify** `findScene` with one real scene id (grab an id from the Recently Added query) — confirm `captions` and `scene_markers` shapes parse.
+- [x] **Step 2: Curl-verify** `findScene` with one real scene id (grab an id from the Recently Added query) — confirm `captions` and `scene_markers` shapes parse.
 
-- [ ] **Step 3: Commit** — `feat: add findSceneFull with metadata, captions, markers, resume time`
+- [x] **Step 3: Commit** — `feat: add findSceneFull with metadata, captions, markers, resume time`
 
 ### Phase 1 Close-out
 
-- [ ] **Refactor Pass** — extra attention: `findEntities` must be ONE function with a `when`, not three near-identical copies; `parseScene` stays under control (extract `parseRefList` helpers if it grows past ~50 lines).
-- [ ] **Close-out** checklist. Manual smoke: all existing screens still work (parser changes touch every list).
-- [ ] **Review Gate.**
+- [x] **Refactor Pass** — extra attention: `findEntities` must be ONE function with a `when`, not three near-identical copies; `parseScene` stays under control (extract `parseRefList` helpers if it grows past ~50 lines).
+- [x] **Close-out** checklist. Manual smoke: all existing screens still work (parser changes touch every list).
+- [x] **Review Gate.**
 
 ---
 
