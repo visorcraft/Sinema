@@ -21,6 +21,7 @@ class SinemaApp : Application() {
         super.onCreate()
         instance = this
         prefs = Prefs(this)
+        prefs.migrateToProfilesIfNeeded()
         api = SinemaApi(prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode)
         configureApi()
     }
@@ -33,7 +34,16 @@ class SinemaApp : Application() {
     private fun configureApi() {
         api.stashUsername = prefs.stashUsername
         api.stashPassword = prefs.stashPassword
-        api.onSessionRefreshed = { cookie -> prefs.sessionCookie = cookie }
+        api.onSessionRefreshed = { cookie ->
+            prefs.sessionCookie = cookie
+            // Also update the active profile's cookie so it survives profile switches
+            val activeId = prefs.activeProfileId
+            if (activeId.isNotBlank()) {
+                prefs.profiles = prefs.profiles.map {
+                    if (it.id == activeId) it.copy(sessionCookie = cookie) else it
+                }
+            }
+        }
     }
 
     companion object {
