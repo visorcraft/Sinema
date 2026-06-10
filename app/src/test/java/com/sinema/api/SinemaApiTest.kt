@@ -53,6 +53,41 @@ class SinemaApiTest {
     }
 
     @Test
+    fun `parseEntity tolerates null fields`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"5","name":null,"scene_count":null,"image_path":null}"""
+        ).asJsonObject
+        val e = api.parseEntity(obj, com.sinema.model.EntityItem.Kind.TAG)
+        assertEquals("5", e.id)
+        assertEquals("", e.name)
+        assertEquals(0, e.sceneCount)
+        assertEquals(null, e.imagePath)
+    }
+
+    @Test
+    fun `parseMarker tolerates null title and primary tag`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"m1","title":null,"seconds":12.5,"primary_tag":null}"""
+        ).asJsonObject
+        val m = api.parseMarker(obj)
+        assertEquals("m1", m.id)
+        assertEquals("", m.title)
+        assertEquals(12.5, m.seconds, 0.0)
+        assertEquals("", m.primaryTag)
+    }
+
+    @Test
+    fun `caption url encodes unsafe characters`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        assertEquals(
+            "http://server/scene/1/caption?lang=pt%2FBR&type=srt",
+            api.getCaptionUrl("1", com.sinema.model.CaptionRef("pt/BR", "srt"))
+        )
+    }
+
+    @Test
     fun `parseScene reads full metadata payload`() {
         val api = SinemaApi("http://server", "k", "", "apikey")
         val obj = com.google.gson.JsonParser.parseString(

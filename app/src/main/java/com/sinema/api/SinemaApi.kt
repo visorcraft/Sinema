@@ -23,6 +23,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class SinemaApi(
@@ -574,12 +575,18 @@ class SinemaApi(
 
     private fun parseTagRefs(arr: JsonArray): List<TagRef> = arr.map { el ->
         val t = el.asJsonObject
-        TagRef(id = t.get("id").asString, name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+        TagRef(
+            id = t.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+        )
     }
 
     private fun parsePerformerRefs(arr: JsonArray): List<PerformerRef> = arr.map { el ->
         val p = el.asJsonObject
-        PerformerRef(id = p.get("id").asString, name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+        PerformerRef(
+            id = p.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+        )
     }
 
     private fun parseCaptionRefs(arr: JsonArray): List<CaptionRef> = arr.map { el ->
@@ -639,19 +646,21 @@ class SinemaApi(
         )
         val result = graphql(query, variables)
         val data = result.getAsJsonObject("data")?.getAsJsonObject(queryName) ?: return Pair(0, emptyList())
-        val count = data.get("count").asInt
-        val items = data.getAsJsonArray(listKey).map { el ->
-            val obj = el.asJsonObject
-            EntityItem(
-                id = obj.get("id").asString,
-                name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
-                sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-                imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
-                kind = kind
-            )
-        }
+        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val items = (data.get(listKey) as? JsonArray)?.map { el ->
+            parseEntity(el.asJsonObject, kind)
+        } ?: emptyList()
         return Pair(count, items)
     }
+
+    @VisibleForTesting
+    internal fun parseEntity(obj: JsonObject, kind: EntityItem.Kind): EntityItem = EntityItem(
+        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+        imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
+        kind = kind
+    )
 
     /**
      * Fetch scenes filtered by a tag, performer, or studio entity.
@@ -696,14 +705,7 @@ class SinemaApi(
             ?.get("findScene")?.takeIf { !it.isJsonNull }?.asJsonObject
             ?: return null
         val markers = (obj.get("scene_markers") as? JsonArray)?.map { m ->
-            val mo = m.asJsonObject
-            MarkerRef(
-                id = mo.get("id").asString,
-                title = mo.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
-                seconds = mo.get("seconds")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
-                primaryTag = mo.get("primary_tag")?.takeIf { !it.isJsonNull }
-                    ?.asJsonObject?.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
-            )
+            parseMarker(m.asJsonObject)
         } ?: emptyList()
         return SceneDetails(
             scene = parseScene(obj),
@@ -712,8 +714,18 @@ class SinemaApi(
         )
     }
 
+    @VisibleForTesting
+    internal fun parseMarker(mo: JsonObject): MarkerRef = MarkerRef(
+        id = mo.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        title = mo.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        seconds = mo.get("seconds")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+        primaryTag = (mo.get("primary_tag") as? JsonObject)?.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+    )
+
     fun getCaptionUrl(sceneId: String, caption: CaptionRef): String =
-        "$serverUrl/scene/$sceneId/caption?lang=${caption.languageCode}&type=${caption.captionType}"
+        "$serverUrl/scene/$sceneId/caption?" +
+            "lang=${URLEncoder.encode(caption.languageCode, "UTF-8")}" +
+            "&type=${URLEncoder.encode(caption.captionType, "UTF-8")}"
 
     suspend fun resetPlayCount(sceneId: String) {
         val query = """
