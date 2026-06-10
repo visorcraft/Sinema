@@ -6,14 +6,13 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.fragment.app.FragmentActivity
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.model.GlideUrl
-import com.bumptech.glide.load.model.LazyHeaders
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.model.ImageItem
+import com.sinema.util.GlideAuth
 
 class ImageViewActivity : FragmentActivity() {
-    private var imageIds: List<String> = emptyList()
-    private var imageNames: List<String> = emptyList()
+    private var images: List<ImageItem> = emptyList()
     private var index = 0
     private lateinit var imageView: ImageView
     private lateinit var caption: TextView
@@ -24,12 +23,14 @@ class ImageViewActivity : FragmentActivity() {
         imageView = findViewById(R.id.fullscreen_image)
         caption = findViewById(R.id.image_caption)
 
-        imageIds = intent.getStringArrayListExtra("image_ids") ?: emptyList()
-        imageNames = intent.getStringArrayListExtra("image_names") ?: emptyList()
+        // Via static holder, not Intent extras: large folders (thousands of
+        // images) would exceed the 1 MB binder transaction limit.
+        images = pendingImages
         index = (savedInstanceState?.getInt("index") ?: intent.getIntExtra("index", 0))
-            .coerceIn(0, (imageIds.size - 1).coerceAtLeast(0))
+            .coerceIn(0, (images.size - 1).coerceAtLeast(0))
 
-        if (imageIds.isEmpty()) {
+        if (images.isEmpty()) {
+            // Nothing to show (e.g. relaunched after process death).
             finish()
             return
         }
@@ -44,7 +45,7 @@ class ImageViewActivity : FragmentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (index < imageIds.size - 1) {
+                if (index < images.size - 1) {
                     index++
                     showImage()
                 }
@@ -62,17 +63,23 @@ class ImageViewActivity : FragmentActivity() {
     }
 
     private fun showImage() {
-        val id = imageIds[index]
-        val name = imageNames.getOrNull(index) ?: ""
-        caption.text = "$name  (${index + 1}/${imageIds.size})"
+        val image = images[index]
+        caption.text = "${image.filename}  (${index + 1}/${images.size})"
 
-        val url = SinemaApp.instance.api.getImageUrl(id)
-        val glideUrl = GlideUrl(url, LazyHeaders.Builder()
-            .addHeader("ApiKey", SinemaApp.instance.prefs.apiKey)
-            .build())
+        val api = SinemaApp.instance.api
         Glide.with(this)
-            .load(glideUrl)
+            .load(GlideAuth.url(api, api.getImageUrl(image.id)))
             .fitCenter()
             .into(imageView)
+    }
+
+    companion object {
+        var pendingImages: List<ImageItem> = emptyList()
+
+        fun intentFor(context: android.content.Context, images: List<ImageItem>, startIndex: Int): android.content.Intent {
+            pendingImages = images
+            return android.content.Intent(context, ImageViewActivity::class.java)
+                .putExtra("index", startIndex.coerceAtLeast(0))
+        }
     }
 }

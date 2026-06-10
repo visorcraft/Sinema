@@ -44,6 +44,15 @@ class SinemaApi(
     fun getImageThumbnailUrl(imageId: String): String = "$serverUrl/image/$imageId/thumbnail"
     fun getImageUrl(imageId: String): String = "$serverUrl/image/$imageId/image"
 
+    /**
+     * Auth headers for non-GraphQL media requests (screenshots, streams,
+     * images). In session mode the API key is blank, so media must be
+     * authenticated with the session cookie instead.
+     */
+    fun mediaAuthHeaders(): Map<String, String> =
+        if (authMode == "session" && sessionCookie.isNotBlank()) mapOf("Cookie" to sessionCookie)
+        else mapOf("ApiKey" to apiKey)
+
     // Stash's INCLUDES modifier tokenizes the value on spaces and treats
     // "-"-prefixed tokens as exclusions, so folder names like "Foo - Bar"
     // match nothing. Anchored MATCHES_REGEX matches the path literally.

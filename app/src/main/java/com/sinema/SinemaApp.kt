@@ -3,12 +3,19 @@ package com.sinema
 import android.app.Application
 import com.sinema.api.SinemaApi
 import com.sinema.util.Prefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class SinemaApp : Application() {
     lateinit var prefs: Prefs
     lateinit var api: SinemaApi
     var pinVerifiedThisSession = false
     var updateCheckedThisSession = false
+
+    // For work that must outlive an activity, e.g. saving playback state
+    // while the playback activity is being destroyed.
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()

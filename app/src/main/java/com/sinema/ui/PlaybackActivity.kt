@@ -3,7 +3,6 @@ package com.sinema.ui
 import android.net.Uri
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -20,6 +19,7 @@ class PlaybackActivity : FragmentActivity() {
     private var sceneId: String = ""
     private var resumePositionMs: Long = 0L
     private var startTimeMs: Long = 0L
+    private var playCountSent = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,11 +65,19 @@ class PlaybackActivity : FragmentActivity() {
 
         val playDurationSec = playDurationMs / 1000.0
 
-        lifecycleScope.launch {
+        // Only increment play count once per viewing, when finishing
+        // (resume cleared) — repeated pauses near the end must not
+        // re-increment.
+        val shouldIncrement = resumeTimeSec == 0.0 && playDurationSec > 5 && !playCountSent
+        if (shouldIncrement) playCountSent = true
+
+        // Run in the app scope: lifecycleScope is cancelled when the
+        // activity is destroyed (the common back-press exit), which would
+        // drop the save mid-flight and lose resume/watched state.
+        app.appScope.launch {
             try {
                 app.api.saveSceneActivity(sceneId, resumeTimeSec, playDurationSec)
-                // Only increment play count when finishing (resume cleared), not on pause/resume
-                if (resumeTimeSec == 0.0 && playDurationSec > 5) {
+                if (shouldIncrement) {
                     app.api.incrementPlayCount(sceneId)
                 }
             } catch (e: Exception) {
@@ -84,7 +92,7 @@ class PlaybackActivity : FragmentActivity() {
         val streamUrl = app.api.getStreamUrl(sceneId)
 
         val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(mapOf("ApiKey" to app.prefs.apiKey))
+            .setDefaultRequestProperties(app.api.mediaAuthHeaders())
 
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
