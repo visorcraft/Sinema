@@ -5,6 +5,7 @@ enum class SortOption(val label: String, val field: String, val direction: Strin
     PATH_ASC("Name (A–Z)", "path", "ASC"),
     PATH_DESC("Name (Z–A)", "path", "DESC"),
     ADDED_DESC("Recently added", "created_at", "DESC"),
+    UPDATED_DESC("Recently updated", "updated_at", "DESC"),
     DATE_DESC("Release date", "date", "DESC"),
     DURATION_DESC("Longest first", "duration", "DESC"),
     RATING_DESC("Highest rated", "rating", "DESC"),
@@ -15,7 +16,7 @@ enum class SortOption(val label: String, val field: String, val direction: Strin
     fun apiSort(seed: Int): String = if (this == RANDOM) "random_${seed.coerceAtLeast(0)}" else field
 
     companion object {
-        fun fromName(name: String?): SortOption =
-            entries.firstOrNull { it.name == name } ?: PATH_ASC
+        fun fromName(name: String?, default: SortOption = PATH_ASC): SortOption =
+            entries.firstOrNull { it.name == name } ?: default
     }
 }

@@ -71,31 +71,8 @@ object FolderHelper {
         }.sortedBy { it.name.lowercase() }
 
         return folderItems +
-            videoFiles.sortedBy { it.name.lowercase() } +
+            videoFiles +
             imageFiles.sortedBy { it.name.lowercase() }
     }
 
-    fun getTopLevelFolders(scenes: List<Scene>): List<FolderItem> {
-        // Find the common root
-        val allFolders = scenes.map { it.folder }.distinct()
-        if (allFolders.isEmpty()) return emptyList()
-        
-        // Find shortest common prefix
-        val root = findCommonPrefix(allFolders)
-        return buildFolderContents(scenes, emptyList(), root)
-    }
-
-    private fun findCommonPrefix(paths: List<String>): String {
-        if (paths.isEmpty()) return ""
-        if (paths.size == 1) return paths[0]
-        
-        // Most scenes are in /data, so use that as root
-        val sorted = paths.sorted()
-        val first = sorted.first()
-        val last = sorted.last()
-        var i = 0
-        while (i < first.length && i < last.length && first[i] == last[i]) i++
-        val prefix = first.substring(0, i).trimEnd('/')
-        return if (prefix.isEmpty()) "/" else prefix
-    }
 }

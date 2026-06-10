@@ -12,8 +12,10 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.Scene
+import com.sinema.model.SortOption
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -29,6 +31,27 @@ abstract class SceneGridFragment : VerticalGridSupportFragment() {
     protected abstract val emptyMessage: String
     protected abstract suspend fun loadItems(): List<Any>
 
+    /** Prefs key for persisting this screen's sort; null = screen is not sortable. */
+    protected open val sortScreenKey: String? = null
+    protected open val defaultSort: SortOption = SortOption.PATH_ASC
+    protected var sort: SortOption = SortOption.PATH_ASC
+    protected val randomSeed: Int = (0..99_999_999).random()
+    private var loadJob: Job? = null
+
+    fun showSortDialog() {
+        val key = sortScreenKey ?: return
+        SortDialog.show(requireContext(), sort) { chosen ->
+            sort = chosen
+            app.prefs.setSortFor(key, chosen.name)
+            updateTitle()
+            reload()
+        }
+    }
+
+    private fun updateTitle() {
+        title = if (sortScreenKey != null) "$gridTitle  •  ${sort.label}" else gridTitle
+    }
+
     /** Subclasses with non-Scene items override to handle their own clicks. */
     protected open fun onItemClicked(item: Any) {
         if (item is Scene) startActivity(SceneIntents.detail(requireContext(), item))
@@ -36,7 +59,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = gridTitle
+        sortScreenKey?.let { sort = SortOption.fromName(app.prefs.sortFor(it), defaultSort) }
+        updateTitle()
         badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
         gridPresenter.numberOfColumns = columns
@@ -66,7 +90,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment() {
     }
 
     protected fun reload() {
-        lifecycleScope.launch {
+        loadJob?.cancel()
+        loadJob = lifecycleScope.launch {
             try {
                 val items = loadItems()
                 gridAdapter.clear()
