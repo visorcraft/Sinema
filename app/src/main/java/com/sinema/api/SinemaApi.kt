@@ -25,7 +25,7 @@ class SinemaApi(
 
     companion object {
         // Single source of truth for scene list payloads. Extended fields
-        // (tags/performers/etc.) live in SCENE_FIELDS_FULL — see findSceneFull.
+        // (tags/performers/etc.) will live in SCENE_FIELDS_FULL — see findSceneFull (planned, PLAN.md Task 1.4).
         internal const val SCENE_FIELDS =
             "id title play_count rating100 files { path size duration width height }"
     }
@@ -416,10 +416,7 @@ class SinemaApi(
         val query = """
             query(${"$"}ids: [Int!]) {
                 findScenes(scene_ids: ${"$"}ids, filter: { per_page: ${intIds.size} }) {
-                    scenes {
-                        id title play_count rating100
-                        files { path size duration width height }
-                    }
+                    scenes { $SCENE_FIELDS }
                 }
             }
         """.trimIndent()
