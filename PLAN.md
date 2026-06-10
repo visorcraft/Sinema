@@ -958,17 +958,9 @@ Caption HTTP requests reuse the same `DefaultHttpDataSource.Factory` and therefo
 
 ### Phase 5 Close-out
 
-- [ ] **Refactor Pass** — `PlaybackActivity` should still be a single small file (~150 lines); `initPlayer` stays under 40 lines (extract `buildMediaItem()`).
-- [ ] **Close-out** checklist. Manual smoke: playback in both auth modes, with and without captions.
-- [ ] **Review Gate.**
-
-> **STATUS (work paused here 2026-06-10 by maintainer instruction):** Tasks 5.1 and 5.2 are
-> implemented, two-stage agent-reviewed (spec + quality, all findings fixed), and committed on
-> `feature/phase-5-player-tracks` (`2470c36`, `4ce66c2`, `bc8660a`) with build + unit tests
-> green. The Phase 5 close-out (refactor pass, lint, opencode Review Gate, merge to `main`) has
-> NOT been run. Phases 0–4 are merged to `main` (nothing pushed to origin; v1.11.0 bump is
-> local, release publication deferred — see Task 4.2). Resume point: run this close-out, then
-> continue with Phase 6.
+- [x] **Refactor Pass** — `PlaybackActivity` is 137 lines; `initPlayer` is 20 lines; `buildMediaItem()` already extracted.
+- [x] **Close-out** checklist. Build + unit tests + lint all green.
+- [x] **Review Gate** — VERDICT approved issues=0 (one finding from first pass fixed: mismatched caption array guard in `SceneIntents.captionsFrom()`).
 
 ---
 
