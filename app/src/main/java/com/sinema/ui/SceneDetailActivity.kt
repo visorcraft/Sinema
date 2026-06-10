@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.model.CaptionRef
 import com.sinema.model.EntityItem
 import com.sinema.model.Scene
 import com.sinema.model.SceneDetails
@@ -37,6 +38,9 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var tagsRow: LinearLayout
     private lateinit var performersScroll: View
     private lateinit var performersRow: LinearLayout
+
+    // Captions loaded from Stash after loadDetails completes; empty until then (fine — Play before load = no subs)
+    private var captions: List<CaptionRef> = emptyList()
 
     // Cache key to skip chip rebuild when metadata is unchanged on re-resume
     private var boundChipsKey: String? = null
@@ -159,6 +163,7 @@ class SceneDetailActivity : FragmentActivity() {
         lifecycleScope.launch {
             try {
                 val details = app.api.findSceneFull(scene.id) ?: return@launch
+                captions = details.scene.captions
                 bindResume(details)
                 bindMeta(details.scene)
                 bindChips(details.scene)
@@ -272,6 +277,7 @@ class SceneDetailActivity : FragmentActivity() {
         intent.putExtra("scene_id", scene.id)
         intent.putExtra("scene_title", scene.filename)
         intent.putExtra("resume_position_ms", resumeMs)
+        SceneIntents.putCaptions(intent, captions)
         startActivity(intent)
     }
 

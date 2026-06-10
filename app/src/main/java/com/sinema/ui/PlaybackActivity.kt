@@ -4,12 +4,14 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.util.SceneIntents
 import kotlinx.coroutines.launch
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -86,10 +88,27 @@ class PlaybackActivity : FragmentActivity() {
         }
     }
 
+    private fun buildMediaItem(): MediaItem {
+        val app = SinemaApp.instance
+        val streamUrl = app.api.getStreamUrl(sceneId)
+        // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
+        val subs = SceneIntents.captionsFrom(intent).map { c ->
+            MediaItem.SubtitleConfiguration.Builder(Uri.parse(app.api.getCaptionUrl(sceneId, c)))
+                .setMimeType(if (c.captionType.equals("vtt", true)) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP)
+                .setLanguage(c.languageCode)
+                .setLabel("${c.languageCode.uppercase()} (${c.captionType})")
+                .build()
+        }
+        return MediaItem.Builder()
+            .setUri(Uri.parse(streamUrl))
+            .setMediaId(sceneId)
+            .setSubtitleConfigurations(subs)
+            .build()
+    }
+
     private fun initPlayer() {
         if (sceneId.isEmpty()) return
         val app = SinemaApp.instance
-        val streamUrl = app.api.getStreamUrl(sceneId)
 
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(app.api.mediaAuthHeaders())
@@ -99,7 +118,7 @@ class PlaybackActivity : FragmentActivity() {
             .build()
             .also { exo ->
                 playerView.player = exo
-                exo.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
+                exo.setMediaItem(buildMediaItem())
                 exo.prepare()
                 if (resumePositionMs > 0) {
                     exo.seekTo(resumePositionMs)
