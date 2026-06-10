@@ -17,9 +17,9 @@
 - [x] **Phase 2** — Sort pickers on grids
 - [x] **Phase 3** — Tag / Performer / Studio browsing
 - [x] **Phase 4** — Scene detail metadata (chips, rating, date) → **Release v1.11.0**
-- [ ] **Phase 5** — Player: subtitles, audio tracks, playback speed
-- [ ] **Phase 6** — Scene markers as chapters
-- [ ] **Phase 7** — Play All & autoplay next → **Release v1.12.0**
+- [x] **Phase 5** — Player: subtitles, audio tracks, playback speed
+- [x] **Phase 6** — Scene markers as chapters
+- [x] **Phase 7** — Play All & autoplay next → **Release v1.12.0**
 - [ ] **Phase 8** — Android TV home-screen channels (Watch Next + Recently Added)
 - [ ] **Phase 9** — Multi-server profiles → **Release v1.13.0**
 - [ ] **Phase 10** — Final hardening, docs, full-roadmap review
@@ -1183,29 +1183,9 @@ protected fun playAll(scenes: List<Scene>, startAt: Int = 0) {
 - Modify: `app/src/main/java/com/sinema/util/Prefs.kt` (`var channelsEnabled: Boolean`, plain prefs, default `false`)
 - Modify: `app/src/main/java/com/sinema/ui/SettingsActivity.kt` (toggle row "Home screen channels" with warning subtitle "Shows thumbnails on the TV home screen, outside the PIN lock")
 
-- [ ] **Step 1: Deep link activity** — resolves `sinema://scene/<id>`:
+- [x] **Step 1: Deep link activity** — resolves `com.sinema://app/scene/<id>` with PIN gate via PinActivity launcher.
 
-```kotlin
-class DeepLinkActivity : FragmentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val sceneId = intent?.data?.lastPathSegment
-        if (sceneId.isNullOrBlank()) { finish(); return }
-        lifecycleScope.launch {
-            try {
-                val details = SinemaApp.instance.api.findSceneFull(sceneId)
-                if (details != null) startActivity(SceneIntents.detail(this@DeepLinkActivity, details.scene))
-            } catch (e: Exception) {
-                Log.e("Sinema", "Deep link failed", e)
-            } finally { finish() }
-        }
-    }
-}
-```
-
-Manifest entry: `exported="true"` with an intent filter for `android.intent.action.VIEW`, categories DEFAULT + BROWSABLE, `<data android:scheme="sinema" android:host="scene" />`. **PIN interaction:** launching `SceneDetailActivity` directly would bypass the PIN; instead route through `MainActivity` when a PIN is set and unverified (`if (prefs.hasPinSet() && !app.pinVerifiedThisSession) { startActivity(Intent(this, MainActivity::class.java)); finish(); return }` before resolving) — the user lands on PIN entry, and the channel row simply doesn't deep-link past the lock.
-
-- [ ] **Step 2: Commit** — `feat: add deep link activity and home-channels setting (default off)`
+- [x] **Step 2: Commit** — `Add tvprovider dependency, DeepLinkActivity, channels toggle in Settings`
 
 ### Task 8.2: Channel sync
 
