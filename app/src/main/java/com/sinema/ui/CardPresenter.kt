@@ -201,6 +201,27 @@ class SettingsPresenter : Presenter() {
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }
+            "Tags" -> {
+                title.text = "🏷️ Tags"
+                content.text = "Browse by tag"
+                image.setImageResource(android.R.drawable.ic_menu_agenda)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Performers" -> {
+                title.text = "👤 Performers"
+                content.text = "Browse by performer"
+                image.setImageResource(android.R.drawable.ic_menu_agenda)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Studios" -> {
+                title.text = "🎬 Studios"
+                content.text = "Browse by studio"
+                image.setImageResource(android.R.drawable.ic_menu_agenda)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
             else -> {
                 title.text = "⚙️ Settings"
                 content.text = "Server configuration"

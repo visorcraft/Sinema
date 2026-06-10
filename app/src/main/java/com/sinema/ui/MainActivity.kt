@@ -174,7 +174,7 @@ class MainFragment : RowsSupportFragment() {
                 Log.d("Sinema", "loadContent starting")
                 rowsAdapter.clear()
 
-                // 1. Top row: Search | Favorites | Browse Folders
+                // 1. Top row: Search | Favorites | Browse Folders | Tags | Performers | Studios (+ Log Out)
                 val topAdapter = ArrayObjectAdapter(SettingsPresenter())
                 topAdapter.add("Search")
                 topAdapter.add("Favorites")
