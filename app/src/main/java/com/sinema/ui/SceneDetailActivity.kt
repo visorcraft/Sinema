@@ -17,6 +17,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.Scene
 import com.sinema.util.GlideAuth
+import com.sinema.util.SceneIntents
 import kotlinx.coroutines.launch
 
 class SceneDetailActivity : FragmentActivity() {
@@ -33,17 +34,7 @@ class SceneDetailActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scene_detail)
 
-        scene = Scene(
-            id = intent.getStringExtra("scene_id") ?: "",
-            title = intent.getStringExtra("scene_title") ?: "",
-            path = intent.getStringExtra("scene_path") ?: "",
-            duration = intent.getDoubleExtra("scene_duration", 0.0),
-            size = intent.getLongExtra("scene_size", 0L),
-            width = intent.getIntExtra("scene_width", 0),
-            height = intent.getIntExtra("scene_height", 0),
-            playCount = intent.getIntExtra("scene_play_count", 0),
-            rating100 = intent.getIntExtra("scene_rating100", -1).let { if (it == -1) null else it }
-        )
+        scene = SceneIntents.sceneFrom(intent)
 
         // Bind views
         val screenshot = findViewById<ImageView>(R.id.detail_screenshot)
@@ -223,17 +214,7 @@ class SceneDetailActivity : FragmentActivity() {
 
                     card.isFocusable = true
                     card.setOnClickListener {
-                        val intent = Intent(this@SceneDetailActivity, SceneDetailActivity::class.java)
-                        intent.putExtra("scene_id", s.id)
-                        intent.putExtra("scene_path", s.path)
-                        intent.putExtra("scene_duration", s.duration)
-                        intent.putExtra("scene_size", s.size)
-                        intent.putExtra("scene_width", s.width)
-                        intent.putExtra("scene_height", s.height)
-                        intent.putExtra("scene_play_count", s.playCount)
-                        intent.putExtra("scene_rating100", s.rating100 ?: -1)
-                        intent.putExtra("scene_title", s.title)
-                        startActivity(intent)
+                        startActivity(SceneIntents.detail(this@SceneDetailActivity, s))
                     }
 
                     val params = LinearLayout.LayoutParams(

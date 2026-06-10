@@ -1,6 +1,5 @@
 package com.sinema.ui
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.Scene
+import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -74,19 +74,7 @@ class FavoritesGridFragment : VerticalGridSupportFragment() {
         adapter = gridAdapter
 
         setOnItemViewClickedListener { _, item, _, _ ->
-            if (item is Scene) {
-                val intent = Intent(requireContext(), SceneDetailActivity::class.java)
-                intent.putExtra("scene_id", item.id)
-                intent.putExtra("scene_path", item.path)
-                intent.putExtra("scene_duration", item.duration)
-                intent.putExtra("scene_size", item.size)
-                intent.putExtra("scene_width", item.width)
-                intent.putExtra("scene_height", item.height)
-                intent.putExtra("scene_play_count", item.playCount)
-                intent.putExtra("scene_rating100", item.rating100 ?: -1)
-                intent.putExtra("scene_title", item.title)
-                startActivity(intent)
-            }
+            if (item is Scene) startActivity(SceneIntents.detail(requireContext(), item))
         }
 
         loadFavorites()
