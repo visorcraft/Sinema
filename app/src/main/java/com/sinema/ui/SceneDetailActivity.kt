@@ -17,6 +17,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.EntityItem
 import com.sinema.model.Scene
+import com.sinema.model.SceneDetails
 import com.sinema.util.GlideAuth
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
@@ -36,6 +37,9 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var tagsRow: LinearLayout
     private lateinit var performersScroll: View
     private lateinit var performersRow: LinearLayout
+
+    // Cache key to skip chip rebuild when metadata is unchanged on re-resume
+    private var boundChipsKey: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,9 +80,6 @@ class SceneDetailActivity : FragmentActivity() {
 
         // Play from start
         btnPlay.setOnClickListener { launchPlayback(0L) }
-
-        // Resume (default click before loadDetails fills in the real position)
-        btnResume.setOnClickListener { launchPlayback(0L) }
 
         // Favorite toggle
         btnFavorite.setOnClickListener {
@@ -158,71 +159,9 @@ class SceneDetailActivity : FragmentActivity() {
         lifecycleScope.launch {
             try {
                 val details = app.api.findSceneFull(scene.id) ?: return@launch
-                val s = details.scene
-
-                // Resume button
-                if (details.resumeTime > 5.0) {
-                    val resumeMs = (details.resumeTime * 1000).toLong()
-                    btnResume.visibility = View.VISIBLE
-                    btnResume.text = "▶ Resume from ${formatMs(resumeMs)}"
-                    btnResume.setOnClickListener { launchPlayback(resumeMs) }
-                } else {
-                    btnResume.visibility = View.GONE
-                }
-
-                // Favorite initial state
-                btnFavorite.text = if (s.isFavorite) "❤️ Unfavorite" else "🤍 Favorite"
-
-                // Meta line: date  •  studio  •  ★ rating
-                val metaParts = buildList {
-                    s.date?.takeIf { it.isNotBlank() }?.let { add(it) }
-                    s.studio?.let { add(it.name) }
-                    s.rating100?.let { add("★ $it") }
-                }
-                if (metaParts.isNotEmpty()) {
-                    metaView.text = metaParts.joinToString("  •  ")
-                    metaView.visibility = View.VISIBLE
-                } else {
-                    metaView.visibility = View.GONE
-                }
-
-                // Chips — clear before repopulating (onResume runs repeatedly)
-                tagsRow.removeAllViews()
-                performersRow.removeAllViews()
-
-                // Studio chip at start of tags row
-                s.studio?.let { studio ->
-                    addChip(tagsRow, "🎬 ${studio.name}") {
-                        startActivity(EntityScenesActivity.intent(
-                            this@SceneDetailActivity,
-                            EntityItem(studio.id, studio.name, 0, null, EntityItem.Kind.STUDIO)
-                        ))
-                    }
-                }
-
-                // Tag chips
-                for (tag in s.tags) {
-                    addChip(tagsRow, "#${tag.name}") {
-                        startActivity(EntityScenesActivity.intent(
-                            this@SceneDetailActivity,
-                            EntityItem(tag.id, tag.name, 0, null, EntityItem.Kind.TAG)
-                        ))
-                    }
-                }
-
-                // Performer chips
-                for (performer in s.performers) {
-                    addChip(performersRow, performer.name) {
-                        startActivity(EntityScenesActivity.intent(
-                            this@SceneDetailActivity,
-                            EntityItem(performer.id, performer.name, 0, null, EntityItem.Kind.PERFORMER)
-                        ))
-                    }
-                }
-
-                tagsScroll.visibility = if (tagsRow.childCount > 0) View.VISIBLE else View.GONE
-                performersScroll.visibility = if (performersRow.childCount > 0) View.VISIBLE else View.GONE
-
+                bindResume(details)
+                bindMeta(details.scene)
+                bindChips(details.scene)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -231,13 +170,101 @@ class SceneDetailActivity : FragmentActivity() {
         }
     }
 
+    private fun bindResume(details: SceneDetails) {
+        if (details.resumeTime > 5.0) {
+            val resumeMs = (details.resumeTime * 1000).toLong()
+            btnResume.visibility = View.VISIBLE
+            btnResume.text = "▶ Resume from ${formatMs(resumeMs)}"
+            btnResume.setOnClickListener { launchPlayback(resumeMs) }
+        } else {
+            btnResume.visibility = View.GONE
+        }
+        btnFavorite.text = if (details.scene.isFavorite) "❤️ Unfavorite" else "🤍 Favorite"
+    }
+
+    private fun bindMeta(s: Scene) {
+        val metaParts = buildList {
+            s.date?.takeIf { it.isNotBlank() }?.let { add(it) }
+            s.studio?.let { add(it.name) }
+            s.rating100?.let { add("★ ${"%.1f".format(it / 20.0)}") }
+        }
+        if (metaParts.isNotEmpty()) {
+            metaView.text = metaParts.joinToString("  •  ")
+            metaView.visibility = View.VISIBLE
+        } else {
+            metaView.visibility = View.GONE
+        }
+    }
+
+    private fun bindChips(s: Scene) {
+        val newKey = buildString {
+            append(s.studio?.id ?: "")
+            append("|")
+            s.tags.forEach { append(it.id); append(",") }
+            append("|")
+            s.performers.forEach { append(it.id); append(",") }
+        }
+        if (newKey == boundChipsKey) return
+        boundChipsKey = newKey
+
+        tagsRow.removeAllViews()
+        performersRow.removeAllViews()
+
+        // Studio chip at start of tags row
+        s.studio?.let { studio ->
+            addChip(tagsRow, "🎬 ${studio.name}") {
+                startActivity(EntityScenesActivity.intent(
+                    this@SceneDetailActivity,
+                    EntityItem(studio.id, studio.name, 0, null, EntityItem.Kind.STUDIO)
+                ))
+            }
+        }
+
+        // Tag chips
+        for (tag in s.tags) {
+            addChip(tagsRow, "#${tag.name}") {
+                startActivity(EntityScenesActivity.intent(
+                    this@SceneDetailActivity,
+                    EntityItem(tag.id, tag.name, 0, null, EntityItem.Kind.TAG)
+                ))
+            }
+        }
+
+        // Performer chips
+        for (performer in s.performers) {
+            addChip(performersRow, performer.name) {
+                startActivity(EntityScenesActivity.intent(
+                    this@SceneDetailActivity,
+                    EntityItem(performer.id, performer.name, 0, null, EntityItem.Kind.PERFORMER)
+                ))
+            }
+        }
+
+        tagsScroll.visibility = if (tagsRow.childCount > 0) View.VISIBLE else View.GONE
+        performersScroll.visibility = if (performersRow.childCount > 0) View.VISIBLE else View.GONE
+    }
+
     private fun addChip(row: LinearLayout, label: String, onClick: () -> Unit) {
+        val density = resources.displayMetrics.density
         val chip = Button(this).apply {
             text = label
             isFocusable = true
+            setBackgroundResource(R.drawable.action_button_background)
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 13f
+            minWidth = 0
+            minimumWidth = 0
+            val hPad = (16 * density).toInt()
+            val vPad = (8 * density).toInt()
+            setPadding(hPad, vPad, hPad, vPad)
             setOnClickListener { onClick() }
         }
-        row.addView(chip)
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        params.marginEnd = (8 * density).toInt()
+        row.addView(chip, params)
     }
 
     private fun launchPlayback(resumeMs: Long) {
