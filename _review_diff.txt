@@ -1,0 +1,177 @@
+app/src/main/java/com/sinema/model/Models.kt       |  9 +-----
+ .../main/java/com/sinema/ui/PlaybackActivity.kt    | 36 ++++++++++++++++++++++
+ .../main/java/com/sinema/ui/SceneDetailActivity.kt | 16 +++++-----
+ app/src/main/java/com/sinema/util/SceneIntents.kt  | 16 ++++++++++
+ app/src/main/java/com/sinema/util/TimeFormat.kt    | 21 +++++++++++++
+ 5 files changed, 81 insertions(+), 17 deletions(-)
+
+--- Changes ---
+
+app/src/main/java/com/sinema/model/Models.kt
+  @@ -46,14 +46,7 @@ data class Scene(
+  -    fun formatDuration(): String {
+  -        val totalSecs = duration.toInt()
+  -        val h = totalSecs / 3600
+  -        val m = (totalSecs % 3600) / 60
+  -        val s = totalSecs % 60
+  -        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+  -        else String.format("%d:%02d", m, s)
+  -    }
+  +    fun formatDuration(): String = com.sinema.util.TimeFormat.formatSeconds(duration)
+       
+       fun formatSize(): String {
+           val mb = size / (1024.0 * 1024.0)
+  +1 -8
+
+app/src/main/java/com/sinema/ui/PlaybackActivity.kt
+  @@ -2,6 +2,7 @@ package com.sinema.ui
+  +import android.view.KeyEvent
+   import androidx.fragment.app.FragmentActivity
+   import androidx.media3.common.MediaItem
+   import androidx.media3.common.MimeTypes
+  @@ -13,6 +14,7 @@ import com.sinema.R
+  +import com.sinema.util.TimeFormat
+   import kotlinx.coroutines.launch
+   
+   @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+  @@ -24,6 +26,7 @@ class PlaybackActivity : FragmentActivity() {
+  +    private var markers: List<Pair<String, Double>> = emptyList()
+   
+       override fun onCreate(savedInstanceState: Bundle?) {
+           super.onCreate(savedInstanceState)
+  @@ -32,6 +35,7 @@ class PlaybackActivity : FragmentActivity() {
+  +        markers = SceneIntents.markersFrom(intent)
+       }
+   
+       override fun onStart() {
+  @@ -134,4 +138,36 @@ class PlaybackActivity : FragmentActivity() {
+  +
+  +    private fun showChapters() {
+  +        if (markers.isEmpty()) return
+  +        val labels = markers.map { "${TimeFormat.formatSeconds(it.second)}  ${it.first}" }
+  +        android.app.AlertDialog.Builder(this)
+  +            .setTitle("Chapters")
+  +            .setItems(labels.toTypedArray()) { _, which ->
+  +                player?.seekTo((markers[which].second * 1000).toLong())
+  +            }
+  +            .show()
+  +    }
+  +
+  +    private fun seekToAdjacentMarker(forward: Boolean) {
+  +        val exo = player ?: return
+  +        val posSec = exo.currentPosition / 1000.0
+  +        val target = if (forward)
+  +            markers.firstOrNull { it.second > posSec + 1 }
+  +        else
+  +            markers.lastOrNull { it.second < posSec - 3 }
+  +        target?.let { exo.seekTo((it.second * 1000).toLong()) }
+  +    }
+  +
+  +    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+  +        if (event.action == KeyEvent.ACTION_DOWN) {
+  +            when (event.keyCode) {
+  +                KeyEvent.KEYCODE_MENU -> { showChapters(); return true }
+  +                KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
+  +                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
+  +            }
+  +        }
+  +        return super.dispatchKeyEvent(event)
+  +    }
+   }
+  +36 -0
+
+app/src/main/java/com/sinema/ui/SceneDetailActivity.kt
+  @@ -17,6 +17,7 @@ import com.sinema.R
+  +import com.sinema.model.MarkerRef
+   import com.sinema.model.Scene
+   import com.sinema.model.SceneDetails
+   import com.sinema.util.GlideAuth
+  @@ -39,8 +40,9 @@ class SceneDetailActivity : FragmentActivity() {
+  -    // Captions loaded from Stash after loadDetails completes; empty until then (fine — Play before load = no subs)
+  +    // Captions and markers loaded from Stash after loadDetails completes
+       private var captions: List<CaptionRef> = emptyList()
+  +    private var markers: List<MarkerRef> = emptyList()
+   
+       // Cache key to skip chip rebuild when metadata is unchanged on re-resume
+       private var boundChipsKey: String? = null
+  @@ -164,6 +166,7 @@ class SceneDetailActivity : FragmentActivity() {
+  +                markers = details.markers
+                   bindResume(details)
+                   bindMeta(details.scene)
+                   bindChips(details.scene)
+  @@ -192,6 +195,7 @@ class SceneDetailActivity : FragmentActivity() {
+  +            if (markers.isNotEmpty()) add("${markers.size} chapters")
+           }
+           if (metaParts.isNotEmpty()) {
+               metaView.text = metaParts.joinToString("  •  ")
+  @@ -278,6 +282,7 @@ class SceneDetailActivity : FragmentActivity() {
+  +        SceneIntents.putMarkers(intent, markers)
+           startActivity(intent)
+       }
+   
+  @@ -328,12 +333,5 @@ class SceneDetailActivity : FragmentActivity() {
+  -    private fun formatMs(ms: Long): String {
+  -        val totalSecs = (ms / 1000).toInt()
+  -        val h = totalSecs / 3600
+  -        val m = (totalSecs % 3600) / 60
+  -        val s = totalSecs % 60
+  -        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+  -        else String.format("%d:%02d", m, s)
+  -    }
+  +    private fun formatMs(ms: Long): String = com.sinema.util.TimeFormat.formatMs(ms)
+   }
+  +7 -9
+
+app/src/main/java/com/sinema/util/SceneIntents.kt
+  @@ -3,6 +3,7 @@ package com.sinema.util
+  +import com.sinema.model.MarkerRef
+   import com.sinema.model.Scene
+   import com.sinema.ui.SceneDetailActivity
+   
+  @@ -22,6 +23,8 @@ object SceneIntents {
+  +    private const val KEY_MARKER_TITLES = "marker_titles"
+  +    private const val KEY_MARKER_SECONDS = "marker_seconds"
+   
+       fun detail(context: Context, scene: Scene): Intent =
+           Intent(context, SceneDetailActivity::class.java).apply {
+  @@ -59,4 +62,17 @@ object SceneIntents {
+  +
+  +    fun putMarkers(intent: Intent, markers: List<MarkerRef>) {
+  +        val sorted = markers.sortedBy { it.seconds }
+  +        intent.putExtra(KEY_MARKER_TITLES, sorted.map { it.title.ifBlank { it.primaryTag } }.toTypedArray())
+  +        intent.putExtra(KEY_MARKER_SECONDS, sorted.map { it.seconds }.toDoubleArray())
+  +    }
+  +
+  +    fun markersFrom(intent: Intent): List<Pair<String, Double>> {
+  +        val titles = intent.getStringArrayExtra(KEY_MARKER_TITLES) ?: return emptyList()
+  +        val seconds = intent.getDoubleArrayExtra(KEY_MARKER_SECONDS) ?: return emptyList()
+  +        if (titles.size != seconds.size) return emptyList()
+  +        return titles.zip(seconds.toList())
+  +    }
+   }
+  +16 -0
+
+app/src/main/java/com/sinema/util/TimeFormat.kt
+  @@ -0,0 +1,21 @@
+  +package com.sinema.util
+  +
+  +object TimeFormat {
+  +    fun formatSeconds(seconds: Double): String {
+  +        val totalSecs = seconds.toInt()
+  +        val h = totalSecs / 3600
+  +        val m = (totalSecs % 3600) / 60
+  +        val s = totalSecs % 60
+  +        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+  +        else String.format("%d:%02d", m, s)
+  +    }
+  +
+  +    fun formatMs(ms: Long): String {
+  +        val totalSecs = (ms / 1000).toInt()
+  +        val h = totalSecs / 3600
+  +        val m = (totalSecs % 3600) / 60
+  +        val s = totalSecs % 60
+  +        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+  +        else String.format("%d:%02d", m, s)
+  +    }
+  +}
+  +21 -0

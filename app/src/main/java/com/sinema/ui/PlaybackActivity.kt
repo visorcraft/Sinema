@@ -27,6 +27,7 @@ class PlaybackActivity : FragmentActivity() {
     private var playCountSent = false
     private var captions: List<CaptionRef> = emptyList()
     private var markers: List<Pair<String, Double>> = emptyList()
+    private var chaptersDialog: android.app.AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +52,8 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        chaptersDialog?.dismiss()
+        chaptersDialog = null
         releasePlayer()
     }
 
@@ -142,7 +145,7 @@ class PlaybackActivity : FragmentActivity() {
     private fun showChapters() {
         if (markers.isEmpty()) return
         val labels = markers.map { "${TimeFormat.formatSeconds(it.second)}  ${it.first}" }
-        android.app.AlertDialog.Builder(this)
+        chaptersDialog = android.app.AlertDialog.Builder(this)
             .setTitle("Chapters")
             .setItems(labels.toTypedArray()) { _, which ->
                 player?.seekTo((markers[which].second * 1000).toLong())
