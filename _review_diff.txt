@@ -1,200 +1,139 @@
-app/src/main/AndroidManifest.xml                   |   9 ++
- app/src/main/java/com/sinema/ui/MainActivity.kt    |   6 +
- .../main/java/com/sinema/ui/PlaybackActivity.kt    |   5 +
- .../main/java/com/sinema/ui/SettingsActivity.kt    |   3 +
- .../java/com/sinema/util/TvChannelInitReceiver.kt  |  30 ++++
- app/src/main/java/com/sinema/util/TvChannels.kt    | 169 +++++++++++++++++++++
- 6 files changed, 222 insertions(+)
+app/src/main/java/com/sinema/SinemaApp.kt          | 11 +++++-
+ .../main/java/com/sinema/model/ServerProfile.kt    | 12 +++++++
+ app/src/main/java/com/sinema/util/Prefs.kt         | 40 ++++++++++++++++++++++
+ app/src/main/java/com/sinema/util/ProfileCodec.kt  | 20 +++++++++++
+ .../test/java/com/sinema/util/ServerProfileTest.kt | 18 ++++++++++
+ 5 files changed, 100 insertions(+), 1 deletion(-)
 
 --- Changes ---
 
-app/src/main/AndroidManifest.xml
-  @@ -88,6 +88,15 @@
-  +        <receiver
-  +            android:name=".util.TvChannelInitReceiver"
-  +            android:exported="true"
-  +            android:enabled="true">
-  +            <intent-filter>
-  +                <action android:name="androidx.tvprovider.media.tv.INITIALIZE_PROGRAMS" />
-  +            </intent-filter>
-  +        </receiver>
+app/src/main/java/com/sinema/SinemaApp.kt
+  @@ -21,6 +21,7 @@ class SinemaApp : Application() {
+  +        prefs.migrateToProfilesIfNeeded()
+           api = SinemaApi(prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode)
+           configureApi()
+       }
+  @@ -33,7 +34,15 @@ class SinemaApp : Application() {
+  -        api.onSessionRefreshed = { cookie -> prefs.sessionCookie = cookie }
+  +        api.onSessionRefreshed = { cookie ->
+  +            prefs.sessionCookie = cookie
+  +            // Also update the active profile's cookie so it survives profile switches
+  +            val active = prefs.activeProfile
+  +            if (active != null) {
+  +                val updated = active.copy(sessionCookie = cookie)
+  +                prefs.profiles = prefs.profiles.map { if (it.id == updated.id) updated else it }
+  +            }
+  +        }
+       }
+   
+       companion object {
+  +10 -1
+
+app/src/main/java/com/sinema/model/ServerProfile.kt
+  @@ -0,0 +1,12 @@
+  +package com.sinema.model
   +
-           <activity
-               android:name=".ui.DeepLinkActivity"
-               android:exported="true"
-  +9 -0
+  +data class ServerProfile(
+  +    val id: String,
+  +    val name: String,
+  +    val serverUrl: String,
+  +    val apiKey: String,
+  +    val sessionCookie: String,
+  +    val authMode: String,
+  +    val stashUsername: String,
+  +    val stashPassword: String
+  +)
+  +12 -0
 
-app/src/main/java/com/sinema/ui/MainActivity.kt
-  @@ -221,6 +221,12 @@ class MainFragment : RowsSupportFragment() {
-  +                // Sync TV channels (fire-and-forget on appScope)
-  +                app.appScope.launch {
-  +                    com.sinema.util.TvChannels.syncWatchNext(requireContext(), continuePairs)
-  +                    com.sinema.util.TvChannels.syncRecentlyAdded(requireContext(), recentScenes)
-  +                }
+app/src/main/java/com/sinema/util/Prefs.kt
+  @@ -46,6 +46,46 @@ class Prefs(context: Context) {
+  +    // Server profiles (stored in secure prefs)
+  +    var profiles: List<com.sinema.model.ServerProfile>
+  +        get() = ProfileCodec.fromJson(getSecureString("server_profiles"))
+  +        set(value) = putSecureString("server_profiles", ProfileCodec.toJson(value))
   +
-               } catch (e: Exception) {
-                   Log.e("Sinema", "loadContent failed", e)
-                   val message = e.message ?: "Unknown error"
-  +6 -0
+  +    var activeProfileId: String
+  +        get() = prefs.getString("active_profile_id", "") ?: ""
+  +        set(value) = prefs.edit().putString("active_profile_id", value).apply()
+  +
+  +    val activeProfile: com.sinema.model.ServerProfile?
+  +        get() = profiles.firstOrNull { it.id == activeProfileId } ?: profiles.firstOrNull()
+  +
+  +    /** Migrate legacy single-server fields into a profile on first use. */
+  +    fun migrateToProfilesIfNeeded() {
+  +        if (profiles.isNotEmpty() || !isConfigured) return
+  +        val p = com.sinema.model.ServerProfile(
+  +            id = java.util.UUID.randomUUID().toString(),
+  +            name = "Default",
+  +            serverUrl = serverUrl,
+  +            apiKey = apiKey,
+  +            sessionCookie = sessionCookie,
+  +            authMode = authMode,
+  +            stashUsername = stashUsername,
+  +            stashPassword = stashPassword
+  +        )
+  +        profiles = listOf(p)
+  +        activeProfileId = p.id
+  +    }
+  +
+  +    /** Persist the active profile's fields back into the legacy accessors. */
+  +    fun applyProfile(p: com.sinema.model.ServerProfile) {
+  +        serverUrl = p.serverUrl
+  +        apiKey = p.apiKey
+  +        sessionCookie = p.sessionCookie
+  +        authMode = p.authMode
+  +        stashUsername = p.stashUsername
+  +        stashPassword = p.stashPassword
+  +        activeProfileId = p.id
+  +    }
+  +
+       val isConfigured: Boolean
+           get() = apiKey.isNotBlank() || sessionCookie.isNotBlank()
+   
+  +40 -0
 
-app/src/main/java/com/sinema/ui/PlaybackActivity.kt
-  @@ -96,6 +96,11 @@ class PlaybackActivity : FragmentActivity() {
-  +                // Refresh Watch Next after saving playback state
-  +                if (resumeTimeSec > 0) {
-  +                    val continuePairs = app.api.findContinuePlaying()
-  +                    com.sinema.util.TvChannels.syncWatchNext(this@PlaybackActivity, continuePairs)
-  +                }
-               } catch (e: Exception) {
-                   android.util.Log.e("Sinema", "Failed to save playback state", e)
-               }
-  +5 -0
-
-app/src/main/java/com/sinema/ui/SettingsActivity.kt
-  @@ -215,6 +215,9 @@ class SettingsFragment : Fragment() {
-  +                    if (!newState) {
-  +                        com.sinema.util.TvChannels.clearAll(ctx)
-  +                    }
-                       Toast.makeText(ctx, "Channels ${if (newState) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
-                   }
-               }
-  +3 -0
-
-app/src/main/java/com/sinema/util/TvChannelInitReceiver.kt
-  @@ -0,0 +1,30 @@
+app/src/main/java/com/sinema/util/ProfileCodec.kt
+  @@ -0,0 +1,20 @@
   +package com.sinema.util
   +
-  +import android.content.BroadcastReceiver
-  +import android.content.Context
-  +import android.content.Intent
-  +import com.sinema.SinemaApp
-  +import kotlinx.coroutines.CoroutineScope
-  +import kotlinx.coroutines.Dispatchers
-  +import kotlinx.coroutines.SupervisorJob
-  +import kotlinx.coroutines.launch
+  +import com.google.gson.Gson
+  +import com.google.gson.reflect.TypeToken
+  +import com.sinema.model.ServerProfile
   +
-  +class TvChannelInitReceiver : BroadcastReceiver() {
-  +    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  +object ProfileCodec {
+  +    private val gson = Gson()
+  +    private val listType = object : TypeToken<List<ServerProfile>>() {}.type
   +
-  +    override fun onReceive(context: Context, intent: Intent?) {
-  +        if (intent?.action != androidx.tvprovider.media.tv.TvContractCompat.ACTION_INITIALIZE_PROGRAMS) return
-  +        val app = SinemaApp.instance
-  +        if (!app.prefs.channelsEnabled) return
-  +        scope.launch {
-  +            try {
-  +                val continuePairs = app.api.findContinuePlaying()
-  +                TvChannels.syncWatchNext(context, continuePairs)
-  +                val recentScenes = app.api.findRecentScenes(20)
-  +                TvChannels.syncRecentlyAdded(context, recentScenes)
-  +            } catch (e: Exception) {
-  +                android.util.Log.e("Sinema", "TV channel init sync failed", e)
-  +            }
+  +    fun toJson(profiles: List<ServerProfile>): String = gson.toJson(profiles, listType)
+  +
+  +    fun fromJson(json: String): List<ServerProfile> {
+  +        return try {
+  +            gson.fromJson(json, listType) ?: emptyList()
+  +        } catch (e: Exception) {
+  +            emptyList()
   +        }
   +    }
   +}
-  +30 -0
+  +20 -0
 
-app/src/main/java/com/sinema/util/TvChannels.kt
-  @@ -0,0 +1,169 @@
+app/src/test/java/com/sinema/util/ServerProfileTest.kt
+  @@ -0,0 +1,18 @@
   +package com.sinema.util
   +
-  +import android.content.ContentUris
-  +import android.content.Context
-  +import android.database.Cursor
-  +import android.graphics.BitmapFactory
-  +import android.net.Uri
-  +import android.provider.BaseColumns
-  +import android.util.Log
-  +import androidx.tvprovider.media.tv.PreviewChannel
-  +import androidx.tvprovider.media.tv.PreviewChannelHelper
-  +import androidx.tvprovider.media.tv.PreviewProgram
-  +import androidx.tvprovider.media.tv.TvContractCompat
-  +import androidx.tvprovider.media.tv.WatchNextProgram
-  +import com.sinema.R
-  +import com.sinema.SinemaApp
-  +import com.sinema.model.Scene
+  +import com.sinema.model.ServerProfile
+  +import org.junit.Assert.assertEquals
+  +import org.junit.Test
   +
-  +object TvChannels {
-  +    private const val CHANNEL_NAME = "Sinema — Recently Added"
-  +    private const val MAX_WATCH_NEXT = 10
-  +    private const val MAX_RECENT = 20
-  +
-  +    fun syncWatchNext(context: Context, continuePairs: List<Pair<Scene, Double>>) {
-  +        val app = SinemaApp.instance
-  +        if (!app.prefs.channelsEnabled) return
-  +        try {
-  +            val helper = PreviewChannelHelper(context)
-  +            val resolver = context.contentResolver
-  +            val uri = TvContractCompat.WatchNextPrograms.CONTENT_URI
-  +            resolver.query(uri, null, null, null, null)?.use { c: Cursor ->
-  +                while (c.moveToNext()) {
-  +                    val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
-  +                    resolver.delete(ContentUris.withAppendedId(uri, id), null, null)
-  +                }
-  +            }
-  +
-  +            continuePairs.take(MAX_WATCH_NEXT).forEach { (scene, resumeSec) ->
-  +                val intentUri = Uri.parse("com.sinema://app/scene/${scene.id}")
-  +                val builder = WatchNextProgram.Builder()
-  +                    .setType(0) // WATCH_NEXT_TYPE_CONTINUE
-  +                    .setTitle(scene.title)
-  +                    .setDurationMillis((scene.duration * 1000).toInt())
-  +                    .setLastPlaybackPositionMillis((resumeSec * 1000).toInt())
-  +                    .setIntentUri(intentUri)
-  +                    .setInternalProviderId(scene.id)
-  +
-  +                val artwork = artworkUri(app, scene)
-  +                if (artwork != null) builder.setPosterArtUri(artwork)
-  +
-  +                helper.publishWatchNextProgram(builder.build())
-  +            }
-  +        } catch (e: Exception) {
-  +            Log.e("Sinema", "Failed to sync Watch Next", e)
-  +        }
+  +class ServerProfileTest {
+  +    @Test
+  +    fun `round trips profile list through json`() {
+  +        val list = listOf(ServerProfile("u1", "A", "http://a", "k", "", "apikey", "", ""))
+  +        assertEquals(list, ProfileCodec.fromJson(ProfileCodec.toJson(list)))
   +    }
   +
-  +    fun syncRecentlyAdded(context: Context, scenes: List<Scene>) {
-  +        val app = SinemaApp.instance
-  +        if (!app.prefs.channelsEnabled) return
-  +        try {
-  +            val helper = PreviewChannelHelper(context)
-  +            val channelUri = findOrCreateChannel(context, helper)
-  +            if (channelUri == null) {
-  +                Log.w("Sinema", "Could not create/find channel")
-  +                return
-  +            }
-  +
-  +            val channelId = ContentUris.parseId(channelUri)
-  +            val resolver = context.contentResolver
-  +            val programsUri = TvContractCompat.buildPreviewProgramsUriForChannel(channelId)
-  +
-  +            resolver.query(programsUri, null, null, null, null)?.use { c: Cursor ->
-  +                while (c.moveToNext()) {
-  +                    val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
-  +                    resolver.delete(ContentUris.withAppendedId(programsUri, id), null, null)
-  +                }
-  +            }
-  +
-  +            scenes.take(MAX_RECENT).forEach { scene ->
-  +                val intentUri = Uri.parse("com.sinema://app/scene/${scene.id}")
-  +                val builder = PreviewProgram.Builder()
-  +                    .setChannelId(channelId)
-  +                    .setType(0) // TYPE_MOVIE
-  +                    .setTitle(scene.title)
-  +                    .setDurationMillis((scene.duration * 1000).toInt())
-  +                    .setIntentUri(intentUri)
-  +                    .setInternalProviderId(scene.id)
-  +
-  +                val artwork = artworkUri(app, scene)
-  +                if (artwork != null) builder.setPosterArtUri(artwork)
-  +
-  +                helper.publishPreviewProgram(builder.build())
-  +            }
-  +        } catch (e: Exception) {
-  +            Log.e("Sinema", "Failed to sync Recently Added channel", e)
-  +        }
+  +    @Test
+  +    fun `fromJson tolerates garbage`() {
+  +        assertEquals(emptyList<ServerProfile>(), ProfileCodec.fromJson("not json"))
   +    }
-  +
-  +    fun clearAll(context: Context) {
-  ... (69 lines truncated)
-  +169 -0
-[full diff: rtk git diff --no-compact]
+  +}
+  +18 -0
