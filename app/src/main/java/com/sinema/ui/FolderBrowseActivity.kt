@@ -13,6 +13,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
 import com.sinema.util.FolderHelper
+import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -83,18 +84,7 @@ class FolderGridFragment : VerticalGridSupportFragment() {
                     } else if (item.image != null) {
                         openImageViewer(item)
                     } else if (item.scene != null) {
-                        val scene = item.scene
-                        val intent = Intent(requireContext(), SceneDetailActivity::class.java)
-                        intent.putExtra("scene_id", scene.id)
-                        intent.putExtra("scene_path", scene.path)
-                        intent.putExtra("scene_duration", scene.duration)
-                        intent.putExtra("scene_size", scene.size)
-                        intent.putExtra("scene_width", scene.width)
-                        intent.putExtra("scene_height", scene.height)
-                        intent.putExtra("scene_play_count", scene.playCount)
-                        intent.putExtra("scene_rating100", scene.rating100 ?: -1)
-                        intent.putExtra("scene_title", scene.title)
-                        startActivity(intent)
+                        startActivity(SceneIntents.detail(requireContext(), item.scene))
                     }
                 }
             }

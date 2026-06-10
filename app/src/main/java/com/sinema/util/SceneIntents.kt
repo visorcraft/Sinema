@@ -1,0 +1,44 @@
+package com.sinema.util
+
+import android.content.Context
+import android.content.Intent
+import com.sinema.model.Scene
+import com.sinema.ui.SceneDetailActivity
+
+/** Single source of truth for passing a Scene between activities via Intent extras. */
+object SceneIntents {
+    private const val KEY_ID = "scene_id"
+    private const val KEY_TITLE = "scene_title"
+    private const val KEY_PATH = "scene_path"
+    private const val KEY_DURATION = "scene_duration"
+    private const val KEY_SIZE = "scene_size"
+    private const val KEY_WIDTH = "scene_width"
+    private const val KEY_HEIGHT = "scene_height"
+    private const val KEY_PLAY_COUNT = "scene_play_count"
+    private const val KEY_RATING = "scene_rating100"
+
+    fun detail(context: Context, scene: Scene): Intent =
+        Intent(context, SceneDetailActivity::class.java).apply {
+            putExtra(KEY_ID, scene.id)
+            putExtra(KEY_TITLE, scene.title)
+            putExtra(KEY_PATH, scene.path)
+            putExtra(KEY_DURATION, scene.duration)
+            putExtra(KEY_SIZE, scene.size)
+            putExtra(KEY_WIDTH, scene.width)
+            putExtra(KEY_HEIGHT, scene.height)
+            putExtra(KEY_PLAY_COUNT, scene.playCount)
+            putExtra(KEY_RATING, scene.rating100 ?: -1)
+        }
+
+    fun sceneFrom(intent: Intent): Scene = Scene(
+        id = intent.getStringExtra(KEY_ID) ?: "",
+        title = intent.getStringExtra(KEY_TITLE) ?: "",
+        path = intent.getStringExtra(KEY_PATH) ?: "",
+        duration = intent.getDoubleExtra(KEY_DURATION, 0.0),
+        size = intent.getLongExtra(KEY_SIZE, 0L),
+        width = intent.getIntExtra(KEY_WIDTH, 0),
+        height = intent.getIntExtra(KEY_HEIGHT, 0),
+        playCount = intent.getIntExtra(KEY_PLAY_COUNT, 0),
+        rating100 = intent.getIntExtra(KEY_RATING, -1).takeIf { it != -1 }
+    )
+}
