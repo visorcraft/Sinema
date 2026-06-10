@@ -11,8 +11,9 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 
 class Prefs(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("sinema", Context.MODE_PRIVATE)
-    private val securePrefs: SharedPreferences? = createSecurePrefs(context)
+    private val appContext = context.applicationContext
+    private val prefs: SharedPreferences = appContext.getSharedPreferences("sinema", Context.MODE_PRIVATE)
+    private val securePrefs: SharedPreferences? = createSecurePrefs(appContext)
     private val gson = Gson()
 
     var serverUrl: String
@@ -40,6 +41,10 @@ class Prefs(context: Context) {
     var authMode: String
         get() = prefs.getString("auth_mode", "apikey") ?: "apikey"
         set(value) = prefs.edit().putString("auth_mode", value).apply()
+
+    var channelsEnabled: Boolean
+        get() = prefs.getBoolean("channels_enabled", false)
+        set(value) = prefs.edit().putBoolean("channels_enabled", value).apply()
 
     val isConfigured: Boolean
         get() = apiKey.isNotBlank() || sessionCookie.isNotBlank()

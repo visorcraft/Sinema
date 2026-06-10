@@ -1,0 +1,31 @@
+[0m
+> build · k2p6
+[0m
+[0m→ [0mRead _review_diff.txt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/DeepLinkActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/SettingsActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/Prefs.kt
+[0m→ [0mRead app/src/main/AndroidManifest.xml
+[0m→ [0mRead app/build.gradle.kts
+**Code Review Findings:**
+
+1. **build.gradle.kts:31** — `signingConfig = signingConfigs.getByName("debug")` in the release build type. Release APKs are signed with the debug keystore, which is a security issue and prevents Play Store distribution.
+
+2. **build.gradle.kts:29** — `isMinifyEnabled = false` in release builds. Anti-pattern; release builds should enable code shrinking for security (harder to reverse engineer) and smaller APK size.
+
+3. **DeepLinkActivity.kt:93-94** — `details != null` is checked but `details.scene` is not null-checked before passing to `SceneIntents.detail()`. Potential NPE if the API returns a details object with a null scene.
+
+4. **DeepLinkActivity.kt:96-105** — Toasts are used for error feedback on Android TV. Toasts are poor TV UX (small text, may overlap with system UI, easily missed). Consider a dialog, Snackbar, or silent failure with logging.
+
+5. **SettingsActivity.kt:206-225** — The "Android TV Channels" toggle only persists a boolean preference and shows a Toast. It never actually calls `TvContract` or `androidx.tvprovider` APIs to create/remove channels. The added `tvprovider` dependency is unused; the feature is non-functional.
+
+6. **AndroidManifest.xml:92-102** — `DeepLinkActivity` uses `Theme.NoDisplay` as a trampoline but lacks `android:noHistory="true"`. If the process dies before `finish()` executes (crash, low memory), the invisible activity could remain in the back stack.
+
+7. **SettingsActivity.kt:218** — Toast used for channel toggle feedback. Same TV UX concern as #4.
+
+**Minor:**
+- `Prefs.kt:45-47` — `channelsEnabled` is clean Kotlin but unused outside the preference layer.
+- `DeepLinkActivity.kt:44` — Good use of `removePrefix` + `takeIf` idiom.
+- `Prefs.kt:14` — Correct use of `applicationContext` to prevent memory leaks.
+
+VERDICT approved issues=7
