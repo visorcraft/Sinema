@@ -39,4 +39,34 @@ class SinemaApiTest {
             api.getCaptionUrl("42", CaptionRef("en", "srt"))
         )
     }
+
+    @Test
+    fun `parseScene tolerates JSON-null captions`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"1","title":"t","captions":null,"tags":null,"performers":null,"files":[]}"""
+        ).asJsonObject
+        val scene = api.parseSceneForTest(obj)
+        assertEquals(emptyList<CaptionRef>(), scene.captions)
+    }
+
+    @Test
+    fun `parseScene tolerates JSON-null tags`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"1","title":"t","captions":null,"tags":null,"performers":null,"files":[]}"""
+        ).asJsonObject
+        val scene = api.parseSceneForTest(obj)
+        assertEquals(emptyList<com.sinema.model.TagRef>(), scene.tags)
+    }
+
+    @Test
+    fun `parseScene tolerates JSON-null performers`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"1","title":"t","captions":null,"tags":null,"performers":null,"files":[]}"""
+        ).asJsonObject
+        val scene = api.parseSceneForTest(obj)
+        assertEquals(emptyList<com.sinema.model.PerformerRef>(), scene.performers)
+    }
 }

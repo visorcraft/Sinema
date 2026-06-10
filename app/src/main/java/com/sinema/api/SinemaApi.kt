@@ -610,11 +610,14 @@ class SinemaApi(
             studio = studioObj?.let { s ->
                 StudioRef(id = s.get("id").asString, name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
             },
-            tags = if (obj.has("tags")) parseTagRefs(obj) else emptyList(),
-            performers = if (obj.has("performers")) parsePerformerRefs(obj) else emptyList(),
-            captions = if (obj.has("captions")) parseCaptionRefs(obj) else emptyList()
+            tags = obj.get("tags")?.takeIf { it.isJsonArray }?.let { parseTagRefs(obj) } ?: emptyList(),
+            performers = obj.get("performers")?.takeIf { it.isJsonArray }?.let { parsePerformerRefs(obj) } ?: emptyList(),
+            captions = obj.get("captions")?.takeIf { it.isJsonArray }?.let { parseCaptionRefs(obj) } ?: emptyList()
         )
     }
+
+    // test seam — allows unit tests to call the private parseScene without reflection
+    internal fun parseSceneForTest(obj: JsonObject): Scene = parseScene(obj)
 
     /**
      * Fetch a paginated list of tags, performers, or studios sorted by scene count descending.
