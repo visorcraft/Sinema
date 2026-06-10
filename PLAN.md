@@ -15,7 +15,7 @@
 - [x] **Phase 0** — Foundations: de-duplication groundwork & shared helpers
 - [x] **Phase 1** — API & model groundwork (metadata, entities, sort plumbing, full-scene query)
 - [x] **Phase 2** — Sort pickers on grids
-- [ ] **Phase 3** — Tag / Performer / Studio browsing
+- [x] **Phase 3** — Tag / Performer / Studio browsing
 - [ ] **Phase 4** — Scene detail metadata (chips, rating, date) → **Release v1.11.0**
 - [ ] **Phase 5** — Player: subtitles, audio tracks, playback speed
 - [ ] **Phase 6** — Scene markers as chapters
@@ -702,9 +702,9 @@ override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
 **Files:**
 - Modify: `app/src/main/java/com/sinema/ui/CardPresenter.kt`
 
-- [ ] **Step 1: Read `CardPresenter.kt` fully first** (it already renders `Scene`, and folder items). Add an `is EntityItem ->` branch in `onBindViewHolder`: title = `item.name`, content = `"${item.sceneCount} scene(s)"` (pluralized like the folder-card counts), image = `item.imagePath` loaded through the existing authenticated Glide path (`GlideAuth.url(api, item.imagePath)`) with a neutral placeholder drawable when `imagePath == null`. Follow the file's existing binding style exactly.
+- [x] **Step 1: Read `CardPresenter.kt` fully first** (it already renders `Scene`, and folder items). Add an `is EntityItem ->` branch in `onBindViewHolder`: title = `item.name`, content = `"${item.sceneCount} scene(s)"` (pluralized like the folder-card counts), image = `item.imagePath` loaded through the existing authenticated Glide path (`GlideAuth.url(api, item.imagePath)`) with a neutral placeholder drawable when `imagePath == null`. Follow the file's existing binding style exactly.
 
-- [ ] **Step 2: Build green. Commit** — `feat: render tag/performer/studio cards in CardPresenter`
+- [x] **Step 2: Build green. Commit** — `feat: render tag/performer/studio cards in CardPresenter`
 
 ### Task 3.2: `EntityGridActivity` (lists tags OR performers OR studios)
 
@@ -712,7 +712,7 @@ override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
 - Create: `app/src/main/java/com/sinema/ui/EntityGridActivity.kt`
 - Modify: `app/src/main/AndroidManifest.xml`
 
-- [ ] **Step 1: Implement using the Phase 0 base:**
+- [x] **Step 1: Implement using the Phase 0 base:**
 
 ```kotlin
 package com.sinema.ui
@@ -764,7 +764,7 @@ class EntityGridFragment : SceneGridFragment() {
 
 Register in the manifest like the other activities (`android:screenOrientation="landscape"`).
 
-- [ ] **Step 2: Commit** — `feat: add entity grid screen for tags, performers, studios`
+- [x] **Step 2: Commit** — `feat: add entity grid screen for tags, performers, studios`
 
 ### Task 3.3: `EntityScenesActivity` (scenes for one entity)
 
@@ -772,7 +772,7 @@ Register in the manifest like the other activities (`android:screenOrientation="
 - Create: `app/src/main/java/com/sinema/ui/EntityScenesActivity.kt`
 - Modify: `app/src/main/AndroidManifest.xml`
 
-- [ ] **Step 1: Implement** — same Activity+Fragment shape as Task 3.2. The fragment:
+- [x] **Step 1: Implement** — same Activity+Fragment shape as Task 3.2. The fragment:
 
 ```kotlin
 class EntityScenesFragment : SceneGridFragment() {
@@ -799,24 +799,24 @@ class EntityScenesFragment : SceneGridFragment() {
 
 The host `EntityScenesActivity` provides `intent(context, item: EntityItem)` (kind/id/name extras) and forwards MENU to `showSortDialog()` like Phase 2. Register in manifest.
 
-- [ ] **Step 2: Commit** — `feat: add per-entity scenes grid`
+- [x] **Step 2: Commit** — `feat: add per-entity scenes grid`
 
 ### Task 3.4: Home screen entry points
 
 **Files:**
 - Modify: `app/src/main/java/com/sinema/ui/MainActivity.kt:184-192` (top row) and the `is String ->` click handler at `:127-159`
 
-- [ ] **Step 1:** Add `"Tags"`, `"Performers"`, `"Studios"` to `topAdapter` after `"Browse Folders"`, and handle the clicks: `"Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))` etc.
+- [x] **Step 1:** Add `"Tags"`, `"Performers"`, `"Studios"` to `topAdapter` after `"Browse Folders"`, and handle the clicks: `"Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))` etc.
 
-- [ ] **Step 2: Sideload + verify on TV:** Home → Tags → tag grid with counts/images → tag → sorted scenes → detail → playback. Same for Performers and Studios. Check D-pad focus never gets trapped, and entity images load in both auth modes (image_path URLs carry their own host — confirm `GlideAuth` headers still apply).
+- [x] **Step 2: Sideload + verify on TV:** Home → Tags → tag grid with counts/images → tag → sorted scenes → detail → playback. Same for Performers and Studios. Check D-pad focus never gets trapped, and entity images load in both auth modes (image_path URLs carry their own host — confirm `GlideAuth` headers still apply).
 
-- [ ] **Step 3: Commit** — `feat: surface tag/performer/studio browsing on home screen`
+- [x] **Step 3: Commit** — `feat: surface tag/performer/studio browsing on home screen`
 
 ### Phase 3 Close-out
 
-- [ ] **Refactor Pass** — `EntityGridFragment`/`EntityScenesFragment` must contain no duplicated grid plumbing (it all lives in `SceneGridFragment`); the two new activities should be near-trivial shells.
-- [ ] **Close-out** checklist.
-- [ ] **Review Gate.**
+- [x] **Refactor Pass** — `EntityGridFragment`/`EntityScenesFragment` must contain no duplicated grid plumbing (it all lives in `SceneGridFragment`); the two new activities should be near-trivial shells.
+- [x] **Close-out** checklist.
+- [x] **Review Gate.**
 
 ---
 
