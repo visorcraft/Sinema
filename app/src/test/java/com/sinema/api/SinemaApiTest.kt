@@ -1,5 +1,6 @@
 package com.sinema.api
 
+import com.sinema.model.CaptionRef
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -28,5 +29,14 @@ class SinemaApiTest {
         val api = SinemaApi("http://server", "old-key", "", "apikey")
         api.updateConfig("http://server", "", "session=zzz", "session")
         assertEquals(mapOf("Cookie" to "session=zzz"), api.mediaAuthHeaders())
+    }
+
+    @Test
+    fun `caption url carries language and type`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        assertEquals(
+            "http://server/scene/42/caption?lang=en&type=srt",
+            api.getCaptionUrl("42", CaptionRef("en", "srt"))
+        )
     }
 }
