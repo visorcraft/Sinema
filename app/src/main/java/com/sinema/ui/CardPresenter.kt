@@ -10,6 +10,7 @@ import com.bumptech.glide.Glide
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
+import com.sinema.model.EntityItem
 import com.sinema.model.FolderItem
 import com.sinema.model.Scene
 import com.sinema.util.GlideAuth
@@ -39,6 +40,22 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
                     .load(GlideAuth.url(api, url))
                     .centerCrop()
                     .into(image)
+            }
+            is EntityItem -> {
+                title.text = item.name
+                content.text = "${item.sceneCount} scenes"
+                heart?.visibility = View.GONE
+                checkmark?.visibility = View.GONE
+                if (item.imagePath != null) {
+                    Glide.with(view.context)
+                        .load(GlideAuth.url(api, item.imagePath))
+                        .centerCrop()
+                        .into(image)
+                } else {
+                    image.setImageResource(android.R.drawable.ic_menu_agenda)
+                    image.scaleType = ImageView.ScaleType.CENTER
+                    image.setBackgroundColor(0xFF444444.toInt())
+                }
             }
         }
     }
