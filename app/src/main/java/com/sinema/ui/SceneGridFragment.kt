@@ -70,17 +70,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open fun playAll() {
         val scenes = (0 until gridAdapter.size())
             .mapNotNull { gridAdapter.get(it) as? Scene }
-            .take(500)
-        if (scenes.isEmpty()) return
-        if (scenes.size == 500) {
-            Toast.makeText(requireContext(), "Queued first 500", Toast.LENGTH_SHORT).show()
-        }
-        PlaybackQueue.start(scenes.map { it.id }, startAt = 0)
-        val first = scenes[0]
-        val intent = Intent(requireContext(), PlaybackActivity::class.java)
-        intent.putExtra("scene_id", first.id)
-        intent.putExtra("resume_position_ms", 0L)
-        startActivity(intent)
+        SceneIntents.playAll(requireContext(), scenes)
     }
 
     private fun updateTitle() {

@@ -1,0 +1,260 @@
+app/build.gradle.kts                               |  4 +--
+ .../java/com/sinema/ui/FolderBrowseActivity.kt     | 28 +++++++++++++++++
+ app/src/main/java/com/sinema/ui/GridMenuDialog.kt  | 31 +++++++++++++++++++
+ .../main/java/com/sinema/ui/PlaybackActivity.kt    | 27 +++++++++++++++++
+ .../main/java/com/sinema/ui/SceneGridFragment.kt   | 35 ++++++++++++++++++++++
+ app/src/main/java/com/sinema/ui/SortableScreen.kt  |  3 +-
+ app/src/main/java/com/sinema/util/PlaybackQueue.kt | 23 ++++++++++++++
+ .../test/java/com/sinema/util/PlaybackQueueTest.kt | 28 +++++++++++++++++
+ 8 files changed, 176 insertions(+), 3 deletions(-)
+
+--- Changes ---
+
+app/build.gradle.kts
+  @@ -20,8 +20,8 @@ android {
+  -        versionCode = 15
+  -        versionName = "1.11.0"
+  +        versionCode = 16
+  +        versionName = "1.12.0"
+       }
+   
+       buildTypes {
+  +2 -2
+
+app/src/main/java/com/sinema/ui/FolderBrowseActivity.kt
+  @@ -49,6 +49,34 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
+  +    override fun showGridMenu() {
+  +        GridMenuDialog.show(requireContext(), sort, canPlayAll = true,
+  +            onSort = { chosen ->
+  +                sort = chosen
+  +                app.prefs.setSortFor("folder", chosen.name)
+  +                updateTitle()
+  +                loadFolder()
+  +            },
+  +            onPlayAll = { playAll() }
+  +        )
+  +    }
+  +
+  +    private fun playAll() {
+  +        val scenes = (0 until gridAdapter.size())
+  +            .mapNotNull { (gridAdapter.get(it) as? FolderItem)?.scene }
+  +            .take(500)
+  +        if (scenes.isEmpty()) return
+  +        if (scenes.size == 500) {
+  +            Toast.makeText(requireContext(), "Queued first 500", Toast.LENGTH_SHORT).show()
+  +        }
+  +        com.sinema.util.PlaybackQueue.start(scenes.map { it.id }, startAt = 0)
+  +        val first = scenes[0]
+  +        val intent = Intent(requireContext(), PlaybackActivity::class.java)
+  +        intent.putExtra("scene_id", first.id)
+  +        intent.putExtra("resume_position_ms", 0L)
+  +        startActivity(intent)
+  +    }
+  +
+       override fun showSortDialog() {
+           SortDialog.show(requireContext(), sort) { chosen ->
+               sort = chosen
+  +28 -0
+
+app/src/main/java/com/sinema/ui/GridMenuDialog.kt
+  @@ -0,0 +1,31 @@
+  +package com.sinema.ui
+  +
+  +import android.app.AlertDialog
+  +import android.content.Context
+  +import android.widget.Toast
+  +import com.sinema.model.SortOption
+  +
+  +object GridMenuDialog {
+  +    fun show(
+  +        context: Context,
+  +        current: SortOption,
+  +        canPlayAll: Boolean,
+  +        onSort: (SortOption) -> Unit,
+  +        onPlayAll: () -> Unit
+  +    ) {
+  +        val items = buildList {
+  +            add("Sort by…")
+  +            if (canPlayAll) add("▶ Play All")
+  +        }
+  +        AlertDialog.Builder(context)
+  +            .setTitle("Menu")
+  +            .setItems(items.toTypedArray()) { dialog, which ->
+  +                dialog.dismiss()
+  +                when (which) {
+  +                    0 -> SortDialog.show(context, current, onSort)
+  +                    1 -> onPlayAll()
+  +                }
+  +            }
+  +            .show()
+  +    }
+  +}
+  +31 -0
+
+app/src/main/java/com/sinema/ui/PlaybackActivity.kt
+  @@ -7,12 +7,15 @@ import androidx.fragment.app.FragmentActivity
+  +import androidx.lifecycle.lifecycleScope
+  +import androidx.media3.common.Player
+   import androidx.media3.exoplayer.ExoPlayer
+   import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+   import androidx.media3.ui.PlayerView
+   import com.sinema.R
+   import com.sinema.SinemaApp
+   import com.sinema.model.CaptionRef
+  +import com.sinema.util.PlaybackQueue
+   import com.sinema.util.SceneIntents
+   import com.sinema.util.TimeFormat
+   import kotlinx.coroutines.launch
+  @@ -55,6 +58,7 @@ class PlaybackActivity : FragmentActivity() {
+  +        if (isFinishing) PlaybackQueue.clear()
+       }
+   
+       private fun savePlayback() {
+  @@ -134,6 +138,29 @@ class PlaybackActivity : FragmentActivity() {
+  +                exo.addListener(object : Player.Listener {
+  +                    override fun onPlaybackStateChanged(state: Int) {
+  +                        if (state != Player.STATE_ENDED) return
+  +                        savePlayback()
+  +                        val nextId = PlaybackQueue.next() ?: run { finish(); return }
+  +                        lifecycleScope.launch {
+  +                            try {
+  +                                val details = app.api.findSceneFull(nextId)
+  +                                captions = details?.scene?.captions ?: emptyList()
+  +                                markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
+  +                            } catch (_: Exception) {
+  +                                captions = emptyList()
+  +                                markers = emptyList()
+  +                            }
+  +                            sceneId = nextId
+  +                            resumePositionMs = 0L
+  +                            playCountSent = false
+  +                            startTimeMs = System.currentTimeMillis()
+  +                            releasePlayer()
+  +                            initPlayer()
+  +                        }
+  +                    }
+  +                })
+               }
+       }
+   
+  +27 -0
+
+app/src/main/java/com/sinema/ui/SceneGridFragment.kt
+  @@ -11,8 +11,10 @@ import androidx.leanback.widget.VerticalGridPresenter
+  +import android.content.Intent
+   import com.sinema.model.Scene
+   import com.sinema.model.SortOption
+  +import com.sinema.util.PlaybackQueue
+   import com.sinema.util.SceneIntents
+   import kotlinx.coroutines.CancellationException
+   import kotlinx.coroutines.Job
+  @@ -48,6 +50,39 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
+  +    override fun showGridMenu() {
+  +        val key = sortScreenKey
+  +        if (key != null) {
+  +            GridMenuDialog.show(requireContext(), sort, canPlayAll = true,
+  +                onSort = { chosen ->
+  +                    sort = chosen
+  +                    app.prefs.setSortFor(key, chosen.name)
+  +                    updateTitle()
+  +                    reload()
+  +                },
+  +                onPlayAll = { playAll() }
+  +            )
+  +        } else {
+  +            showSortDialog()
+  +        }
+  +    }
+  +
+  +    protected open fun playAll() {
+  +        val scenes = (0 until gridAdapter.size())
+  +            .mapNotNull { gridAdapter.get(it) as? Scene }
+  +            .take(500)
+  +        if (scenes.isEmpty()) return
+  +        if (scenes.size == 500) {
+  +            Toast.makeText(requireContext(), "Queued first 500", Toast.LENGTH_SHORT).show()
+  +        }
+  +        PlaybackQueue.start(scenes.map { it.id }, startAt = 0)
+  +        val first = scenes[0]
+  +        val intent = Intent(requireContext(), PlaybackActivity::class.java)
+  +        intent.putExtra("scene_id", first.id)
+  +        intent.putExtra("resume_position_ms", 0L)
+  +        startActivity(intent)
+  +    }
+  +
+       private fun updateTitle() {
+           title = if (sortScreenKey != null) "$gridTitle  •  ${sort.label}" else gridTitle
+       }
+  +35 -0
+
+app/src/main/java/com/sinema/ui/SortableScreen.kt
+  @@ -7,6 +7,7 @@ import com.sinema.R
+  +    fun showGridMenu() = showSortDialog()
+   }
+   
+   /**
+  @@ -15,6 +16,6 @@ interface SortableScreen {
+  -    (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)?.showSortDialog()
+  +    (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)?.showGridMenu()
+       return true
+   }
+  +2 -1
+
+app/src/main/java/com/sinema/util/PlaybackQueue.kt
+  @@ -0,0 +1,23 @@
+  +package com.sinema.util
+  +
+  +/** In-process playback queue; survives activity recreation, dies with the process (fine for TV). */
+  +object PlaybackQueue {
+  +    private var ids: List<String> = emptyList()
+  +    private var index: Int = -1
+  +
+  +    val isActive: Boolean get() = index in ids.indices
+  +
+  +    @Synchronized
+  +    fun start(sceneIds: List<String>, startAt: Int) {
+  +        ids = sceneIds.toList()
+  +        index = startAt.coerceIn(-1, ids.size)
+  +    }
+  +
+  +    @Synchronized
+  +    fun next(): String? = if (index + 1 < ids.size) ids[++index] else null.also { clearInternal() }
+  +
+  +    @Synchronized
+  +    fun clear() = clearInternal()
+  +
+  +    private fun clearInternal() { ids = emptyList(); index = -1 }
+  +}
+  +23 -0
+
+app/src/test/java/com/sinema/util/PlaybackQueueTest.kt
+  @@ -0,0 +1,28 @@
+  +package com.sinema.util
+  +
+  +import org.junit.Assert.assertEquals
+  +import org.junit.Assert.assertNull
+  +import org.junit.Test
+  +
+  +class PlaybackQueueTest {
+  +    @Test
+  +    fun `next walks the queue and returns null at the end`() {
+  +        PlaybackQueue.start(listOf("1", "2", "3"), startAt = 0)
+  +        assertEquals("2", PlaybackQueue.next())
+  +        assertEquals("3", PlaybackQueue.next())
+  +        assertNull(PlaybackQueue.next())
+  +    }
+  +
+  +    @Test
+  +    fun `clear deactivates the queue`() {
+  +        PlaybackQueue.start(listOf("1", "2"), startAt = 0)
+  +        PlaybackQueue.clear()
+  +        assertNull(PlaybackQueue.next())
+  +    }
+  +
+  +    @Test
+  +    fun `start mid-list resumes from that position`() {
+  +        PlaybackQueue.start(listOf("a", "b", "c"), startAt = 1)
+  +        assertEquals("c", PlaybackQueue.next())
+  +    }
+  +}
+  +28 -0

@@ -142,7 +142,12 @@ class PlaybackActivity : FragmentActivity() {
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state != Player.STATE_ENDED) return
                         savePlayback()
-                        val nextId = PlaybackQueue.next() ?: run { finish(); return }
+                        val wasActive = PlaybackQueue.isActive
+                        val nextId = PlaybackQueue.next()
+                        if (nextId == null) {
+                            if (wasActive) finish()
+                            return
+                        }
                         lifecycleScope.launch {
                             try {
                                 val details = app.api.findSceneFull(nextId)

@@ -2,9 +2,11 @@ package com.sinema.util
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import com.sinema.model.CaptionRef
 import com.sinema.model.MarkerRef
 import com.sinema.model.Scene
+import com.sinema.ui.PlaybackActivity
 import com.sinema.ui.SceneDetailActivity
 
 /**
@@ -74,5 +76,20 @@ object SceneIntents {
         val seconds = intent.getDoubleArrayExtra(KEY_MARKER_SECONDS) ?: return emptyList()
         if (titles.size != seconds.size) return emptyList()
         return titles.zip(seconds.toList())
+    }
+
+    /** Launch playback for the first scene in a list, seeding the queue with up to 500 ids. */
+    fun playAll(context: Context, scenes: List<Scene>) {
+        val capped = scenes.take(500)
+        if (capped.isEmpty()) return
+        if (capped.size == 500) {
+            Toast.makeText(context, "Queued first 500", Toast.LENGTH_SHORT).show()
+        }
+        PlaybackQueue.start(capped.map { it.id }, startAt = 0)
+        val first = capped[0]
+        val intent = Intent(context, PlaybackActivity::class.java)
+        intent.putExtra("scene_id", first.id)
+        intent.putExtra("resume_position_ms", 0L)
+        context.startActivity(intent)
     }
 }

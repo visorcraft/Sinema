@@ -21,9 +21,9 @@ object GridMenuDialog {
             .setTitle("Menu")
             .setItems(items.toTypedArray()) { dialog, which ->
                 dialog.dismiss()
-                when (which) {
-                    0 -> SortDialog.show(context, current, onSort)
-                    1 -> onPlayAll()
+                when (items[which]) {
+                    "Sort by…" -> SortDialog.show(context, current, onSort)
+                    "▶ Play All" -> onPlayAll()
                 }
             }
             .show()
