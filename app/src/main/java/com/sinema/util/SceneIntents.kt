@@ -56,6 +56,7 @@ object SceneIntents {
     fun captionsFrom(intent: Intent): List<CaptionRef> {
         val langs = intent.getStringArrayExtra(KEY_CAPTION_LANGS) ?: return emptyList()
         val types = intent.getStringArrayExtra(KEY_CAPTION_TYPES) ?: return emptyList()
+        if (langs.size != types.size) return emptyList()
         return langs.zip(types).map { (l, t) -> CaptionRef(l, t) }
     }
 }

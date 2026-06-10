@@ -1,0 +1,141 @@
+.../main/java/com/sinema/ui/PlaybackActivity.kt    | 26 ++++++++++++++++++++--
+ .../main/java/com/sinema/ui/SceneDetailActivity.kt |  6 +++++
+ app/src/main/java/com/sinema/util/SceneIntents.kt  | 16 ++++++++++++-
+ app/src/main/res/layout/activity_playback.xml      |  5 ++++-
+ 4 files changed, 49 insertions(+), 4 deletions(-)
+
+--- Changes ---
+
+app/src/main/java/com/sinema/ui/PlaybackActivity.kt
+  @@ -4,12 +4,15 @@ import android.net.Uri
+  +import androidx.media3.common.MimeTypes
+   import androidx.media3.datasource.DefaultHttpDataSource
+   import androidx.media3.exoplayer.ExoPlayer
+   import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+   import androidx.media3.ui.PlayerView
+   import com.sinema.R
+   import com.sinema.SinemaApp
+  +import com.sinema.model.CaptionRef
+  +import com.sinema.util.SceneIntents
+   import kotlinx.coroutines.launch
+   
+   @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+  @@ -20,6 +23,7 @@ class PlaybackActivity : FragmentActivity() {
+  +    private var captions: List<CaptionRef> = emptyList()
+   
+       override fun onCreate(savedInstanceState: Bundle?) {
+           super.onCreate(savedInstanceState)
+  @@ -27,6 +31,7 @@ class PlaybackActivity : FragmentActivity() {
+  +        captions = SceneIntents.captionsFrom(intent)
+       }
+   
+       override fun onStart() {
+  @@ -86,10 +91,27 @@ class PlaybackActivity : FragmentActivity() {
+  +    private fun buildMediaItem(): MediaItem {
+  +        val app = SinemaApp.instance
+  +        val streamUrl = app.api.getStreamUrl(sceneId)
+  +        // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
+  +        val subs = captions.map { c ->
+  +            MediaItem.SubtitleConfiguration.Builder(Uri.parse(app.api.getCaptionUrl(sceneId, c)))
+  +                .setMimeType(if (c.captionType.equals("vtt", true)) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP)
+  +                .setLanguage(c.languageCode.takeIf { it.isNotBlank() })
+  +                .setLabel("${c.languageCode.uppercase().ifBlank { "UNKNOWN" }} (${c.captionType})")
+  +                .build()
+  +        }
+  +        return MediaItem.Builder()
+  +            .setUri(Uri.parse(streamUrl))
+  +            .setMediaId(sceneId)
+  +            .setSubtitleConfigurations(subs)
+  +            .build()
+  +    }
+  +
+       private fun initPlayer() {
+           if (sceneId.isEmpty()) return
+           val app = SinemaApp.instance
+  -        val streamUrl = app.api.getStreamUrl(sceneId)
+   
+           val dataSourceFactory = DefaultHttpDataSource.Factory()
+               .setDefaultRequestProperties(app.api.mediaAuthHeaders())
+  @@ -99,7 +121,7 @@ class PlaybackActivity : FragmentActivity() {
+  -                exo.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
+  +                exo.setMediaItem(buildMediaItem())
+                   exo.prepare()
+                   if (resumePositionMs > 0) {
+                       exo.seekTo(resumePositionMs)
+  +24 -2
+
+app/src/main/java/com/sinema/ui/SceneDetailActivity.kt
+  @@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
+  +import com.sinema.model.CaptionRef
+   import com.sinema.model.EntityItem
+   import com.sinema.model.Scene
+   import com.sinema.model.SceneDetails
+  @@ -38,6 +39,9 @@ class SceneDetailActivity : FragmentActivity() {
+  +    // Captions loaded from Stash after loadDetails completes; empty until then (fine — Play before load = no subs)
+  +    private var captions: List<CaptionRef> = emptyList()
+  +
+       // Cache key to skip chip rebuild when metadata is unchanged on re-resume
+       private var boundChipsKey: String? = null
+   
+  @@ -159,6 +163,7 @@ class SceneDetailActivity : FragmentActivity() {
+  +                captions = details.scene.captions
+                   bindResume(details)
+                   bindMeta(details.scene)
+                   bindChips(details.scene)
+  @@ -272,6 +277,7 @@ class SceneDetailActivity : FragmentActivity() {
+  +        SceneIntents.putCaptions(intent, captions)
+           startActivity(intent)
+       }
+   
+  +6 -0
+
+app/src/main/java/com/sinema/util/SceneIntents.kt
+  @@ -2,12 +2,13 @@ package com.sinema.util
+  +import com.sinema.model.CaptionRef
+   import com.sinema.model.Scene
+   import com.sinema.ui.SceneDetailActivity
+   
+   /**
+    * Single source of truth for passing a Scene between activities via Intent extras.
+  - * Scene metadata (tags/performers/captions/etc.) is NOT carried across the round-trip — receivers needing it must refetch via the full scene query.
+  + * Scene metadata (tags/performers/captions/etc.) is NOT carried across the round-trip — receivers needing it must refetch via the full scene query, except via the explicit putCaptions/captionsFrom pair used for playback intents.
+    */
+   object SceneIntents {
+       private const val KEY_ID = "scene_id"
+  @@ -19,6 +20,8 @@ object SceneIntents {
+  +    private const val KEY_CAPTION_LANGS = "caption_langs"
+  +    private const val KEY_CAPTION_TYPES = "caption_types"
+   
+       fun detail(context: Context, scene: Scene): Intent =
+           Intent(context, SceneDetailActivity::class.java).apply {
+  @@ -44,4 +47,15 @@ object SceneIntents {
+  +
+  +    fun putCaptions(intent: Intent, captions: List<CaptionRef>) {
+  +        intent.putExtra(KEY_CAPTION_LANGS, captions.map { it.languageCode }.toTypedArray())
+  +        intent.putExtra(KEY_CAPTION_TYPES, captions.map { it.captionType }.toTypedArray())
+  +    }
+  +
+  +    fun captionsFrom(intent: Intent): List<CaptionRef> {
+  +        val langs = intent.getStringArrayExtra(KEY_CAPTION_LANGS) ?: return emptyList()
+  +        val types = intent.getStringArrayExtra(KEY_CAPTION_TYPES) ?: return emptyList()
+  +        return langs.zip(types).map { (l, t) -> CaptionRef(l, t) }
+  +    }
+   }
+  +15 -1
+
+app/src/main/res/layout/activity_playback.xml
+  @@ -1,11 +1,14 @@
+  +    xmlns:app="http://schemas.android.com/apk/res-auto"
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:background="#000000">
+   
+  +    <!-- CC button toggles/picks text tracks; gear menu (default controller) provides speed + audio track selection -->
+       <androidx.media3.ui.PlayerView
+           android:id="@+id/player_view"
+           android:layout_width="match_parent"
+  -        android:layout_height="match_parent" />
+  +        android:layout_height="match_parent"
+  +        app:show_subtitle_button="true" />
+   </FrameLayout>
+  +4 -1
