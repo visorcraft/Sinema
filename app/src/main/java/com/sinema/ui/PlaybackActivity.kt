@@ -7,12 +7,15 @@ import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.CaptionRef
+import com.sinema.util.PlaybackQueue
 import com.sinema.util.SceneIntents
 import com.sinema.util.TimeFormat
 import kotlinx.coroutines.launch
@@ -55,6 +58,7 @@ class PlaybackActivity : FragmentActivity() {
         chaptersDialog?.dismiss()
         chaptersDialog = null
         releasePlayer()
+        if (isFinishing) PlaybackQueue.clear()
     }
 
     private fun savePlayback() {
@@ -134,6 +138,29 @@ class PlaybackActivity : FragmentActivity() {
                     exo.seekTo(resumePositionMs)
                 }
                 exo.playWhenReady = true
+                exo.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(state: Int) {
+                        if (state != Player.STATE_ENDED) return
+                        savePlayback()
+                        val nextId = PlaybackQueue.next() ?: run { finish(); return }
+                        lifecycleScope.launch {
+                            try {
+                                val details = app.api.findSceneFull(nextId)
+                                captions = details?.scene?.captions ?: emptyList()
+                                markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
+                            } catch (_: Exception) {
+                                captions = emptyList()
+                                markers = emptyList()
+                            }
+                            sceneId = nextId
+                            resumePositionMs = 0L
+                            playCountSent = false
+                            startTimeMs = System.currentTimeMillis()
+                            releasePlayer()
+                            initPlayer()
+                        }
+                    }
+                })
             }
     }
 
