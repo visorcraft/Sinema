@@ -34,4 +34,10 @@ class SortOptionTest {
     fun `fromName round trips a real entry`() {
         assertEquals(SortOption.RANDOM, SortOption.fromName("RANDOM"))
     }
+
+    @Test
+    fun `fromName honors caller default`() {
+        assertEquals(SortOption.UPDATED_DESC, SortOption.fromName("", SortOption.UPDATED_DESC))
+        assertEquals(SortOption.RANDOM, SortOption.fromName("RANDOM", SortOption.UPDATED_DESC))
+    }
 }

@@ -2,6 +2,7 @@ package com.sinema.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
@@ -12,9 +13,11 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
+import com.sinema.model.SortOption
 import com.sinema.util.FolderHelper
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
@@ -32,12 +35,39 @@ class FolderBrowseActivity : FragmentActivity() {
                 .commit()
         }
     }
+
+    // MENU-key opens the sort picker; on-device fallback (remotes lacking MENU) is deferred.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            (supportFragmentManager.findFragmentById(R.id.main_frame) as? FolderGridFragment)
+                ?.showSortDialog()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 }
 
 class FolderGridFragment : VerticalGridSupportFragment() {
     private val app get() = SinemaApp.instance
     private lateinit var gridAdapter: ArrayObjectAdapter
     private var currentPath = "/data"
+
+    private var sort: SortOption = SortOption.PATH_ASC
+    private val randomSeed: Int = (0..99_999_999).random()
+    private var loadJob: Job? = null
+
+    fun showSortDialog() {
+        SortDialog.show(requireContext(), sort) { chosen ->
+            sort = chosen
+            app.prefs.setSortFor("folder", chosen.name)
+            updateTitle()
+            loadFolder()
+        }
+    }
+
+    private fun updateTitle() {
+        title = "$currentPath  •  ${sort.label}"
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -64,7 +94,8 @@ class FolderGridFragment : VerticalGridSupportFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         currentPath = arguments?.getString("path") ?: "/data"
-        title = currentPath
+        sort = SortOption.fromName(app.prefs.sortFor("folder"))
+        updateTitle()
         badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
 
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false)
@@ -101,10 +132,17 @@ class FolderGridFragment : VerticalGridSupportFragment() {
     }
 
     private fun loadFolder() {
-        lifecycleScope.launch {
+        loadJob?.cancel()
+        loadJob = lifecycleScope.launch {
             try {
                 val scenesJob = async {
-                    fetchAllPages { page -> app.api.findScenesByPath(currentPath, page, PAGE_SIZE) }
+                    // sort applies to scene queries only; image/folder queries keep their current order
+                    fetchAllPages { page ->
+                        app.api.findScenesByPath(
+                            currentPath, page, PAGE_SIZE,
+                            sort = sort.apiSort(randomSeed), direction = sort.direction
+                        )
+                    }
                 }
                 val imagesJob = async {
                     fetchAllPages { page -> app.api.findImagesByPath(currentPath, page, PAGE_SIZE) }
