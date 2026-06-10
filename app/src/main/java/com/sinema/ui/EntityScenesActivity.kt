@@ -3,10 +3,10 @@ package com.sinema.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.fragment.app.FragmentActivity
 import com.sinema.R
 import com.sinema.model.EntityItem
-import com.sinema.model.SortOption
 
 class EntityScenesActivity : FragmentActivity() {
     companion object {
@@ -31,7 +31,7 @@ class EntityScenesActivity : FragmentActivity() {
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean =
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
         if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 }
 
@@ -49,9 +49,11 @@ class EntityScenesFragment : SceneGridFragment() {
     override val gridTitle get() = requireArguments().getString("name") ?: ""
     override val emptyMessage = "No scenes"
 
-    override suspend fun loadItems(): List<Any> =
-        app.api.findScenesForEntity(
+    override suspend fun loadItems(): List<Any> {
+        // TODO: paginate; silently capped at 200 (server count available in .first)
+        return app.api.findScenesForEntity(
             kind, requireArguments().getString("id")!!,
             perPage = 200, sort = sort.apiSort(randomSeed), direction = sort.direction
         ).second
+    }
 }
