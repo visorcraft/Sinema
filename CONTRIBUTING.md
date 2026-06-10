@@ -70,6 +70,17 @@ Keep Stash-talking logic in `api/`. UI code should call into the API
 client and present results — it should not assemble GraphQL queries
 inline.
 
+### Shared helpers (use them, don't reinvent)
+
+New grid screens should extend `SceneGridFragment` (in `ui/`) instead of
+duplicating VerticalGridPresenter setup, overscan padding, and click-
+to-detail wiring. Pass scenes between activities via `SceneIntents`
+(`util/SceneIntents.kt`) — never hand-roll `intent.putExtra("scene_*", …)`
+blocks. Scene queries go through `SinemaApi.findScenesInternal` (in `api/`)
+which centralizes the GraphQL field list; extend `SCENE_FIELDS` only when
+adding new server-side fields. Format durations with `TimeFormat`
+(`util/TimeFormat.kt`) rather than inline `%d:%02d` logic.
+
 ## Local development
 
 You can build Sinema two ways. Pick the one that fits your machine.

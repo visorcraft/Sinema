@@ -279,7 +279,6 @@ class SceneDetailActivity : FragmentActivity() {
     private fun launchPlayback(resumeMs: Long) {
         val intent = Intent(this, PlaybackActivity::class.java)
         intent.putExtra("scene_id", scene.id)
-        intent.putExtra("scene_title", scene.filename)
         intent.putExtra("resume_position_ms", resumeMs)
         SceneIntents.putCaptions(intent, captions)
         SceneIntents.putMarkers(intent, markers)
