@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.leanback.app.SearchSupportFragment
 import androidx.leanback.widget.*
 import androidx.fragment.app.FragmentActivity
@@ -52,6 +53,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         SortDialog.show(requireContext(), sort) { chosen ->
             sort = chosen
             app.prefs.setSortFor("search", chosen.name)
+            Toast.makeText(requireContext(), "Sorted by ${chosen.label}", Toast.LENGTH_SHORT).show()
             // Re-run the current query with the new sort; if blank, just persist the sort.
             if (currentQuery.length >= 2) search(currentQuery)
         }

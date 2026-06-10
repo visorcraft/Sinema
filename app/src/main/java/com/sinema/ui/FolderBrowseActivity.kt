@@ -17,6 +17,7 @@ import com.sinema.model.SortOption
 import com.sinema.util.FolderHelper
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
@@ -53,14 +54,19 @@ class FolderGridFragment : VerticalGridSupportFragment() {
 
     private var sort: SortOption = SortOption.PATH_ASC
     private val randomSeed: Int = (0..99_999_999).random()
+    private var loadJob: Job? = null
 
     fun showSortDialog() {
         SortDialog.show(requireContext(), sort) { chosen ->
             sort = chosen
             app.prefs.setSortFor("folder", chosen.name)
-            title = "$currentPath  •  ${sort.label}"
+            updateTitle()
             loadFolder()
         }
+    }
+
+    private fun updateTitle() {
+        title = "$currentPath  •  ${sort.label}"
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -89,7 +95,7 @@ class FolderGridFragment : VerticalGridSupportFragment() {
         super.onCreate(savedInstanceState)
         currentPath = arguments?.getString("path") ?: "/data"
         sort = SortOption.fromName(app.prefs.sortFor("folder"))
-        title = "$currentPath  •  ${sort.label}"
+        updateTitle()
         badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
 
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false)
@@ -126,7 +132,8 @@ class FolderGridFragment : VerticalGridSupportFragment() {
     }
 
     private fun loadFolder() {
-        lifecycleScope.launch {
+        loadJob?.cancel()
+        loadJob = lifecycleScope.launch {
             try {
                 val scenesJob = async {
                     // sort applies to scene queries only; image/folder queries keep their current order
