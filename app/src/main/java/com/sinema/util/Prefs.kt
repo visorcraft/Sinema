@@ -84,6 +84,12 @@ class Prefs(context: Context) {
         prefs.edit().remove("resume_$sceneId").apply()
     }
 
+    fun sortFor(screen: String): String =
+        prefs.getString("sort_$screen", "") ?: ""
+
+    fun setSortFor(screen: String, optionName: String) =
+        prefs.edit().putString("sort_$screen", optionName).apply()
+
     fun getAllResumePositions(): Map<String, Long> {
         return prefs.all.filter { it.key.startsWith("resume_") && it.value is Long && (it.value as Long) > 0 }
             .map { it.key.removePrefix("resume_") to (it.value as Long) }

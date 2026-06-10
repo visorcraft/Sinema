@@ -1,10 +1,19 @@
 package com.sinema.api
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.sinema.model.CaptionRef
+import com.sinema.model.EntityItem
 import com.sinema.model.ImageItem
+import com.sinema.model.MarkerRef
+import com.sinema.model.PerformerRef
 import com.sinema.model.Scene
+import com.sinema.model.SceneDetails
+import com.sinema.model.StudioRef
+import com.sinema.model.TagRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
@@ -14,6 +23,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class SinemaApi(
@@ -24,10 +34,17 @@ class SinemaApi(
 ) {
 
     companion object {
-        // Single source of truth for scene list payloads. Extended fields
-        // (tags/performers/etc.) will live in SCENE_FIELDS_FULL — see findSceneFull (planned, PLAN.md Task 1.4).
+        // Single source of truth for scene list payloads.
         internal const val SCENE_FIELDS =
             "id title play_count rating100 files { path size duration width height }"
+
+        // Full scene payload — used by findSceneFull for detail/player screens.
+        internal const val SCENE_FIELDS_FULL = SCENE_FIELDS +
+            " date" +
+            " studio { id name }" +
+            " tags { id name }" +
+            " performers { id name }" +
+            " captions { language_code caption_type }"
     }
 
     private val client = OkHttpClient.Builder()
@@ -187,10 +204,12 @@ class SinemaApi(
     suspend fun findAllScenes(page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
         findScenesInternal(page = page, perPage = perPage)
 
-    suspend fun findScenesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
+    suspend fun findScenesByPath(
+        pathPrefix: String, page: Int = 1, perPage: Int = 100,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> =
         findScenesInternal(
-            page = page,
-            perPage = perPage,
+            page = page, perPage = perPage, sort = sort, direction = direction,
             sceneFilter = mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
         )
 
@@ -295,8 +314,11 @@ class SinemaApi(
         )
     }
 
-    suspend fun searchScenes(searchTerm: String, page: Int = 1, perPage: Int = 40): Pair<Int, List<Scene>> =
-        findScenesInternal(page = page, perPage = perPage, searchTerm = searchTerm)
+    suspend fun searchScenes(
+        searchTerm: String, page: Int = 1, perPage: Int = 40,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> =
+        findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, searchTerm = searchTerm)
 
     suspend fun setSceneRating(sceneId: String, rating: Int?): Boolean {
         val query = """
@@ -321,11 +343,9 @@ class SinemaApi(
         return if (scene.get("rating100")?.isJsonNull != false) null else scene.get("rating100").asInt
     }
 
-    suspend fun findFavoriteScenes(): List<Scene> =
+    suspend fun findFavoriteScenes(sort: String = "updated_at", direction: String = "DESC"): List<Scene> =
         findScenesInternal(
-            perPage = 100,
-            sort = "updated_at",
-            direction = "DESC",
+            perPage = 100, sort = sort, direction = direction,
             sceneFilter = mapOf("rating100" to mapOf("value" to 1, "modifier" to "GREATER_THAN"))
         ).second
 
@@ -544,30 +564,171 @@ class SinemaApi(
         return result.getAsJsonObject("data")?.getAsJsonObject("findScenes")?.get("count")?.asInt ?: 0
     }
 
-    suspend fun findScenesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<Scene>> =
+    suspend fun findScenesInFolderDirect(
+        folderPath: String, page: Int = 1, perPage: Int = 500,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> =
         findScenesInternal(
-            page = page,
-            perPage = perPage,
+            page = page, perPage = perPage, sort = sort, direction = direction,
             sceneFilter = mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
         )
 
-    private fun parseScene(obj: JsonObject): Scene {
-        val id = obj.get("id").asString
-        val title = obj.get("title")?.asString ?: ""
+    private fun parseTagRefs(arr: JsonArray): List<TagRef> = arr.map { el ->
+        val t = el.asJsonObject
+        TagRef(
+            id = t.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+        )
+    }
+
+    private fun parsePerformerRefs(arr: JsonArray): List<PerformerRef> = arr.map { el ->
+        val p = el.asJsonObject
+        PerformerRef(
+            id = p.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+        )
+    }
+
+    private fun parseCaptionRefs(arr: JsonArray): List<CaptionRef> = arr.map { el ->
+        val c = el.asJsonObject
+        CaptionRef(
+            languageCode = c.get("language_code")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            captionType = c.get("caption_type")?.takeIf { !it.isJsonNull }?.asString ?: ""
+        )
+    }
+
+    @VisibleForTesting
+    internal fun parseScene(obj: JsonObject): Scene {
         val files = obj.getAsJsonArray("files")
         val file = if (files != null && files.size() > 0) files[0].asJsonObject else null
+        // Optional metadata — only present in SCENE_FIELDS_FULL queries; guarded to keep lean list queries working.
+        val studioObj = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
         return Scene(
-            id = id,
-            title = title,
+            id = obj.get("id").asString,
+            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
             path = file?.get("path")?.asString ?: "",
             size = file?.get("size")?.asLong ?: 0L,
             duration = file?.get("duration")?.asDouble ?: 0.0,
             width = file?.get("width")?.asInt ?: 0,
             height = file?.get("height")?.asInt ?: 0,
-            playCount = obj.get("play_count")?.asInt ?: 0,
-            rating100 = if (obj.has("rating100") && !obj.get("rating100").isJsonNull) obj.get("rating100").asInt else null
+            playCount = obj.get("play_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt,
+            date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
+            studio = studioObj?.let { s ->
+                StudioRef(
+                    id = s.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+                    name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                )
+            },
+            tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
+            performers = (obj.get("performers") as? JsonArray)?.let(::parsePerformerRefs) ?: emptyList(),
+            captions = (obj.get("captions") as? JsonArray)?.let(::parseCaptionRefs) ?: emptyList()
         )
     }
+
+    /**
+     * Fetch a paginated list of tags, performers, or studios sorted by scene count descending.
+     * Note: sort field is "scenes_count" (plural) — confirmed in stashapp/stash pkg/sqlite tag.go, performer.go, studio.go.
+     */
+    suspend fun findEntities(kind: EntityItem.Kind, page: Int = 1, perPage: Int = 100): Pair<Int, List<EntityItem>> {
+        val (queryName, listKey) = when (kind) {
+            EntityItem.Kind.TAG -> "findTags" to "tags"
+            EntityItem.Kind.PERFORMER -> "findPerformers" to "performers"
+            EntityItem.Kind.STUDIO -> "findStudios" to "studios"
+        }
+        val query = """
+            query(${"$"}filter: FindFilterType) {
+                $queryName(filter: ${"$"}filter) {
+                    count
+                    $listKey { id name scene_count image_path }
+                }
+            }
+        """.trimIndent()
+        val variables = mapOf(
+            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "scenes_count", "direction" to "DESC")
+        )
+        val result = graphql(query, variables)
+        val data = result.getAsJsonObject("data")?.getAsJsonObject(queryName) ?: return Pair(0, emptyList())
+        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val items = (data.get(listKey) as? JsonArray)?.map { el ->
+            parseEntity(el.asJsonObject, kind)
+        } ?: emptyList()
+        return Pair(count, items)
+    }
+
+    @VisibleForTesting
+    internal fun parseEntity(obj: JsonObject, kind: EntityItem.Kind): EntityItem = EntityItem(
+        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+        imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
+        kind = kind
+    )
+
+    /**
+     * Fetch scenes filtered by a tag, performer, or studio entity.
+     * performers uses MultiCriterionInput (no depth); tags/studios use HierarchicalMultiCriterionInput (depth supported).
+     */
+    suspend fun findScenesForEntity(
+        kind: EntityItem.Kind, entityId: String,
+        page: Int = 1, perPage: Int = 100,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> {
+        val sceneFilter = when (kind) {
+            EntityItem.Kind.TAG ->
+                mapOf("tags" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES", "depth" to 0))
+            EntityItem.Kind.PERFORMER ->
+                mapOf("performers" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES"))
+            EntityItem.Kind.STUDIO ->
+                mapOf("studios" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES", "depth" to 0))
+        }
+        return findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, sceneFilter = sceneFilter)
+    }
+
+    /**
+     * Fetches the full metadata payload for one scene.
+     * @return scene details, or null if the scene does not exist.
+     * @throws IOException on transport or GraphQL errors (callers must catch, as with every method here).
+     */
+    suspend fun findSceneFull(sceneId: String): SceneDetails? {
+        val query = """
+            query(${"$"}id: ID!) {
+                findScene(id: ${"$"}id) {
+                    $SCENE_FIELDS_FULL
+                    resume_time
+                    scene_markers { id title seconds primary_tag { id name } }
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("id" to sceneId))
+        // Use .get().takeIf{!isJsonNull}.asJsonObject rather than getAsJsonObject() because
+        // Gson 2.10.1's getAsJsonObject(String) does a raw checkcast and throws ClassCastException
+        // when the value is JsonNull (scene not found). The safe accessor avoids that.
+        val obj = result.getAsJsonObject("data")
+            ?.get("findScene")?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?: return null
+        val markers = (obj.get("scene_markers") as? JsonArray)?.map { m ->
+            parseMarker(m.asJsonObject)
+        } ?: emptyList()
+        return SceneDetails(
+            scene = parseScene(obj),
+            resumeTime = obj.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            markers = markers
+        )
+    }
+
+    @VisibleForTesting
+    internal fun parseMarker(mo: JsonObject): MarkerRef = MarkerRef(
+        id = mo.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        title = mo.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        seconds = mo.get("seconds")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+        primaryTag = (mo.get("primary_tag") as? JsonObject)?.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+    )
+
+    fun getCaptionUrl(sceneId: String, caption: CaptionRef): String =
+        "$serverUrl/scene/$sceneId/caption?" +
+            "lang=${URLEncoder.encode(caption.languageCode, "UTF-8")}" +
+            "&type=${URLEncoder.encode(caption.captionType, "UTF-8")}"
 
     suspend fun resetPlayCount(sceneId: String) {
         val query = """

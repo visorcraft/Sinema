@@ -1,5 +1,29 @@
 package com.sinema.model
 
+data class TagRef(val id: String, val name: String)
+data class PerformerRef(val id: String, val name: String)
+data class StudioRef(val id: String, val name: String)
+data class CaptionRef(val languageCode: String, val captionType: String)
+data class MarkerRef(val id: String, val title: String, val seconds: Double, val primaryTag: String)
+
+/** A browsable Stash entity (tag, performer, or studio). */
+data class EntityItem(
+    val id: String,
+    val name: String,
+    val sceneCount: Int,
+    val imagePath: String?,   // absolute URL from Stash, needs auth headers
+    val kind: Kind
+) {
+    enum class Kind(val label: String) { TAG("Tags"), PERFORMER("Performers"), STUDIO("Studios") }
+}
+
+/** Full single-scene payload for the detail screen and player. */
+data class SceneDetails(
+    val scene: Scene,
+    val resumeTime: Double,
+    val markers: List<MarkerRef>
+)
+
 data class Scene(
     val id: String,
     val title: String,
@@ -9,7 +33,13 @@ data class Scene(
     val width: Int,
     val height: Int,
     val playCount: Int = 0,
-    val rating100: Int? = null
+    val rating100: Int? = null,
+    // Metadata below is empty/null on list-query results; populated only by the full scene query.
+    val date: String? = null,
+    val studio: StudioRef? = null,
+    val tags: List<TagRef> = emptyList(),
+    val performers: List<PerformerRef> = emptyList(),
+    val captions: List<CaptionRef> = emptyList()
 ) {
     val isWatched: Boolean get() = playCount > 0
     val isFavorite: Boolean get() = (rating100 ?: 0) > 0
