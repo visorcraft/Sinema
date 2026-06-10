@@ -71,7 +71,7 @@ object FolderHelper {
         }.sortedBy { it.name.lowercase() }
 
         return folderItems +
-            videoFiles.sortedBy { it.name.lowercase() } +
+            videoFiles +
             imageFiles.sortedBy { it.name.lowercase() }
     }
 

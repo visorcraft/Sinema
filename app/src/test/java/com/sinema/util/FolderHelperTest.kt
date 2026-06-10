@@ -29,12 +29,26 @@ class FolderHelperTest {
         )
         val items = FolderHelper.buildFolderContents(scenes, images, "/data/root")
 
+        // Videos preserve API input order (z before a); images stay alphabetical.
         assertEquals(
-            listOf("aa-video.mp4", "zz-video.mp4", "aa-picture.jpg", "zz-picture.jpg"),
+            listOf("zz-video.mp4", "aa-video.mp4", "aa-picture.jpg", "zz-picture.jpg"),
             items.map { it.name }
         )
         assertTrue(items.take(2).all { it.scene != null })
         assertTrue(items.drop(2).all { it.image != null })
+    }
+
+    @Test
+    fun `video order from API is preserved so sort picker takes effect`() {
+        // Simulate the API returning scenes in reverse-alpha order (e.g. sort=title DESC).
+        // buildFolderContents must NOT re-sort them; the caller owns the order.
+        val scenes = listOf(
+            scene("s1", "/data/root/z.mp4"),
+            scene("s2", "/data/root/a.mp4")
+        )
+        val items = FolderHelper.buildFolderContents(scenes, emptyList(), "/data/root")
+
+        assertEquals(listOf("z.mp4", "a.mp4"), items.map { it.name })
     }
 
     @Test
