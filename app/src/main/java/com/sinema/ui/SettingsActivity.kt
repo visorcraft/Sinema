@@ -228,100 +228,11 @@ class SettingsFragment : Fragment() {
             ).apply { topMargin = 16; bottomMargin = 16 })
         }
 
-        // Servers Section
-        val serversLabel = TextView(ctx).apply {
-            text = "\nServers:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
+        ServerProfileSection.build(ctx, layout) {
+            val intent = Intent(ctx, SetupActivity::class.java)
+            intent.putExtra("add_profile", true)
+            setupLauncher.launch(intent)
         }
-        layout.addView(serversLabel)
-
-        val profiles = app.prefs.profiles
-        val activeId = app.prefs.activeProfileId
-
-        profiles.forEach { profile ->
-            val isActive = profile.id == activeId
-            val rowLayout = LinearLayout(ctx).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setBackgroundColor(0xFF333333.toInt())
-                isFocusable = false
-            }
-
-            val btn = Button(ctx).apply {
-                text = "${profile.name}${if (isActive) " ✓" else ""}\n${profile.serverUrl}"
-                textSize = 14f
-                isFocusable = true
-                setBackgroundColor(0xFF333333.toInt())
-                setTextColor(0xFFFFFFFF.toInt())
-                setOnFocusChangeListener { _, hasFocus ->
-                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-                    rowLayout.setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-                }
-                setOnClickListener {
-                    if (isActive) {
-                        Toast.makeText(ctx, "${profile.name} is already active", Toast.LENGTH_SHORT).show()
-                    } else {
-                        AlertDialog.Builder(ctx)
-                            .setTitle("Switch Server")
-                            .setMessage("Switch to ${profile.name}?")
-                            .setPositiveButton("Switch") { _, _ ->
-                                app.prefs.applyProfile(profile)
-                                app.refreshApi()
-                                val intent = Intent(ctx, MainActivity::class.java)
-                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                startActivity(intent)
-                                requireActivity().finish()
-                            }
-                            .setNegativeButton("Cancel", null)
-                            .show()
-                    }
-                }
-            }
-            rowLayout.addView(btn, LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-            ))
-
-            val optionsBtn = Button(ctx).apply {
-                text = "..."
-                textSize = 14f
-                isFocusable = true
-                setBackgroundColor(0xFF333333.toInt())
-                setTextColor(0xFFFFFFFF.toInt())
-                setOnFocusChangeListener { _, hasFocus ->
-                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-                }
-                setOnClickListener {
-                    showProfileOptions(profile, profiles.size <= 1)
-                }
-            }
-            rowLayout.addView(optionsBtn, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ))
-            layout.addView(rowLayout, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 8 })
-        }
-
-        val addServerBtn = Button(ctx).apply {
-            text = "+ Add Server"
-            isFocusable = true
-            setBackgroundColor(0xFF333333.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener {
-                val intent = Intent(ctx, SetupActivity::class.java)
-                intent.putExtra("add_profile", true)
-                setupLauncher.launch(intent)
-            }
-        }
-        layout.addView(addServerBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 8; bottomMargin = 16 })
 
         val pm = ctx.packageManager
         if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
@@ -362,18 +273,20 @@ class SettingsFragment : Fragment() {
                 if (apiKeyEdit.visibility == View.VISIBLE) {
                     app.prefs.apiKey = apiKeyEdit.text.toString().trim()
                 }
-                // Also update the active profile so the change survives switches
-                val active = app.prefs.activeProfile
-                if (active != null) {
-                    val updated = active.copy(
-                        serverUrl = app.prefs.serverUrl,
-                        apiKey = app.prefs.apiKey,
-                        sessionCookie = app.prefs.sessionCookie,
-                        authMode = app.prefs.authMode,
-                        stashUsername = app.prefs.stashUsername,
-                        stashPassword = app.prefs.stashPassword
-                    )
-                    app.prefs.profiles = app.prefs.profiles.map { if (it.id == updated.id) updated else it }
+                // Also update the active profile so the change survives switches.
+                // If activeProfileId is stale, update the profile with matching ID directly.
+                val activeId = app.prefs.activeProfileId
+                if (activeId.isNotBlank()) {
+                    app.prefs.profiles = app.prefs.profiles.map {
+                        if (it.id == activeId) it.copy(
+                            serverUrl = app.prefs.serverUrl,
+                            apiKey = app.prefs.apiKey,
+                            sessionCookie = app.prefs.sessionCookie,
+                            authMode = app.prefs.authMode,
+                            stashUsername = app.prefs.stashUsername,
+                            stashPassword = app.prefs.stashPassword
+                        ) else it
+                    }
                 }
                 app.refreshApi()
                 Toast.makeText(ctx, "Settings saved!", Toast.LENGTH_SHORT).show()
@@ -402,63 +315,5 @@ class SettingsFragment : Fragment() {
         val intent = Intent(requireContext(), PinActivity::class.java)
         intent.putExtra("verify_for_removal", true)
         pinActivityLauncher.launch(intent)
-    }
-
-    private fun showProfileOptions(profile: com.sinema.model.ServerProfile, isLast: Boolean) {
-        val ctx = requireContext()
-        val app = SinemaApp.instance
-        val items = arrayOf("Rename", "Remove")
-        AlertDialog.Builder(ctx)
-            .setTitle(profile.name)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> { // Rename
-                        val edit = EditText(ctx).apply {
-                            setText(profile.name)
-                            setTextColor(0xFFFFFFFF.toInt())
-                            setBackgroundColor(0xFF333333.toInt())
-                        }
-                        AlertDialog.Builder(ctx)
-                            .setTitle("Rename Server")
-                            .setView(edit)
-                            .setPositiveButton("Save") { _, _ ->
-                                val newName = edit.text.toString().trim()
-                                if (newName.isNotBlank()) {
-                                    val updated = profile.copy(name = newName)
-                                    app.prefs.profiles = app.prefs.profiles.map { if (it.id == profile.id) updated else it }
-                                    if (app.prefs.activeProfileId == profile.id) {
-                                        app.prefs.applyProfile(updated)
-                                    }
-                                    requireActivity().recreate()
-                                }
-                            }
-                            .setNegativeButton("Cancel", null)
-                            .show()
-                    }
-                    1 -> { // Remove
-                        if (isLast) {
-                            Toast.makeText(ctx, "Cannot remove the last server", Toast.LENGTH_SHORT).show()
-                            return@setItems
-                        }
-                        AlertDialog.Builder(ctx)
-                            .setTitle("Remove Server")
-                            .setMessage("Remove ${profile.name}?")
-                            .setPositiveButton("Remove") { _, _ ->
-                                val remaining = app.prefs.profiles.filter { it.id != profile.id }
-                                app.prefs.profiles = remaining
-                                if (app.prefs.activeProfileId == profile.id) {
-                                    remaining.firstOrNull()?.let {
-                                        app.prefs.applyProfile(it)
-                                        app.refreshApi()
-                                    }
-                                }
-                                requireActivity().recreate()
-                            }
-                            .setNegativeButton("Cancel", null)
-                            .show()
-                    }
-                }
-            }
-            .show()
     }
 }

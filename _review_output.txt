@@ -2,29 +2,31 @@
 > build · k2p6
 [0m
 [0m→ [0mRead _review_diff.txt
+[0m→ [0mRead app/src/main/java/com/sinema/util/Prefs.kt
+[0m→ [0mRead app/src/main/java/com/sinema/model/ServerProfile.kt
+[0m→ [0mRead app/src/main/java/com/sinema/SinemaApp.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/ServerProfileSection.kt
 [0m→ [0mRead app/src/main/java/com/sinema/ui/SettingsActivity.kt
 [0m→ [0mRead app/src/main/java/com/sinema/ui/SetupActivity.kt
-[0m✱ [0mGrep "class ServerProfile|data class ServerProfile"[90m 4 matches[0m
-[0m✱ [0mGrep "class Prefs|object Prefs"[90m 1 match[0m
-[0m→ [0mRead app/src/main/java/com/sinema/model/ServerProfile.kt
-[0m→ [0mRead app/src/main/java/com/sinema/util/Prefs.kt
-[0m✱ [0mGrep "ProfileCodec"[90m 15 matches[0m
 [0m→ [0mRead app/src/main/java/com/sinema/util/ProfileCodec.kt
-[0m→ [0mRead app/src/test/java/com/sinema/util/ServerProfileTest.kt
-Review of the multi-server profile feature:
+## Review Findings
 
-**Bugs**
-1. **Crash on malformed URL** (`SettingsActivity.kt:68`): `java.net.URI(prefs.serverUrl).host` throws `URISyntaxException` if the server URL is malformed (e.g., missing scheme, invalid chars). No try/catch — app crashes when returning from SetupActivity.
-2. **Data inconsistency on legacy save** (`SettingsActivity.kt:336-340`): The "Save Settings" button updates legacy prefs (`serverUrl`, `apiKey`) but does **not** update the active profile in `prefs.profiles`. Edits are lost on the next profile switch or app restart because the profile list still holds the old values.
+**1. Migration idempotency / atomicity bug** — `Prefs.kt:76-77`
+`profiles = listOf(p)` (secure prefs) and `activeProfileId = p.id` (plain prefs) are two separate `apply()` calls. If the process crashes between them, `profiles` is non-empty but `activeProfileId` is blank. On next launch `migrateToProfilesIfNeeded()` returns early because `profiles.isNotEmpty()`, leaving `activeProfile` permanently null. **Fix:** set `activeProfileId` before `profiles` so a crash allows re-migration, or add a safety-net check for `activeProfileId.isBlank() && profiles.isNotEmpty()`.
 
-**Security**
-- No new security issues. Credentials continue to live in `EncryptedSharedPreferences`. Profile list is serialized to secure prefs. OK.
+**2. Profile list read-modify-write race** — `SinemaApp.kt:42-44`
+`onSessionRefreshed` reads `prefs.profiles`, maps, and writes back. If the API invokes this on a background thread (common for network callbacks), it races with main-thread profile mutations (rename, remove, settings save). One update can silently clobber another. **Fix:** dispatch the profile list update to the main thread, or synchronize/serialize all profile mutations.
 
-**Anti-patterns**
-- `requireActivity().recreate()` is used 4× (add server, rename, remove). On Android TV this causes visible flicker and can race with the fragment lifecycle. Prefer targeted UI updates or `notifyDataSetChanged`-style refresh.
+**3. Gson does not respect Kotlin default values** — `ProfileCodec.kt:8`, `ServerProfile.kt:5`
+Plain Gson instantiates Kotlin data classes via reflection/UnsafeAllocator; missing JSON fields may become `null` rather than using Kotlin default parameter values. The `id` field is especially critical—if null, profile matching and switching will NPE. The test `partial json fills defaults` does not assert `id`. **Fix:** use `kotlinx.serialization` (which respects defaults) or validate/deserialize through a no-arg DTO.
 
-**TV UX**
-3. **Long-press is inaccessible on TV remotes** (`SettingsActivity.kt:271-274`): `setOnLongClickListener` for profile options (Rename/Remove) is a TV anti-pattern — most D-pad remotes don't reliably generate long-press events. Users may be unable to rename or remove servers. A dedicated "Options" button per row (or a click-to-show dialog) is the standard TV pattern.
-4. **No cancel path in add-profile mode** (`SetupActivity.kt:36-44`): When launched with `"add_profile"`, pressing Back loops to the menu screen instead of cancelling. There is no button to return `RESULT_CANCELED`, trapping the user in SetupActivity.
+**4. Settings save diverges when active profile is missing** — `SettingsFragment.kt:277-288`
+If `activeProfileId` is stale/corrupted and `activeProfile` returns null, the save button updates legacy prefs but skips updating the profile list. The next profile switch will restore stale values. **Fix:** handle the null case (e.g., recreate the active profile from legacy prefs, or assert).
 
-VERDICT approved issues=4
+**5. TV D-pad focus order** — `ServerProfileSection.kt:49-113`
+Each profile row is a horizontal `LinearLayout` with two focusable `Button`s. Pressing DOWN on the main profile button may move focus to the "..." button instead of the next row, creating a zig-zag navigation pattern. **Fix:** set `nextFocusDown` / `nextFocusUp` explicitly on the row buttons.
+
+**6. TV AlertDialog focus visuals** — `ServerProfileSection.kt:71, 117`
+`AlertDialog.Builder(ctx).setItems(...)` and `.setPositiveButton`/`.setNegativeButton` use the system default theme, which on some Android TV devices provides poor or invisible focus highlighting for list items and buttons. **Fix:** use a leanback-styled dialog or a custom layout with clearly focusable buttons.
+
+VERDICT approved issues=6

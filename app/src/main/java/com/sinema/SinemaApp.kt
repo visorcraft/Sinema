@@ -36,11 +36,14 @@ class SinemaApp : Application() {
         api.stashPassword = prefs.stashPassword
         api.onSessionRefreshed = { cookie ->
             prefs.sessionCookie = cookie
-            // Also update the active profile's cookie so it survives profile switches
-            val activeId = prefs.activeProfileId
-            if (activeId.isNotBlank()) {
-                prefs.profiles = prefs.profiles.map {
-                    if (it.id == activeId) it.copy(sessionCookie = cookie) else it
+            // Also update the active profile's cookie so it survives profile switches.
+            // Synchronize against UI-driven mutations via the prefs object monitor.
+            synchronized(prefs) {
+                val activeId = prefs.activeProfileId
+                if (activeId.isNotBlank()) {
+                    prefs.profiles = prefs.profiles.map {
+                        if (it.id == activeId) it.copy(sessionCookie = cookie) else it
+                    }
                 }
             }
         }

@@ -63,7 +63,15 @@ class Prefs(context: Context) {
      *  behind them. applyProfile() writes the selected profile back into
      *  the legacy fields so all existing consumers keep working. */
     fun migrateToProfilesIfNeeded() {
-        if (profiles.isNotEmpty() || !isConfigured) return
+        if (!isConfigured) return
+        val existing = profiles
+        if (existing.isNotEmpty() && activeProfileId.isNotBlank()) return
+        // Safety-net: if profiles exist but activeProfileId is blank (crash during migration),
+        // just set it to the first profile instead of re-migrating.
+        if (existing.isNotEmpty()) {
+            activeProfileId = existing.first().id
+            return
+        }
         val p = com.sinema.model.ServerProfile(
             name = "Default",
             serverUrl = serverUrl,
