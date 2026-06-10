@@ -26,10 +26,21 @@ class SetupActivity : FragmentActivity() {
     private var httpServer: ServerSocket? = null
     private var serverThread: Thread? = null
     private var webSetupToken: String? = null
+    private val isAddProfile get() = intent.getBooleanExtra("add_profile", false)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showMenuScreen()
+    }
+
+    private fun finishWithSuccess() {
+        if (isAddProfile) {
+            setResult(RESULT_OK)
+            finish()
+        } else {
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+        }
     }
     
     override fun onDestroy() {
@@ -87,7 +98,18 @@ class SetupActivity : FragmentActivity() {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ))
-        
+
+        if (isAddProfile) {
+            val cancelBtn = createButton("Cancel") {
+                setResult(RESULT_CANCELED)
+                finish()
+            }
+            layout.addView(cancelBtn, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 40 })
+        }
+
         val scrollView = ScrollView(this).apply {
             isFocusable = false
             setBackgroundColor(0xFF1B1B1B.toInt())
@@ -365,8 +387,7 @@ class SetupActivity : FragmentActivity() {
                         app.refreshApi()
 
                         Toast.makeText(this@SetupActivity, "API key generated! You're all set.", Toast.LENGTH_SHORT).show()
-                        startActivity(Intent(this@SetupActivity, MainActivity::class.java))
-                        finish()
+                        finishWithSuccess()
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -420,8 +441,7 @@ class SetupActivity : FragmentActivity() {
             app.refreshApi()
 
             Toast.makeText(this, "Connected! You're all set.", Toast.LENGTH_SHORT).show()
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+            finishWithSuccess()
         }
         layout.addView(sessionBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -676,8 +696,7 @@ class SetupActivity : FragmentActivity() {
                                         
                                         Toast.makeText(this, "Setup complete!", Toast.LENGTH_SHORT).show()
                                         stopHttpServer()
-                                        startActivity(Intent(this, MainActivity::class.java))
-                                        finish()
+                                        finishWithSuccess()
                                     }
                                     
                                     val successHtml = """
@@ -800,8 +819,7 @@ class SetupActivity : FragmentActivity() {
             app.refreshApi()
             
             Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+            finishWithSuccess()
         }
         layout.addView(saveBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,

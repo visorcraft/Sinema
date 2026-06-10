@@ -1,139 +1,224 @@
-app/src/main/java/com/sinema/SinemaApp.kt          | 11 +++++-
- .../main/java/com/sinema/model/ServerProfile.kt    | 12 +++++++
- app/src/main/java/com/sinema/util/Prefs.kt         | 40 ++++++++++++++++++++++
- app/src/main/java/com/sinema/util/ProfileCodec.kt  | 20 +++++++++++
- .../test/java/com/sinema/util/ServerProfileTest.kt | 18 ++++++++++
- 5 files changed, 100 insertions(+), 1 deletion(-)
+.../main/java/com/sinema/ui/SettingsActivity.kt    | 155 +++++++++++++++++++++
+ app/src/main/java/com/sinema/ui/SetupActivity.kt   |  23 +--
+ 2 files changed, 170 insertions(+), 8 deletions(-)
 
 --- Changes ---
 
-app/src/main/java/com/sinema/SinemaApp.kt
-  @@ -21,6 +21,7 @@ class SinemaApp : Application() {
-  +        prefs.migrateToProfilesIfNeeded()
-           api = SinemaApi(prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode)
-           configureApi()
-       }
-  @@ -33,7 +34,15 @@ class SinemaApp : Application() {
-  -        api.onSessionRefreshed = { cookie -> prefs.sessionCookie = cookie }
-  +        api.onSessionRefreshed = { cookie ->
-  +            prefs.sessionCookie = cookie
-  +            // Also update the active profile's cookie so it survives profile switches
-  +            val active = prefs.activeProfile
-  +            if (active != null) {
-  +                val updated = active.copy(sessionCookie = cookie)
-  +                prefs.profiles = prefs.profiles.map { if (it.id == updated.id) updated else it }
+app/src/main/java/com/sinema/ui/SettingsActivity.kt
+  @@ -55,6 +55,32 @@ class SettingsFragment : Fragment() {
+  +    private val setupLauncher = registerForActivityResult(
+  +        ActivityResultContracts.StartActivityForResult()
+  +    ) { result ->
+  +        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+  +
+  +        val app = SinemaApp.instance
+  +        val prefs = app.prefs
+  +
+  +        // SetupActivity wrote credentials into legacy prefs; wrap them into a new profile
+  +        val p = com.sinema.model.ServerProfile(
+  +            name = java.net.URI(prefs.serverUrl).host ?: prefs.serverUrl,
+  +            serverUrl = prefs.serverUrl,
+  +            apiKey = prefs.apiKey,
+  +            sessionCookie = prefs.sessionCookie,
+  +            authMode = prefs.authMode,
+  +            stashUsername = prefs.stashUsername,
+  +            stashPassword = prefs.stashPassword
+  +        )
+  +        prefs.profiles = prefs.profiles + p
+  +        prefs.applyProfile(p)
+  +        app.refreshApi()
+  +
+  +        Toast.makeText(requireContext(), "Server added: ${p.name}", Toast.LENGTH_SHORT).show()
+  +        requireActivity().recreate()
+  +    }
+  +
+       override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+           val app = SinemaApp.instance
+           val ctx = requireContext()
+  @@ -201,6 +227,77 @@ class SettingsFragment : Fragment() {
+  +        // Servers Section
+  +        val serversLabel = TextView(ctx).apply {
+  +            text = "\nServers:"
+  +            textSize = 18f
+  +            setTextColor(0xFFCCCCCC.toInt())
+  +        }
+  +        layout.addView(serversLabel)
+  +
+  +        val profiles = app.prefs.profiles
+  +        val activeId = app.prefs.activeProfileId
+  +
+  +        profiles.forEach { profile ->
+  +            val isActive = profile.id == activeId
+  +            val btn = Button(ctx).apply {
+  +                text = "${profile.name}${if (isActive) " ✓" else ""}\n${profile.serverUrl}"
+  +                textSize = 14f
+  +                isFocusable = true
+  +                setBackgroundColor(0xFF333333.toInt())
+  +                setTextColor(0xFFFFFFFF.toInt())
+  +                setOnFocusChangeListener { _, hasFocus ->
+  +                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
+  +                }
+  +                setOnClickListener {
+  +                    if (isActive) {
+  +                        Toast.makeText(ctx, "${profile.name} is already active", Toast.LENGTH_SHORT).show()
+  +                    } else {
+  +                        AlertDialog.Builder(ctx)
+  +                            .setTitle("Switch Server")
+  +                            .setMessage("Switch to ${profile.name}?")
+  +                            .setPositiveButton("Switch") { _, _ ->
+  +                                app.prefs.applyProfile(profile)
+  +                                app.refreshApi()
+  +                                val intent = Intent(ctx, MainActivity::class.java)
+  +                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+  +                                startActivity(intent)
+  +                                requireActivity().finish()
+  +                            }
+  +                            .setNegativeButton("Cancel", null)
+  +                            .show()
+  +                    }
+  +                }
+  +                setOnLongClickListener {
+  +                    showProfileOptions(profile, profiles.size <= 1)
+  +                    true
+  +                }
+  +            }
+  +            layout.addView(btn, LinearLayout.LayoutParams(
+  +                LinearLayout.LayoutParams.MATCH_PARENT,
+  +                LinearLayout.LayoutParams.WRAP_CONTENT
+  +            ).apply { topMargin = 8 })
+  +        }
+  +
+  +        val addServerBtn = Button(ctx).apply {
+  +            text = "+ Add Server"
+  +            isFocusable = true
+  +            setBackgroundColor(0xFF333333.toInt())
+  +            setTextColor(0xFFFFFFFF.toInt())
+  +            setOnFocusChangeListener { _, hasFocus ->
+  +                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
+  +            }
+  +            setOnClickListener {
+  +                val intent = Intent(ctx, SetupActivity::class.java)
+  +                intent.putExtra("add_profile", true)
+  +                setupLauncher.launch(intent)
   +            }
   +        }
+  +        layout.addView(addServerBtn, LinearLayout.LayoutParams(
+  +            LinearLayout.LayoutParams.MATCH_PARENT,
+  +            LinearLayout.LayoutParams.WRAP_CONTENT
+  +        ).apply { topMargin = 8; bottomMargin = 16 })
+  +
+           val pm = ctx.packageManager
+           if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
+               val channelsToggle = Button(ctx).apply {
+  @@ -268,4 +365,62 @@ class SettingsFragment : Fragment() {
+  +
+  +    private fun showProfileOptions(profile: com.sinema.model.ServerProfile, isLast: Boolean) {
+  +        val ctx = requireContext()
+  +        val app = SinemaApp.instance
+  +        val items = arrayOf("Rename", "Remove")
+  +        AlertDialog.Builder(ctx)
+  +            .setTitle(profile.name)
+  +            .setItems(items) { _, which ->
+  +                when (which) {
+  +                    0 -> { // Rename
+  +                        val edit = EditText(ctx).apply {
+  +                            setText(profile.name)
+  +                            setTextColor(0xFFFFFFFF.toInt())
+  +                            setBackgroundColor(0xFF333333.toInt())
+  +                        }
+  +                        AlertDialog.Builder(ctx)
+  +                            .setTitle("Rename Server")
+  +                            .setView(edit)
+  +                            .setPositiveButton("Save") { _, _ ->
+  +                                val newName = edit.text.toString().trim()
+  +                                if (newName.isNotBlank()) {
+  +                                    val updated = profile.copy(name = newName)
+  +                                    app.prefs.profiles = app.prefs.profiles.map { if (it.id == profile.id) updated else it }
+  +                                    if (app.prefs.activeProfileId == profile.id) {
+  +                                        app.prefs.applyProfile(updated)
+  +                                    }
+  +                                    requireActivity().recreate()
+  +                                }
+  +                            }
+  +                            .setNegativeButton("Cancel", null)
+  +                            .show()
+  +                    }
+  +                    1 -> { // Remove
+  +                        if (isLast) {
+  +                            Toast.makeText(ctx, "Cannot remove the last server", Toast.LENGTH_SHORT).show()
+  +                            return@setItems
+  +                        }
+  +                        AlertDialog.Builder(ctx)
+  +                            .setTitle("Remove Server")
+  +                            .setMessage("Remove ${profile.name}?")
+  +                            .setPositiveButton("Remove") { _, _ ->
+  +                                val remaining = app.prefs.profiles.filter { it.id != profile.id }
+  +                                app.prefs.profiles = remaining
+  +                                if (app.prefs.activeProfileId == profile.id) {
+  +                                    remaining.firstOrNull()?.let {
+  +                                        app.prefs.applyProfile(it)
+  +                                        app.refreshApi()
+  +                                    }
+  +                                }
+  +                                requireActivity().recreate()
+  +                            }
+  +                            .setNegativeButton("Cancel", null)
+  +                            .show()
+  +                    }
+  +                }
+  +            }
+  +            .show()
+  +    }
+   }
+  +155 -0
+
+app/src/main/java/com/sinema/ui/SetupActivity.kt
+  @@ -26,11 +26,22 @@ class SetupActivity : FragmentActivity() {
+  +    private val isAddProfile get() = intent.getBooleanExtra("add_profile", false)
+       
+       override fun onCreate(savedInstanceState: Bundle?) {
+           super.onCreate(savedInstanceState)
+           showMenuScreen()
        }
-   
-       companion object {
-  +10 -1
-
-app/src/main/java/com/sinema/model/ServerProfile.kt
-  @@ -0,0 +1,12 @@
-  +package com.sinema.model
   +
-  +data class ServerProfile(
-  +    val id: String,
-  +    val name: String,
-  +    val serverUrl: String,
-  +    val apiKey: String,
-  +    val sessionCookie: String,
-  +    val authMode: String,
-  +    val stashUsername: String,
-  +    val stashPassword: String
-  +)
-  +12 -0
-
-app/src/main/java/com/sinema/util/Prefs.kt
-  @@ -46,6 +46,46 @@ class Prefs(context: Context) {
-  +    // Server profiles (stored in secure prefs)
-  +    var profiles: List<com.sinema.model.ServerProfile>
-  +        get() = ProfileCodec.fromJson(getSecureString("server_profiles"))
-  +        set(value) = putSecureString("server_profiles", ProfileCodec.toJson(value))
-  +
-  +    var activeProfileId: String
-  +        get() = prefs.getString("active_profile_id", "") ?: ""
-  +        set(value) = prefs.edit().putString("active_profile_id", value).apply()
-  +
-  +    val activeProfile: com.sinema.model.ServerProfile?
-  +        get() = profiles.firstOrNull { it.id == activeProfileId } ?: profiles.firstOrNull()
-  +
-  +    /** Migrate legacy single-server fields into a profile on first use. */
-  +    fun migrateToProfilesIfNeeded() {
-  +        if (profiles.isNotEmpty() || !isConfigured) return
-  +        val p = com.sinema.model.ServerProfile(
-  +            id = java.util.UUID.randomUUID().toString(),
-  +            name = "Default",
-  +            serverUrl = serverUrl,
-  +            apiKey = apiKey,
-  +            sessionCookie = sessionCookie,
-  +            authMode = authMode,
-  +            stashUsername = stashUsername,
-  +            stashPassword = stashPassword
-  +        )
-  +        profiles = listOf(p)
-  +        activeProfileId = p.id
-  +    }
-  +
-  +    /** Persist the active profile's fields back into the legacy accessors. */
-  +    fun applyProfile(p: com.sinema.model.ServerProfile) {
-  +        serverUrl = p.serverUrl
-  +        apiKey = p.apiKey
-  +        sessionCookie = p.sessionCookie
-  +        authMode = p.authMode
-  +        stashUsername = p.stashUsername
-  +        stashPassword = p.stashPassword
-  +        activeProfileId = p.id
-  +    }
-  +
-       val isConfigured: Boolean
-           get() = apiKey.isNotBlank() || sessionCookie.isNotBlank()
-   
-  +40 -0
-
-app/src/main/java/com/sinema/util/ProfileCodec.kt
-  @@ -0,0 +1,20 @@
-  +package com.sinema.util
-  +
-  +import com.google.gson.Gson
-  +import com.google.gson.reflect.TypeToken
-  +import com.sinema.model.ServerProfile
-  +
-  +object ProfileCodec {
-  +    private val gson = Gson()
-  +    private val listType = object : TypeToken<List<ServerProfile>>() {}.type
-  +
-  +    fun toJson(profiles: List<ServerProfile>): String = gson.toJson(profiles, listType)
-  +
-  +    fun fromJson(json: String): List<ServerProfile> {
-  +        return try {
-  +            gson.fromJson(json, listType) ?: emptyList()
-  +        } catch (e: Exception) {
-  +            emptyList()
+  +    private fun finishWithSuccess() {
+  +        if (isAddProfile) {
+  +            setResult(RESULT_OK)
+  +            finish()
+  +        } else {
+  +            startActivity(Intent(this, MainActivity::class.java))
+  +            finish()
   +        }
   +    }
-  +}
-  +20 -0
-
-app/src/test/java/com/sinema/util/ServerProfileTest.kt
-  @@ -0,0 +1,18 @@
-  +package com.sinema.util
-  +
-  +import com.sinema.model.ServerProfile
-  +import org.junit.Assert.assertEquals
-  +import org.junit.Test
-  +
-  +class ServerProfileTest {
-  +    @Test
-  +    fun `round trips profile list through json`() {
-  +        val list = listOf(ServerProfile("u1", "A", "http://a", "k", "", "apikey", "", ""))
-  +        assertEquals(list, ProfileCodec.fromJson(ProfileCodec.toJson(list)))
-  +    }
-  +
-  +    @Test
-  +    fun `fromJson tolerates garbage`() {
-  +        assertEquals(emptyList<ServerProfile>(), ProfileCodec.fromJson("not json"))
-  +    }
-  +}
-  +18 -0
+       
+       override fun onDestroy() {
+           super.onDestroy()
+  @@ -365,8 +376,7 @@ class SetupActivity : FragmentActivity() {
+  -                        startActivity(Intent(this@SetupActivity, MainActivity::class.java))
+  -                        finish()
+  +                        finishWithSuccess()
+                       }
+                   } catch (e: Exception) {
+                       withContext(Dispatchers.Main) {
+  @@ -420,8 +430,7 @@ class SetupActivity : FragmentActivity() {
+  -            startActivity(Intent(this, MainActivity::class.java))
+  -            finish()
+  +            finishWithSuccess()
+           }
+           layout.addView(sessionBtn, LinearLayout.LayoutParams(
+               LinearLayout.LayoutParams.MATCH_PARENT,
+  @@ -676,8 +685,7 @@ class SetupActivity : FragmentActivity() {
+  -                                        startActivity(Intent(this, MainActivity::class.java))
+  -                                        finish()
+  +                                        finishWithSuccess()
+                                       }
+                                       
+                                       val successHtml = """
+  @@ -800,8 +808,7 @@ class SetupActivity : FragmentActivity() {
+  -            startActivity(Intent(this, MainActivity::class.java))
+  -            finish()
+  +            finishWithSuccess()
+           }
+           layout.addView(saveBtn, LinearLayout.LayoutParams(
+               LinearLayout.LayoutParams.MATCH_PARENT,
+  +15 -8
