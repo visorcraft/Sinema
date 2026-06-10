@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.model.CaptionRef
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.launch
 
@@ -22,6 +23,7 @@ class PlaybackActivity : FragmentActivity() {
     private var resumePositionMs: Long = 0L
     private var startTimeMs: Long = 0L
     private var playCountSent = false
+    private var captions: List<CaptionRef> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,6 +31,7 @@ class PlaybackActivity : FragmentActivity() {
         playerView = findViewById(R.id.player_view)
         sceneId = intent.getStringExtra("scene_id") ?: ""
         resumePositionMs = intent.getLongExtra("resume_position_ms", 0L)
+        captions = SceneIntents.captionsFrom(intent)
     }
 
     override fun onStart() {
@@ -92,11 +95,11 @@ class PlaybackActivity : FragmentActivity() {
         val app = SinemaApp.instance
         val streamUrl = app.api.getStreamUrl(sceneId)
         // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
-        val subs = SceneIntents.captionsFrom(intent).map { c ->
+        val subs = captions.map { c ->
             MediaItem.SubtitleConfiguration.Builder(Uri.parse(app.api.getCaptionUrl(sceneId, c)))
                 .setMimeType(if (c.captionType.equals("vtt", true)) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP)
-                .setLanguage(c.languageCode)
-                .setLabel("${c.languageCode.uppercase()} (${c.captionType})")
+                .setLanguage(c.languageCode.takeIf { it.isNotBlank() })
+                .setLabel("${c.languageCode.uppercase().ifBlank { "UNKNOWN" }} (${c.captionType})")
                 .build()
         }
         return MediaItem.Builder()
