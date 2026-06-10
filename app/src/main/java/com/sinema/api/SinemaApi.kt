@@ -3,9 +3,15 @@ package com.sinema.api
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.sinema.model.CaptionRef
 import com.sinema.model.EntityItem
 import com.sinema.model.ImageItem
+import com.sinema.model.MarkerRef
+import com.sinema.model.PerformerRef
 import com.sinema.model.Scene
+import com.sinema.model.SceneDetails
+import com.sinema.model.StudioRef
+import com.sinema.model.TagRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
@@ -25,10 +31,17 @@ class SinemaApi(
 ) {
 
     companion object {
-        // Single source of truth for scene list payloads. Extended fields
-        // (tags/performers/etc.) will live in SCENE_FIELDS_FULL — see findSceneFull (planned, PLAN.md Task 1.4).
+        // Single source of truth for scene list payloads.
         internal const val SCENE_FIELDS =
             "id title play_count rating100 files { path size duration width height }"
+
+        // Full scene payload — used by findSceneFull for detail/player screens.
+        internal const val SCENE_FIELDS_FULL = SCENE_FIELDS +
+            " date" +
+            " studio { id name }" +
+            " tags { id name }" +
+            " performers { id name }" +
+            " captions { language_code caption_type }"
     }
 
     private val client = OkHttpClient.Builder()
@@ -557,21 +570,49 @@ class SinemaApi(
             sceneFilter = mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
         )
 
+    private fun parseTagRefs(obj: JsonObject): List<TagRef> =
+        obj.getAsJsonArray("tags")?.map { el ->
+            val t = el.asJsonObject
+            TagRef(id = t.get("id").asString, name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+        } ?: emptyList()
+
+    private fun parsePerformerRefs(obj: JsonObject): List<PerformerRef> =
+        obj.getAsJsonArray("performers")?.map { el ->
+            val p = el.asJsonObject
+            PerformerRef(id = p.get("id").asString, name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+        } ?: emptyList()
+
+    private fun parseCaptionRefs(obj: JsonObject): List<CaptionRef> =
+        obj.getAsJsonArray("captions")?.map { el ->
+            val c = el.asJsonObject
+            CaptionRef(
+                languageCode = c.get("language_code")?.takeIf { !it.isJsonNull }?.asString ?: "",
+                captionType = c.get("caption_type")?.takeIf { !it.isJsonNull }?.asString ?: ""
+            )
+        } ?: emptyList()
+
     private fun parseScene(obj: JsonObject): Scene {
-        val id = obj.get("id").asString
-        val title = obj.get("title")?.asString ?: ""
         val files = obj.getAsJsonArray("files")
         val file = if (files != null && files.size() > 0) files[0].asJsonObject else null
+        // Optional metadata — only present in SCENE_FIELDS_FULL queries; guarded to keep lean list queries working.
+        val studioObj = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
         return Scene(
-            id = id,
-            title = title,
+            id = obj.get("id").asString,
+            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
             path = file?.get("path")?.asString ?: "",
             size = file?.get("size")?.asLong ?: 0L,
             duration = file?.get("duration")?.asDouble ?: 0.0,
             width = file?.get("width")?.asInt ?: 0,
             height = file?.get("height")?.asInt ?: 0,
-            playCount = obj.get("play_count")?.asInt ?: 0,
-            rating100 = if (obj.has("rating100") && !obj.get("rating100").isJsonNull) obj.get("rating100").asInt else null
+            playCount = obj.get("play_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt,
+            date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
+            studio = studioObj?.let { s ->
+                StudioRef(id = s.get("id").asString, name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+            },
+            tags = if (obj.has("tags")) parseTagRefs(obj) else emptyList(),
+            performers = if (obj.has("performers")) parsePerformerRefs(obj) else emptyList(),
+            captions = if (obj.has("captions")) parseCaptionRefs(obj) else emptyList()
         )
     }
 
@@ -631,6 +672,43 @@ class SinemaApi(
         }
         return findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, sceneFilter = sceneFilter)
     }
+
+    suspend fun findSceneFull(sceneId: String): SceneDetails? {
+        val query = """
+            query(${"$"}id: ID!) {
+                findScene(id: ${"$"}id) {
+                    $SCENE_FIELDS_FULL
+                    resume_time
+                    scene_markers { id title seconds primary_tag { id name } }
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("id" to sceneId))
+        // Use .get().takeIf{!isJsonNull}.asJsonObject rather than getAsJsonObject() because
+        // Gson 2.10.1's getAsJsonObject(String) does a raw checkcast and throws ClassCastException
+        // when the value is JsonNull (scene not found). The safe accessor avoids that.
+        val obj = result.getAsJsonObject("data")
+            ?.get("findScene")?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?: return null
+        val markers = obj.getAsJsonArray("scene_markers")?.map { m ->
+            val mo = m.asJsonObject
+            MarkerRef(
+                id = mo.get("id").asString,
+                title = mo.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+                seconds = mo.get("seconds")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+                primaryTag = mo.get("primary_tag")?.takeIf { !it.isJsonNull }
+                    ?.asJsonObject?.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+            )
+        } ?: emptyList()
+        return SceneDetails(
+            scene = parseScene(obj),
+            resumeTime = obj.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            markers = markers
+        )
+    }
+
+    fun getCaptionUrl(sceneId: String, c: CaptionRef): String =
+        "$serverUrl/scene/$sceneId/caption?lang=${c.languageCode}&type=${c.captionType}"
 
     suspend fun resetPlayCount(sceneId: String) {
         val query = """
