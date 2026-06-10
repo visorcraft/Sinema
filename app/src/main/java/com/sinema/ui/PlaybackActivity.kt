@@ -144,12 +144,14 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun showChapters() {
         if (markers.isEmpty()) return
+        if (chaptersDialog?.isShowing == true) return
         val labels = markers.map { "${TimeFormat.formatSeconds(it.second)}  ${it.first}" }
         chaptersDialog = android.app.AlertDialog.Builder(this)
             .setTitle("Chapters")
             .setItems(labels.toTypedArray()) { _, which ->
                 player?.seekTo((markers[which].second * 1000).toLong())
             }
+            .setOnDismissListener { playerView.requestFocus() }
             .show()
     }
 
