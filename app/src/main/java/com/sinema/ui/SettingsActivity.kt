@@ -201,6 +201,29 @@ class SettingsFragment : Fragment() {
             ).apply { topMargin = 16; bottomMargin = 16 })
         }
 
+        val pm = ctx.packageManager
+        if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
+            val channelsToggle = Button(ctx).apply {
+                text = if (app.prefs.channelsEnabled) "Android TV Channels: ON" else "Android TV Channels: OFF"
+                isFocusable = true
+                setBackgroundColor(0xFF333333.toInt())
+                setTextColor(0xFFFFFFFF.toInt())
+                setOnFocusChangeListener { _, hasFocus ->
+                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
+                }
+                setOnClickListener {
+                    val newState = !app.prefs.channelsEnabled
+                    app.prefs.channelsEnabled = newState
+                    this.text = if (newState) "Android TV Channels: ON" else "Android TV Channels: OFF"
+                    Toast.makeText(ctx, "Channels ${if (newState) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            layout.addView(channelsToggle, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 16 })
+        }
+
         val saveBtn = Button(ctx).apply {
             text = "Save Settings"
             isFocusable = true

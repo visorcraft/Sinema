@@ -88,5 +88,19 @@
             android:name=".ui.EntityScenesActivity"
             android:screenOrientation="landscape" />
 
+        <activity
+            android:name=".ui.DeepLinkActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:noHistory="true" >
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.sinema" android:host="app" android:pathPrefix="/scene/" />
+            </intent-filter>
+        </activity>
+
     </application>
 </manifest>
