@@ -2,6 +2,7 @@ package com.sinema.util
 
 import android.content.Context
 import android.content.Intent
+import com.sinema.model.CaptionRef
 import com.sinema.model.Scene
 import com.sinema.ui.SceneDetailActivity
 
@@ -19,6 +20,8 @@ object SceneIntents {
     private const val KEY_HEIGHT = "scene_height"
     private const val KEY_PLAY_COUNT = "scene_play_count"
     private const val KEY_RATING = "scene_rating100"
+    private const val KEY_CAPTION_LANGS = "caption_langs"
+    private const val KEY_CAPTION_TYPES = "caption_types"
 
     fun detail(context: Context, scene: Scene): Intent =
         Intent(context, SceneDetailActivity::class.java).apply {
@@ -44,4 +47,15 @@ object SceneIntents {
         playCount = intent.getIntExtra(KEY_PLAY_COUNT, 0),
         rating100 = intent.getIntExtra(KEY_RATING, -1).takeIf { it != -1 }
     )
+
+    fun putCaptions(intent: Intent, captions: List<CaptionRef>) {
+        intent.putExtra(KEY_CAPTION_LANGS, captions.map { it.languageCode }.toTypedArray())
+        intent.putExtra(KEY_CAPTION_TYPES, captions.map { it.captionType }.toTypedArray())
+    }
+
+    fun captionsFrom(intent: Intent): List<CaptionRef> {
+        val langs = intent.getStringArrayExtra(KEY_CAPTION_LANGS) ?: return emptyList()
+        val types = intent.getStringArrayExtra(KEY_CAPTION_TYPES) ?: return emptyList()
+        return langs.zip(types).map { (l, t) -> CaptionRef(l, t) }
+    }
 }
