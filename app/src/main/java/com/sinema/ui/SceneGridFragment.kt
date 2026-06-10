@@ -25,9 +25,9 @@ abstract class SceneGridFragment : VerticalGridSupportFragment() {
     protected lateinit var gridAdapter: ArrayObjectAdapter
 
     protected open val columns = 3
-    abstract val gridTitle: String
-    abstract val emptyMessage: String
-    abstract suspend fun loadItems(): List<Any>
+    protected abstract val gridTitle: String
+    protected abstract val emptyMessage: String
+    protected abstract suspend fun loadItems(): List<Any>
 
     /** Subclasses with non-Scene items override to handle their own clicks. */
     protected open fun onItemClicked(item: Any) {
@@ -43,7 +43,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment() {
         setGridPresenter(gridPresenter)
         gridAdapter = ArrayObjectAdapter(CardPresenter(app.api))
         adapter = gridAdapter
-        setOnItemViewClickedListener { _, item, _, _ -> onItemClicked(item) }
+        setOnItemViewClickedListener { _, item, _, _ -> item?.let { onItemClicked(it) } }
         reload()
     }
 
