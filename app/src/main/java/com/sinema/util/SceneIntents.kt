@@ -8,7 +8,7 @@ import com.sinema.ui.SceneDetailActivity
 
 /**
  * Single source of truth for passing a Scene between activities via Intent extras.
- * Scene metadata (tags/performers/captions/etc.) is NOT carried across the round-trip — receivers needing it must refetch via the full scene query.
+ * Scene metadata (tags/performers/captions/etc.) is NOT carried across the round-trip — receivers needing it must refetch via the full scene query, except via the explicit putCaptions/captionsFrom pair used for playback intents.
  */
 object SceneIntents {
     private const val KEY_ID = "scene_id"
