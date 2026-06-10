@@ -629,7 +629,7 @@ class SinemaApi(
             EntityItem.Kind.STUDIO ->
                 mapOf("studios" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES", "depth" to 0))
         }
-        return findScenesInternal(page, perPage, sort, direction, sceneFilter = sceneFilter)
+        return findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, sceneFilter = sceneFilter)
     }
 
     suspend fun resetPlayCount(sceneId: String) {
