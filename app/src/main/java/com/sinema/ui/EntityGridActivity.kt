@@ -16,8 +16,8 @@ class EntityGridActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val kind = EntityItem.Kind.valueOf(intent.getStringExtra("kind") ?: EntityItem.Kind.TAG.name)
         if (savedInstanceState == null) {
+            val kind = EntityItem.Kind.valueOf(intent.getStringExtra("kind") ?: EntityItem.Kind.TAG.name)
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_frame, EntityGridFragment.create(kind))
                 .commit()
@@ -37,7 +37,10 @@ class EntityGridFragment : SceneGridFragment() {
     override val gridTitle get() = kind.label
     override val emptyMessage get() = "No ${kind.label.lowercase()} found"
 
-    override suspend fun loadItems(): List<Any> = app.api.findEntities(kind, perPage = 200).second
+    override suspend fun loadItems(): List<Any> {
+        // TODO: paginate; silently capped at 200 (server count available in .first)
+        return app.api.findEntities(kind, perPage = 200).second
+    }
 
     override fun onItemClicked(item: Any) {
         if (item is EntityItem) startActivity(EntityScenesActivity.intent(requireContext(), item))
