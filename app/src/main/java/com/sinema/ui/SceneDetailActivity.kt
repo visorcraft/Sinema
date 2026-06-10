@@ -186,7 +186,7 @@ class SceneDetailActivity : FragmentActivity() {
         val metaParts = buildList {
             s.date?.takeIf { it.isNotBlank() }?.let { add(it) }
             s.studio?.let { add(it.name) }
-            s.rating100?.let { add("★ ${"%.1f".format(it / 20.0)}") }
+            s.rating100?.takeIf { it > 0 }?.let { add("★ ${"%.1f".format(it / 20.0)}") }
         }
         if (metaParts.isNotEmpty()) {
             metaView.text = metaParts.joinToString("  •  ")
