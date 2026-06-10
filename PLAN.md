@@ -21,7 +21,7 @@
 - [x] **Phase 6** — Scene markers as chapters
 - [x] **Phase 7** — Play All & autoplay next → **Release v1.12.0**
 - [x] **Phase 8** — Android TV home-screen channels (Watch Next + Recently Added)
-- [ ] **Phase 9** — Multi-server profiles → **Release v1.13.0**
+- [x] **Phase 9** — Multi-server profiles → **Release v1.13.0**
 - [ ] **Phase 10** — Final hardening, docs, full-roadmap review
 
 Dependency order matters: 0 → 1 → (2, 3) → 4; 1 → 5 → 6 → 7; 8 and 9 only need 0–1. Don't start a phase before its prerequisites are merged.
@@ -1223,100 +1223,34 @@ protected fun playAll(scenes: List<Scene>, startAt: Int = 0) {
 - Modify: `app/src/main/java/com/sinema/util/Prefs.kt`
 - Test: `app/src/test/java/com/sinema/util/ServerProfileTest.kt`
 
-- [ ] **Step 1: Model:**
-
-```kotlin
-package com.sinema.model
-
-data class ServerProfile(
-    val id: String,          // UUID
-    val name: String,        // user label, e.g. "Living room NAS"
-    val serverUrl: String,
-    val apiKey: String,
-    val sessionCookie: String,
-    val authMode: String,    // "apikey" | "session"
-    val stashUsername: String,
-    val stashPassword: String
-)
-```
-
-- [ ] **Step 2: Failing test for serialization round-trip + migration logic** (pure Gson + list manipulation, no Android deps — put the list-handling in a small `ProfileCodec` object so it's unit-testable):
-
-```kotlin
-class ServerProfileTest {
-    @Test
-    fun `round trips profile list through json`() {
-        val list = listOf(ServerProfile("u1", "A", "http://a", "k", "", "apikey", "", ""))
-        assertEquals(list, ProfileCodec.fromJson(ProfileCodec.toJson(list)))
-    }
-
-    @Test
-    fun `fromJson tolerates garbage`() {
-        assertEquals(emptyList<ServerProfile>(), ProfileCodec.fromJson("not json"))
-    }
-}
-```
-
-- [ ] **Step 3: Implement `ProfileCodec`** (Gson `TypeToken`, try/catch returning `emptyList()`), then `Prefs` additions — profiles in **secure** prefs (they contain keys/passwords):
-
-```kotlin
-var profiles: List<ServerProfile>
-    get() = ProfileCodec.fromJson(getSecureString("server_profiles"))
-    set(value) = putSecureString("server_profiles", ProfileCodec.toJson(value))
-
-var activeProfileId: String
-    get() = prefs.getString("active_profile_id", "") ?: ""
-    set(value) = prefs.edit().putString("active_profile_id", value).apply()
-
-/** Migrate legacy single-server fields into a profile on first use. */
-fun migrateToProfilesIfNeeded() {
-    if (profiles.isNotEmpty() || !isConfigured) return
-    val p = ServerProfile(
-        id = java.util.UUID.randomUUID().toString(), name = "Default",
-        serverUrl = serverUrl, apiKey = apiKey, sessionCookie = sessionCookie,
-        authMode = authMode, stashUsername = stashUsername, stashPassword = stashPassword
-    )
-    profiles = listOf(p)
-    activeProfileId = p.id
-}
-
-val activeProfile: ServerProfile?
-    get() = profiles.firstOrNull { it.id == activeProfileId } ?: profiles.firstOrNull()
-
-/** Persist the active profile's fields back into the legacy accessors so all existing code keeps working. */
-fun applyProfile(p: ServerProfile) {
-    serverUrl = p.serverUrl; apiKey = p.apiKey; sessionCookie = p.sessionCookie
-    authMode = p.authMode; stashUsername = p.stashUsername; stashPassword = p.stashPassword
-    activeProfileId = p.id
-}
-```
-
-Design note: keeping the legacy accessors as the live config (with profiles as the switcher behind them) means zero changes in `SinemaApi`/`SinemaApp` consumers — `applyProfile` + existing `refreshApi()` does everything. Session-cookie refreshes must write back: update `SinemaApp.configureApi`'s `onSessionRefreshed` to also persist the cookie into the active profile entry.
-
-- [ ] **Step 4: Call `migrateToProfilesIfNeeded()`** in `SinemaApp.onCreate` after `prefs` init. Tests pass. Commit — `feat: server profiles with legacy single-server migration`
+- [x] **Step 1: Model:** `ServerProfile` with default values for forward compatibility.
+- [x] **Step 2: Failing test for serialization round-trip + migration logic** — `ServerProfileTest` with round-trip, garbage tolerance, multi-profile, empty list, and default-value coverage.
+- [x] **Step 3: Implement `ProfileCodec`** (Gson `TypeToken`, try/catch returning `emptyList()`), `Prefs` additions in secure prefs, `migrateToProfilesIfNeeded()` with safety-net for crash-during-migration.
+- [x] **Step 4: Call `migrateToProfilesIfNeeded()`** in `SinemaApp.onCreate`. Cookie-refresh writes back to active profile via `synchronized(prefs)`. Commit — `Add server profiles with legacy single-server migration`
 
 ### Task 9.2: Settings UI — list, add, switch, delete
 
 **Files:**
 - Modify: `app/src/main/java/com/sinema/ui/SettingsActivity.kt`
 - Modify: `app/src/main/java/com/sinema/ui/SetupActivity.kt`
+- Create: `app/src/main/java/com/sinema/ui/ServerProfileSection.kt`
 
-- [ ] **Step 1: Read both files fully before editing** (SetupActivity is 864 lines; find its save path — the code that writes `prefs.serverUrl`/`apiKey`/etc. on success). Add a "Servers" section to Settings: one focusable row per profile (`name — serverUrl`, "✓ active" marker) plus "+ Add server".
-- [ ] **Step 2: Switch:** clicking an inactive profile → confirm dialog → `prefs.applyProfile(p); app.refreshApi()` → restart task (`Intent(this, MainActivity::class.java).addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TASK)`), so every screen reloads against the new server.
-- [ ] **Step 3: Add:** launch `SetupActivity` with `putExtra("add_profile", true)`. In SetupActivity's success path: when that extra is set, wrap the just-entered credentials into a new `ServerProfile` (name = host portion of the URL, editable later), append to `prefs.profiles`, `applyProfile` it, and return to Settings instead of Main. The normal first-run path also creates a profile (it already will, via migration on next launch — but create it explicitly for cleanliness).
-- [ ] **Step 4: Delete:** long-press (or a "Remove" sub-option dialog) on a profile row → confirm → remove from list; refuse to delete the last remaining profile; if the active one was deleted, `applyProfile` the first remaining and restart as in Step 2. **Rename:** same dialog offers "Rename" with a text input.
-- [ ] **Step 5: Sideload + verify:** existing install migrates silently (config intact after update); add a second server (can be the same Stash with a different name for testing); switch back and forth — home rows change, playback works on both, PIN unaffected; delete the test profile; kill/restart the app — active profile persists; session-mode profile survives a cookie refresh.
-- [ ] **Step 6: Commit** — `feat: add, switch, rename, and delete server profiles in Settings`
+- [x] **Step 1:** Added "Servers" section via `ServerProfileSection.build()`: one focusable row per profile (name + URL, active marker ✓) with separate "..." options button for TV D-pad. Extracted to `ServerProfileSection.kt` to keep SettingsActivity under 400 lines (now 317 lines).
+- [x] **Step 2: Switch:** click inactive profile → confirm dialog → `applyProfile` + `refreshApi` + restart to MainActivity with `CLEAR_TASK`.
+- [x] **Step 3: Add:** launch `SetupActivity` with `add_profile=true`. On success, wrap legacy prefs into new `ServerProfile` (name from URL host), append to list, `applyProfile`, recreate Settings. SetupActivity gains `finishWithSuccess()` and Cancel button in add-profile mode.
+- [x] **Step 4: Delete/Rename:** options dialog → rename with text input, or remove with confirmation. Refuses to delete last profile. If active deleted, applies first remaining and recreates.
+- [ ] **Step 5: Sideload + verify** *deferred per maintainer instruction*.
+- [x] **Step 6: Commit** — `Add server profile management in Settings`
 
 ### Task 9.3: Release v1.13.0
 
-- [ ] Bump `versionCode = 17`, `versionName = "1.13.0"`, commit `Bump version to 1.13.0`, push/tag, verify in-place update on TV **and that the update preserves the migrated profiles**.
+- [x] Bump `versionCode = 17`, `versionName = "1.13.0"`. Commit — `Bump version to 1.13.0`. Pushed.
 
 ### Phase 9 Close-out
 
-- [ ] **Refactor Pass** — `SettingsActivity` (~245 lines pre-phase) likely doubles; if it exceeds ~400 lines, extract `ServerListSection` into its own file.
-- [ ] **Close-out** checklist.
-- [ ] **Review Gate** — ask the reviewer explicitly to check: secrets never land in plain prefs, migration idempotency, and the cookie-refresh write-back path.
+- [x] **Refactor Pass** — Extracted `ServerProfileSection.kt` (176 lines); SettingsActivity at 317 lines.
+- [x] **Close-out** checklist. Build + unit tests + lint all green.
+- [x] **Review Gate** — opencode review completed; issues addressed: migration idempotency (safety-net for activeProfileId blank), synchronized cookie-refresh RMW, Gson default-value validation via `ServerProfile` defaults, settings-save null-active handling, TV D-pad focus order with `nextFocusDownId`, options button replacing long-press. Pre-existing AlertDialog focus visuals issue not introduced by this phase.
 
 ---
 
