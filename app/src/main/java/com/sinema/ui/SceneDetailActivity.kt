@@ -17,6 +17,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.CaptionRef
 import com.sinema.model.EntityItem
+import com.sinema.model.MarkerRef
 import com.sinema.model.Scene
 import com.sinema.model.SceneDetails
 import com.sinema.util.GlideAuth
@@ -39,8 +40,9 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var performersScroll: View
     private lateinit var performersRow: LinearLayout
 
-    // Captions loaded from Stash after loadDetails completes; empty until then (fine — Play before load = no subs)
+    // Captions and markers loaded from Stash after loadDetails completes
     private var captions: List<CaptionRef> = emptyList()
+    private var markers: List<MarkerRef> = emptyList()
 
     // Cache key to skip chip rebuild when metadata is unchanged on re-resume
     private var boundChipsKey: String? = null
@@ -164,6 +166,7 @@ class SceneDetailActivity : FragmentActivity() {
             try {
                 val details = app.api.findSceneFull(scene.id) ?: return@launch
                 captions = details.scene.captions
+                markers = details.markers
                 bindResume(details)
                 bindMeta(details.scene)
                 bindChips(details.scene)
@@ -192,6 +195,7 @@ class SceneDetailActivity : FragmentActivity() {
             s.date?.takeIf { it.isNotBlank() }?.let { add(it) }
             s.studio?.let { add(it.name) }
             s.rating100?.takeIf { it > 0 }?.let { add("★ ${"%.1f".format(it / 20.0)}") }
+            if (markers.isNotEmpty()) add("${markers.size} chapters")
         }
         if (metaParts.isNotEmpty()) {
             metaView.text = metaParts.joinToString("  •  ")
@@ -278,6 +282,7 @@ class SceneDetailActivity : FragmentActivity() {
         intent.putExtra("scene_title", scene.filename)
         intent.putExtra("resume_position_ms", resumeMs)
         SceneIntents.putCaptions(intent, captions)
+        SceneIntents.putMarkers(intent, markers)
         startActivity(intent)
     }
 
@@ -328,12 +333,5 @@ class SceneDetailActivity : FragmentActivity() {
         }
     }
 
-    private fun formatMs(ms: Long): String {
-        val totalSecs = (ms / 1000).toInt()
-        val h = totalSecs / 3600
-        val m = (totalSecs % 3600) / 60
-        val s = totalSecs % 60
-        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
-        else String.format("%d:%02d", m, s)
-    }
+    private fun formatMs(ms: Long): String = com.sinema.util.TimeFormat.formatMs(ms)
 }
