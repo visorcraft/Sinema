@@ -7,6 +7,7 @@ import com.sinema.R
 /** A fragment that can show a sort picker; hosts forward the remote's MENU key here. */
 interface SortableScreen {
     fun showSortDialog()
+    fun showGridMenu() = showSortDialog()
 }
 
 /**
@@ -15,6 +16,6 @@ interface SortableScreen {
  */
 fun FragmentActivity.handleSortMenuKey(keyCode: Int): Boolean {
     if (keyCode != KeyEvent.KEYCODE_MENU) return false
-    (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)?.showSortDialog()
+    (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)?.showGridMenu()
     return true
 }

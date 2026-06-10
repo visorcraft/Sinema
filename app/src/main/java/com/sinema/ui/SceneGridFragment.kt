@@ -11,8 +11,10 @@ import androidx.leanback.widget.VerticalGridPresenter
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
+import android.content.Intent
 import com.sinema.model.Scene
 import com.sinema.model.SortOption
+import com.sinema.util.PlaybackQueue
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -46,6 +48,39 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             updateTitle()
             reload()
         }
+    }
+
+    override fun showGridMenu() {
+        val key = sortScreenKey
+        if (key != null) {
+            GridMenuDialog.show(requireContext(), sort, canPlayAll = true,
+                onSort = { chosen ->
+                    sort = chosen
+                    app.prefs.setSortFor(key, chosen.name)
+                    updateTitle()
+                    reload()
+                },
+                onPlayAll = { playAll() }
+            )
+        } else {
+            showSortDialog()
+        }
+    }
+
+    protected open fun playAll() {
+        val scenes = (0 until gridAdapter.size())
+            .mapNotNull { gridAdapter.get(it) as? Scene }
+            .take(500)
+        if (scenes.isEmpty()) return
+        if (scenes.size == 500) {
+            Toast.makeText(requireContext(), "Queued first 500", Toast.LENGTH_SHORT).show()
+        }
+        PlaybackQueue.start(scenes.map { it.id }, startAt = 0)
+        val first = scenes[0]
+        val intent = Intent(requireContext(), PlaybackActivity::class.java)
+        intent.putExtra("scene_id", first.id)
+        intent.putExtra("resume_position_ms", 0L)
+        startActivity(intent)
     }
 
     private fun updateTitle() {
