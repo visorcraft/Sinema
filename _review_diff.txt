@@ -1,9 +1,9 @@
-app/src/main/java/com/sinema/model/Models.kt       |  9 +-----
- .../main/java/com/sinema/ui/PlaybackActivity.kt    | 36 ++++++++++++++++++++++
- .../main/java/com/sinema/ui/SceneDetailActivity.kt | 16 +++++-----
- app/src/main/java/com/sinema/util/SceneIntents.kt  | 16 ++++++++++
- app/src/main/java/com/sinema/util/TimeFormat.kt    | 21 +++++++++++++
- 5 files changed, 81 insertions(+), 17 deletions(-)
+app/src/main/java/com/sinema/model/Models.kt       |  9 +----
+ .../main/java/com/sinema/ui/PlaybackActivity.kt    | 39 ++++++++++++++++++++++
+ .../main/java/com/sinema/ui/SceneDetailActivity.kt | 16 ++++-----
+ app/src/main/java/com/sinema/util/SceneIntents.kt  | 16 +++++++++
+ app/src/main/java/com/sinema/util/TimeFormat.kt    | 15 +++++++++
+ 5 files changed, 78 insertions(+), 17 deletions(-)
 
 --- Changes ---
 
@@ -34,22 +34,29 @@ app/src/main/java/com/sinema/ui/PlaybackActivity.kt
    import kotlinx.coroutines.launch
    
    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-  @@ -24,6 +26,7 @@ class PlaybackActivity : FragmentActivity() {
+  @@ -24,6 +26,8 @@ class PlaybackActivity : FragmentActivity() {
   +    private var markers: List<Pair<String, Double>> = emptyList()
+  +    private var chaptersDialog: android.app.AlertDialog? = null
    
        override fun onCreate(savedInstanceState: Bundle?) {
            super.onCreate(savedInstanceState)
-  @@ -32,6 +35,7 @@ class PlaybackActivity : FragmentActivity() {
+  @@ -32,6 +36,7 @@ class PlaybackActivity : FragmentActivity() {
   +        markers = SceneIntents.markersFrom(intent)
        }
    
        override fun onStart() {
-  @@ -134,4 +138,36 @@ class PlaybackActivity : FragmentActivity() {
+  @@ -47,6 +52,8 @@ class PlaybackActivity : FragmentActivity() {
+  +        chaptersDialog?.dismiss()
+  +        chaptersDialog = null
+           releasePlayer()
+       }
+   
+  @@ -134,4 +141,36 @@ class PlaybackActivity : FragmentActivity() {
   +
   +    private fun showChapters() {
   +        if (markers.isEmpty()) return
   +        val labels = markers.map { "${TimeFormat.formatSeconds(it.second)}  ${it.first}" }
-  +        android.app.AlertDialog.Builder(this)
+  +        chaptersDialog = android.app.AlertDialog.Builder(this)
   +            .setTitle("Chapters")
   +            .setItems(labels.toTypedArray()) { _, which ->
   +                player?.seekTo((markers[which].second * 1000).toLong())
@@ -78,7 +85,7 @@ app/src/main/java/com/sinema/ui/PlaybackActivity.kt
   +        return super.dispatchKeyEvent(event)
   +    }
    }
-  +36 -0
+  +39 -0
 
 app/src/main/java/com/sinema/ui/SceneDetailActivity.kt
   @@ -17,6 +17,7 @@ import com.sinema.R
@@ -152,21 +159,15 @@ app/src/main/java/com/sinema/util/SceneIntents.kt
   +16 -0
 
 app/src/main/java/com/sinema/util/TimeFormat.kt
-  @@ -0,0 +1,21 @@
+  @@ -0,0 +1,15 @@
   +package com.sinema.util
   +
   +object TimeFormat {
-  +    fun formatSeconds(seconds: Double): String {
-  +        val totalSecs = seconds.toInt()
-  +        val h = totalSecs / 3600
-  +        val m = (totalSecs % 3600) / 60
-  +        val s = totalSecs % 60
-  +        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
-  +        else String.format("%d:%02d", m, s)
-  +    }
+  +    fun formatSeconds(seconds: Double): String = formatTotalSeconds(seconds.toInt())
   +
-  +    fun formatMs(ms: Long): String {
-  +        val totalSecs = (ms / 1000).toInt()
+  +    fun formatMs(ms: Long): String = formatTotalSeconds((ms / 1000).toInt())
+  +
+  +    private fun formatTotalSeconds(totalSecs: Int): String {
   +        val h = totalSecs / 3600
   +        val m = (totalSecs % 3600) / 60
   +        val s = totalSecs % 60
@@ -174,4 +175,4 @@ app/src/main/java/com/sinema/util/TimeFormat.kt
   +        else String.format("%d:%02d", m, s)
   +    }
   +}
-  +21 -0
+  +15 -0
