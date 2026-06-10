@@ -36,6 +36,8 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE
                 val url = api.getScreenshotUrl(item.id)
+                image.scaleType = ImageView.ScaleType.CENTER_CROP
+                image.setBackgroundColor(0xFF333333.toInt())
                 Glide.with(view.context)
                     .load(GlideAuth.url(api, url))
                     .centerCrop()
@@ -43,15 +45,18 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
             }
             is EntityItem -> {
                 title.text = item.name
-                content.text = "${item.sceneCount} scenes"
+                content.text = "${item.sceneCount} " + if (item.sceneCount == 1) "scene" else "scenes"
                 heart?.visibility = View.GONE
                 checkmark?.visibility = View.GONE
                 if (item.imagePath != null) {
+                    image.scaleType = ImageView.ScaleType.CENTER_CROP
+                    image.setBackgroundColor(0xFF333333.toInt())
                     Glide.with(view.context)
                         .load(GlideAuth.url(api, item.imagePath))
                         .centerCrop()
                         .into(image)
                 } else {
+                    Glide.with(view.context).clear(image)
                     image.setImageResource(android.R.drawable.ic_menu_agenda)
                     image.scaleType = ImageView.ScaleType.CENTER
                     image.setBackgroundColor(0xFF444444.toInt())
@@ -94,11 +99,14 @@ class FolderCardPresenter : Presenter() {
                         else -> null
                     }
                     if (thumbUrl != null) {
+                        image.scaleType = ImageView.ScaleType.CENTER_CROP
+                        image.setBackgroundColor(0xFF333333.toInt())
                         Glide.with(view.context)
                             .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
                             .centerCrop()
                             .into(image)
                     } else {
+                        Glide.with(view.context).clear(image)
                         image.setImageResource(android.R.drawable.ic_menu_agenda)
                         image.scaleType = ImageView.ScaleType.CENTER
                         image.setBackgroundColor(0xFF444444.toInt())
@@ -121,6 +129,8 @@ class FolderCardPresenter : Presenter() {
                         }
                     }
                     if (thumbUrl != null) {
+                        image.scaleType = ImageView.ScaleType.CENTER_CROP
+                        image.setBackgroundColor(0xFF333333.toInt())
                         Glide.with(view.context)
                             .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
                             .centerCrop()
