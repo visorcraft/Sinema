@@ -92,6 +92,9 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 ### What Sinema uses from Stash
 - **Scenes** — browsing, searching, thumbnails, streaming
 - **Folders** — directory-based browsing
+- **Tags / Performers / Studios** — metadata browsing and filtering
+- **Captions** — subtitle tracks (SRT/VTT)
+- **Scene Markers** — chapters for navigation
 - **Ratings** — favorites (rating100 > 0 = ❤️)
 - **Playback tracking** — resume position, play count, watch history (all server-side)
 
@@ -100,13 +103,19 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 ## Features
 
 - **🏠 Home Screen** — Continue Playing, Recently Played, Recently Added, Favorites.
+- **🏷️ Metadata Browsing** — Browse by Tags, Performers, and Studios with scene counts and images.
 - **📁 Folder Browser** — Navigate your library by directory structure.
-- **🔍 Search** — Find scenes by filename.
+- **🔍 Search** — Find scenes by filename with sortable results.
 - **▶️ Resume Playback** — Pause anywhere, pick up where you left off (persisted to Stash).
+- **🎬 Scene Detail** — Thumbnail, metadata, date, rating, studio, tag/performer chips. Tap chips to browse related scenes.
+- **📝 Subtitles & Tracks** — Select subtitle tracks (SRT/VTT), audio tracks, and playback speed.
+- **📑 Scene Markers as Chapters** — Jump between markers via chapters dialog or media keys.
+- **▶️ Play All & Autoplay** — Queue all scenes in a folder or entity grid; auto-advances when one ends.
 - **❤️ Favorites** — One-tap favorite/unfavorite, synced with Stash ratings. Folders with favorited content show a heart overlay.
-- **🎬 Scene Detail** — Thumbnail, metadata, action buttons, related videos from the same folder.
+- **📺 Android TV Channels** — Optional "Watch Next" (Continue Watching) and "Recently Added" rows on the launcher home screen (opt-in, privacy-first).
+- **🖥️ Multi-Server Profiles** — Switch between multiple Stash servers from Settings.
 - **🔒 PIN Lock** — Optional 4-digit PIN to keep things private. Log Out locks the app until PIN is re-entered.
-- **📺 D-pad Native** — Built for TV remotes, no touchscreen needed.
+- **🎮 D-pad Native** — Built for TV remotes, no touchscreen needed.
 - **🌙 Dark Theme** — Easy on the eyes for late-night viewing.
 
 ---
@@ -120,6 +129,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **OkHttp + Gson** (HTTP + JSON)
 - **Stash GraphQL API** (backend)
 - **Jetpack Security Crypto** (`EncryptedSharedPreferences` for sensitive storage)
+- **AndroidX TVProvider** (Android TV home-screen channels)
 
 ### Build / toolchain versions
 
