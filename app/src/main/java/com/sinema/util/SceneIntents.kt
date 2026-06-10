@@ -3,6 +3,7 @@ package com.sinema.util
 import android.content.Context
 import android.content.Intent
 import com.sinema.model.CaptionRef
+import com.sinema.model.MarkerRef
 import com.sinema.model.Scene
 import com.sinema.ui.SceneDetailActivity
 
@@ -22,6 +23,8 @@ object SceneIntents {
     private const val KEY_RATING = "scene_rating100"
     private const val KEY_CAPTION_LANGS = "caption_langs"
     private const val KEY_CAPTION_TYPES = "caption_types"
+    private const val KEY_MARKER_TITLES = "marker_titles"
+    private const val KEY_MARKER_SECONDS = "marker_seconds"
 
     fun detail(context: Context, scene: Scene): Intent =
         Intent(context, SceneDetailActivity::class.java).apply {
@@ -58,5 +61,18 @@ object SceneIntents {
         val types = intent.getStringArrayExtra(KEY_CAPTION_TYPES) ?: return emptyList()
         if (langs.size != types.size) return emptyList()
         return langs.zip(types).map { (l, t) -> CaptionRef(l, t) }
+    }
+
+    fun putMarkers(intent: Intent, markers: List<MarkerRef>) {
+        val sorted = markers.sortedBy { it.seconds }
+        intent.putExtra(KEY_MARKER_TITLES, sorted.map { it.title.ifBlank { it.primaryTag } }.toTypedArray())
+        intent.putExtra(KEY_MARKER_SECONDS, sorted.map { it.seconds }.toDoubleArray())
+    }
+
+    fun markersFrom(intent: Intent): List<Pair<String, Double>> {
+        val titles = intent.getStringArrayExtra(KEY_MARKER_TITLES) ?: return emptyList()
+        val seconds = intent.getDoubleArrayExtra(KEY_MARKER_SECONDS) ?: return emptyList()
+        if (titles.size != seconds.size) return emptyList()
+        return titles.zip(seconds.toList())
     }
 }

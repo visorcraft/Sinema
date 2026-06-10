@@ -2,6 +2,7 @@ package com.sinema.ui
 
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -13,6 +14,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.CaptionRef
 import com.sinema.util.SceneIntents
+import com.sinema.util.TimeFormat
 import kotlinx.coroutines.launch
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -24,6 +26,7 @@ class PlaybackActivity : FragmentActivity() {
     private var startTimeMs: Long = 0L
     private var playCountSent = false
     private var captions: List<CaptionRef> = emptyList()
+    private var markers: List<Pair<String, Double>> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +35,7 @@ class PlaybackActivity : FragmentActivity() {
         sceneId = intent.getStringExtra("scene_id") ?: ""
         resumePositionMs = intent.getLongExtra("resume_position_ms", 0L)
         captions = SceneIntents.captionsFrom(intent)
+        markers = SceneIntents.markersFrom(intent)
     }
 
     override fun onStart() {
@@ -133,5 +137,37 @@ class PlaybackActivity : FragmentActivity() {
     private fun releasePlayer() {
         player?.release()
         player = null
+    }
+
+    private fun showChapters() {
+        if (markers.isEmpty()) return
+        val labels = markers.map { "${TimeFormat.formatSeconds(it.second)}  ${it.first}" }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Chapters")
+            .setItems(labels.toTypedArray()) { _, which ->
+                player?.seekTo((markers[which].second * 1000).toLong())
+            }
+            .show()
+    }
+
+    private fun seekToAdjacentMarker(forward: Boolean) {
+        val exo = player ?: return
+        val posSec = exo.currentPosition / 1000.0
+        val target = if (forward)
+            markers.firstOrNull { it.second > posSec + 1 }
+        else
+            markers.lastOrNull { it.second < posSec - 3 }
+        target?.let { exo.seekTo((it.second * 1000).toLong()) }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_MENU -> { showChapters(); return true }
+                KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
+                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 }

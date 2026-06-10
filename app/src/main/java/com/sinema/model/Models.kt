@@ -46,14 +46,7 @@ data class Scene(
     val filename: String get() = path.substringAfterLast('/')
     val folder: String get() = path.substringBeforeLast('/')
     
-    fun formatDuration(): String {
-        val totalSecs = duration.toInt()
-        val h = totalSecs / 3600
-        val m = (totalSecs % 3600) / 60
-        val s = totalSecs % 60
-        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
-        else String.format("%d:%02d", m, s)
-    }
+    fun formatDuration(): String = com.sinema.util.TimeFormat.formatSeconds(duration)
     
     fun formatSize(): String {
         val mb = size / (1024.0 * 1024.0)
