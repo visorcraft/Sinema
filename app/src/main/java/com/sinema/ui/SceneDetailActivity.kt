@@ -15,9 +15,11 @@ import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.model.EntityItem
 import com.sinema.model.Scene
 import com.sinema.util.GlideAuth
 import com.sinema.util.SceneIntents
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class SceneDetailActivity : FragmentActivity() {
@@ -29,6 +31,11 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var btnFavorite: Button
     private lateinit var btnMarkWatched: Button
     private var btnFolder: Button? = null
+    private lateinit var metaView: TextView
+    private lateinit var tagsScroll: View
+    private lateinit var tagsRow: LinearLayout
+    private lateinit var performersScroll: View
+    private lateinit var performersRow: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,8 +53,13 @@ class SceneDetailActivity : FragmentActivity() {
         btnFavorite = findViewById(R.id.btn_favorite)
         btnMarkWatched = findViewById(R.id.btn_mark_watched)
         btnFolder = findViewById(R.id.btn_folder)
+        metaView = findViewById(R.id.detail_meta)
+        tagsScroll = findViewById(R.id.detail_tags_scroll)
+        tagsRow = findViewById(R.id.detail_tags_row)
+        performersScroll = findViewById(R.id.detail_performers_scroll)
+        performersRow = findViewById(R.id.detail_performers_row)
 
-        // Set info
+        // Set static info
         titleView.text = scene.filename
         subtitleView.text = "${scene.formatDuration()} • ${scene.formatSize()} • ${scene.width}x${scene.height}"
         pathView.text = scene.path
@@ -59,57 +71,16 @@ class SceneDetailActivity : FragmentActivity() {
             .centerCrop()
             .into(screenshot)
 
-        // Resume button — fetch from Stash
-        updateResumeButton()
-        lifecycleScope.launch {
-            try {
-                val continuePairs = app.api.findContinuePlaying()
-                val match = continuePairs.find { it.first.id == scene.id }
-                if (match != null && match.second > 5.0) {
-                    val resumeMs = (match.second * 1000).toLong()
-                    runOnUiThread {
-                        btnResume.visibility = View.VISIBLE
-                        btnResume.text = "▶ Resume from ${formatMs(resumeMs)}"
-                        btnResume.setOnClickListener {
-                            val intent = Intent(this@SceneDetailActivity, PlaybackActivity::class.java)
-                            intent.putExtra("scene_id", scene.id)
-                            intent.putExtra("scene_title", scene.filename)
-                            intent.putExtra("resume_position_ms", resumeMs)
-                            startActivity(intent)
-                        }
-                    }
-                }
-            } catch (_: Exception) {}
-        }
+        // Initial resume button state — hidden until loadDetails responds
+        btnResume.visibility = View.GONE
 
-        // Play (from start — Stash will clear resume_time when saveActivity sends 0)
-        btnPlay.setOnClickListener {
-            val intent = Intent(this, PlaybackActivity::class.java)
-            intent.putExtra("scene_id", scene.id)
-            intent.putExtra("scene_title", scene.filename)
-            intent.putExtra("resume_position_ms", 0L)
-            startActivity(intent)
-        }
+        // Play from start
+        btnPlay.setOnClickListener { launchPlayback(0L) }
 
-        // Resume (default — will be updated with Stash data above)
-        btnResume.setOnClickListener {
-            val intent = Intent(this, PlaybackActivity::class.java)
-            intent.putExtra("scene_id", scene.id)
-            intent.putExtra("scene_title", scene.filename)
-            startActivity(intent)
-        }
+        // Resume (default click before loadDetails fills in the real position)
+        btnResume.setOnClickListener { launchPlayback(0L) }
 
-        // Favorite
-        lifecycleScope.launch {
-            try {
-                val rating = app.api.getSceneRating(scene.id)
-                val isFav = rating != null && rating > 0
-                btnFavorite.text = if (isFav) "❤️ Unfavorite" else "🤍 Favorite"
-            } catch (e: Exception) {
-                Log.e("Sinema", "Failed to fetch favorite state", e)
-            }
-        }
-
+        // Favorite toggle
         btnFavorite.setOnClickListener {
             lifecycleScope.launch {
                 try {
@@ -174,12 +145,107 @@ class SceneDetailActivity : FragmentActivity() {
         // Load related scenes from same folder
         loadRelatedScenes()
 
-        // Set initial focus to resume or play
-        if (btnResume.visibility == View.VISIBLE) {
-            btnResume.requestFocus()
-        } else {
-            btnPlay.requestFocus()
+        // Initial focus
+        btnPlay.requestFocus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadDetails()
+    }
+
+    private fun loadDetails() {
+        lifecycleScope.launch {
+            try {
+                val details = app.api.findSceneFull(scene.id) ?: return@launch
+                val s = details.scene
+
+                // Resume button
+                if (details.resumeTime > 5.0) {
+                    val resumeMs = (details.resumeTime * 1000).toLong()
+                    btnResume.visibility = View.VISIBLE
+                    btnResume.text = "▶ Resume from ${formatMs(resumeMs)}"
+                    btnResume.setOnClickListener { launchPlayback(resumeMs) }
+                } else {
+                    btnResume.visibility = View.GONE
+                }
+
+                // Favorite initial state
+                btnFavorite.text = if (s.isFavorite) "❤️ Unfavorite" else "🤍 Favorite"
+
+                // Meta line: date  •  studio  •  ★ rating
+                val metaParts = buildList {
+                    s.date?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    s.studio?.let { add(it.name) }
+                    s.rating100?.let { add("★ $it") }
+                }
+                if (metaParts.isNotEmpty()) {
+                    metaView.text = metaParts.joinToString("  •  ")
+                    metaView.visibility = View.VISIBLE
+                } else {
+                    metaView.visibility = View.GONE
+                }
+
+                // Chips — clear before repopulating (onResume runs repeatedly)
+                tagsRow.removeAllViews()
+                performersRow.removeAllViews()
+
+                // Studio chip at start of tags row
+                s.studio?.let { studio ->
+                    addChip(tagsRow, "🎬 ${studio.name}") {
+                        startActivity(EntityScenesActivity.intent(
+                            this@SceneDetailActivity,
+                            EntityItem(studio.id, studio.name, 0, null, EntityItem.Kind.STUDIO)
+                        ))
+                    }
+                }
+
+                // Tag chips
+                for (tag in s.tags) {
+                    addChip(tagsRow, "#${tag.name}") {
+                        startActivity(EntityScenesActivity.intent(
+                            this@SceneDetailActivity,
+                            EntityItem(tag.id, tag.name, 0, null, EntityItem.Kind.TAG)
+                        ))
+                    }
+                }
+
+                // Performer chips
+                for (performer in s.performers) {
+                    addChip(performersRow, performer.name) {
+                        startActivity(EntityScenesActivity.intent(
+                            this@SceneDetailActivity,
+                            EntityItem(performer.id, performer.name, 0, null, EntityItem.Kind.PERFORMER)
+                        ))
+                    }
+                }
+
+                tagsScroll.visibility = if (tagsRow.childCount > 0) View.VISIBLE else View.GONE
+                performersScroll.visibility = if (performersRow.childCount > 0) View.VISIBLE else View.GONE
+
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Failed to load scene details for ${scene.id}", e)
+            }
         }
+    }
+
+    private fun addChip(row: LinearLayout, label: String, onClick: () -> Unit) {
+        val chip = Button(this).apply {
+            text = label
+            isFocusable = true
+            setOnClickListener { onClick() }
+        }
+        row.addView(chip)
+    }
+
+    private fun launchPlayback(resumeMs: Long) {
+        val intent = Intent(this, PlaybackActivity::class.java)
+        intent.putExtra("scene_id", scene.id)
+        intent.putExtra("scene_title", scene.filename)
+        intent.putExtra("resume_position_ms", resumeMs)
+        startActivity(intent)
     }
 
     private fun loadRelatedScenes() {
@@ -227,38 +293,6 @@ class SceneDetailActivity : FragmentActivity() {
                 }
             } catch (_: Exception) {}
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // Refresh resume from Stash
-        lifecycleScope.launch {
-            try {
-                val continuePairs = app.api.findContinuePlaying()
-                val match = continuePairs.find { it.first.id == scene.id }
-                runOnUiThread {
-                    if (match != null && match.second > 5.0) {
-                        val resumeMs = (match.second * 1000).toLong()
-                        btnResume.visibility = View.VISIBLE
-                        btnResume.text = "▶ Resume from ${formatMs(resumeMs)}"
-                        btnResume.setOnClickListener {
-                            val intent = Intent(this@SceneDetailActivity, PlaybackActivity::class.java)
-                            intent.putExtra("scene_id", scene.id)
-                            intent.putExtra("scene_title", scene.filename)
-                            intent.putExtra("resume_position_ms", resumeMs)
-                            startActivity(intent)
-                        }
-                    } else {
-                        btnResume.visibility = View.GONE
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    private fun updateResumeButton() {
-        // Initial state — hidden until Stash responds
-        btnResume.visibility = View.GONE
     }
 
     private fun formatMs(ms: Long): String {
