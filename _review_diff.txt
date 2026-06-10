@@ -1,26 +1,99 @@
-app/build.gradle.kts                               |   4 +-
- app/src/main/java/com/sinema/SinemaApp.kt          |  12 +-
- .../main/java/com/sinema/model/ServerProfile.kt    |  14 ++
- .../java/com/sinema/ui/ServerProfileSection.kt     | 176 +++++++++++++++++++++
- .../main/java/com/sinema/ui/SettingsActivity.kt    |  46 ++++++
- app/src/main/java/com/sinema/ui/SetupActivity.kt   |  36 +++--
- app/src/main/java/com/sinema/util/Prefs.kt         |  42 +++++
- app/src/main/java/com/sinema/util/ProfileCodec.kt  |  20 +++
- .../test/java/com/sinema/util/ServerProfileTest.kt |  56 +++++++
- 9 files changed, 394 insertions(+), 12 deletions(-)
+app/build.gradle.kts                               |   5 +-
+ app/src/main/AndroidManifest.xml                   |  31 ++
+ app/src/main/java/com/sinema/SinemaApp.kt          |  15 +-
+ app/src/main/java/com/sinema/api/SinemaApi.kt      | 390 +++++++++++++--------
+ app/src/main/java/com/sinema/model/Models.kt       |  41 ++-
+ .../main/java/com/sinema/model/ServerProfile.kt    |  14 +
+ app/src/main/java/com/sinema/model/SortOption.kt   |  22 ++
+ .../java/com/sinema/ui/BrowseFoldersActivity.kt    |  14 +-
+ app/src/main/java/com/sinema/ui/CardPresenter.kt   |  48 +++
+ .../main/java/com/sinema/ui/DeepLinkActivity.kt    |  78 +++++
+ .../main/java/com/sinema/ui/EntityGridActivity.kt  |  48 +++
+ .../java/com/sinema/ui/EntityScenesActivity.kt     |  59 ++++
+ .../main/java/com/sinema/ui/FavoritesActivity.kt   | 104 +-----
+ .../java/com/sinema/ui/FolderBrowseActivity.kt     |  71 +++-
+ app/src/main/java/com/sinema/ui/GridMenuDialog.kt  |  31 ++
+ app/src/main/java/com/sinema/ui/MainActivity.kt    |  30 +-
+ .../main/java/com/sinema/ui/PlaybackActivity.kt    | 104 +++++-
+ .../main/java/com/sinema/ui/SceneDetailActivity.kt | 277 +++++++++------
+ .../main/java/com/sinema/ui/SceneGridFragment.kt   | 144 ++++++++
+ app/src/main/java/com/sinema/ui/SearchActivity.kt  |  46 ++-
+ .../java/com/sinema/ui/ServerProfileSection.kt     | 183 ++++++++++
+ .../main/java/com/sinema/ui/SettingsActivity.kt    |  74 ++++
+ app/src/main/java/com/sinema/ui/SetupActivity.kt   |  36 +-
+ app/src/main/java/com/sinema/ui/SortDialog.kt      |  21 ++
+ app/src/main/java/com/sinema/ui/SortableScreen.kt  |  21 ++
+ app/src/main/java/com/sinema/util/FolderHelper.kt  |  25 +-
+ app/src/main/java/com/sinema/util/PlaybackQueue.kt |  23 ++
+ app/src/main/java/com/sinema/util/Prefs.kt         |  65 +++-
+ app/src/main/java/com/sinema/util/ProfileCodec.kt  |  20 ++
+ app/src/main/java/com/sinema/util/SceneIntents.kt  |  95 +++++
+ app/src/main/java/com/sinema/util/TimeFormat.kt    |  15 +
+ .../java/com/sinema/util/TvChannelInitReceiver.kt  |  41 +++
+ app/src/main/java/com/sinema/util/TvChannels.kt    | 174 +++++++++
+ app/src/main/res/layout/activity_playback.xml      |   5 +-
+ app/src/main/res/layout/activity_scene_detail.xml  |  39 +++
+ app/src/test/java/com/sinema/api/SinemaApiTest.kt  |  76 ++++
+ .../test/java/com/sinema/model/SortOptionTest.kt   |  43 +++
+ .../test/java/com/sinema/util/FolderHelperTest.kt  |  16 +-
+ .../test/java/com/sinema/util/PlaybackQueueTest.kt |  28 ++
+ .../test/java/com/sinema/util/ServerProfileTest.kt |  56 +++
+ 40 files changed, 2156 insertions(+), 472 deletions(-)
 
 --- Changes ---
 
 app/build.gradle.kts
   @@ -20,8 +20,8 @@ android {
-  -        versionCode = 16
-  -        versionName = "1.12.0"
+  -        versionCode = 14
+  -        versionName = "1.10.0"
   +        versionCode = 17
   +        versionName = "1.13.0"
        }
    
        buildTypes {
-  +2 -2
+  @@ -69,6 +69,7 @@ dependencies {
+  +    implementation("androidx.tvprovider:tvprovider:1.0.0")
+   
+       testImplementation("junit:junit:4.13.2")
+   }
+  +3 -2
+
+app/src/main/AndroidManifest.xml
+  @@ -80,5 +80,36 @@
+  +        <activity
+  +            android:name=".ui.EntityGridActivity"
+  +            android:screenOrientation="landscape" />
+  +
+  +        <activity
+  +            android:name=".ui.EntityScenesActivity"
+  +            android:screenOrientation="landscape" />
+  +
+  +        <receiver
+  +            android:name=".util.TvChannelInitReceiver"
+  +            android:exported="true"
+  +            android:enabled="true">
+  +            <intent-filter>
+  +                <action android:name="androidx.tvprovider.media.tv.INITIALIZE_PROGRAMS" />
+  +            </intent-filter>
+  +        </receiver>
+  +
+  +        <activity
+  +            android:name=".ui.DeepLinkActivity"
+  +            android:exported="true"
+  +            android:screenOrientation="landscape"
+  +            android:theme="@android:style/Theme.NoDisplay"
+  +            android:noHistory="true" >
+  +            <intent-filter>
+  +                <action android:name="android.intent.action.VIEW" />
+  +                <category android:name="android.intent.category.DEFAULT" />
+  +                <category android:name="android.intent.category.BROWSABLE" />
+  +                <data android:scheme="com.sinema" android:host="app" android:pathPrefix="/scene/" />
+  +            </intent-filter>
+  +        </activity>
+  +
+       </application>
+   </manifest>
+  +31 -0
 
 app/src/main/java/com/sinema/SinemaApp.kt
   @@ -21,6 +21,7 @@ class SinemaApp : Application() {
@@ -28,405 +101,452 @@ app/src/main/java/com/sinema/SinemaApp.kt
            api = SinemaApi(prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode)
            configureApi()
        }
-  @@ -33,7 +34,16 @@ class SinemaApp : Application() {
+  @@ -33,7 +34,19 @@ class SinemaApp : Application() {
   -        api.onSessionRefreshed = { cookie -> prefs.sessionCookie = cookie }
   +        api.onSessionRefreshed = { cookie ->
   +            prefs.sessionCookie = cookie
-  +            // Also update the active profile's cookie so it survives profile switches
-  +            val activeId = prefs.activeProfileId
-  +            if (activeId.isNotBlank()) {
-  +                prefs.profiles = prefs.profiles.map {
-  +                    if (it.id == activeId) it.copy(sessionCookie = cookie) else it
+  +            // Also update the active profile's cookie so it survives profile switches.
+  +            // Synchronize against UI-driven mutations via the prefs object monitor.
+  +            synchronized(prefs) {
+  +                val activeId = prefs.activeProfileId
+  +                if (activeId.isNotBlank()) {
+  +                    prefs.profiles = prefs.profiles.map {
+  +                        if (it.id == activeId) it.copy(sessionCookie = cookie) else it
+  +                    }
   +                }
   +            }
   +        }
        }
    
        companion object {
-  +11 -1
+  +14 -1
+
+app/src/main/java/com/sinema/api/SinemaApi.kt
+  @@ -1,10 +1,19 @@
+  +import androidx.annotation.VisibleForTesting
+   import com.google.gson.Gson
+  +import com.google.gson.JsonArray
+   import com.google.gson.JsonObject
+  +import com.sinema.model.CaptionRef
+  +import com.sinema.model.EntityItem
+   import com.sinema.model.ImageItem
+  +import com.sinema.model.MarkerRef
+  +import com.sinema.model.PerformerRef
+   import com.sinema.model.Scene
+  +import com.sinema.model.SceneDetails
+  +import com.sinema.model.StudioRef
+  +import com.sinema.model.TagRef
+   import kotlinx.coroutines.Dispatchers
+   import kotlinx.coroutines.withContext
+   import okhttp3.Dispatcher
+  @@ -14,6 +23,7 @@ import okhttp3.OkHttpClient
+  +import java.net.URLEncoder
+   import java.util.concurrent.TimeUnit
+   
+   class SinemaApi(
+  @@ -23,6 +33,20 @@ class SinemaApi(
+  +    companion object {
+  +        // Single source of truth for scene list payloads.
+  +        internal const val SCENE_FIELDS =
+  +            "id title play_count rating100 files { path size duration width height }"
+  +
+  +        // Full scene payload — used by findSceneFull for detail/player screens.
+  +        internal const val SCENE_FIELDS_FULL = SCENE_FIELDS +
+  +            " date" +
+  +            " studio { id name }" +
+  +            " tags { id name }" +
+  +            " performers { id name }" +
+  +            " captions { language_code caption_type }"
+  +    }
+  +
+       private val client = OkHttpClient.Builder()
+           .connectTimeout(15, TimeUnit.SECONDS)
+           .readTimeout(30, TimeUnit.SECONDS)
+  @@ -65,6 +89,35 @@ class SinemaApi(
+  +    private suspend fun findScenesInternal(
+  +        page: Int = 1,
+  +        perPage: Int = 100,
+  +        sort: String = "path",
+  +        direction: String = "ASC",
+  +        searchTerm: String? = null,
+  +        sceneFilter: Map<String, Any?>? = null,
+  +        fields: String = SCENE_FIELDS
+  +    ): Pair<Int, List<Scene>> {
+  +        val query = """
+  +            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
+  +                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
+  +                    count
+  +                    scenes { $fields }
+  +                }
+  +            }
+  +        """.trimIndent()
+  +        val filter = mutableMapOf<String, Any?>(
+  +            "page" to page, "per_page" to perPage, "sort" to sort, "direction" to direction
+  +        )
+  +        if (searchTerm != null) filter["q"] = searchTerm
+  +        val result = graphql(query, mapOf("filter" to filter, "scene_filter" to sceneFilter))
+  +        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes")
+  +            ?: return Pair(0, emptyList())
+  +        val count = data.get("count").asInt
+  +        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  +        return Pair(count, scenes)
+  +    }
+  +
+       private suspend fun graphql(query: String, variables: Map<String, Any?> = emptyMap()): JsonObject {
+           return withContext(Dispatchers.IO) {
+               val body = gson.toJson(mapOf("query" to query, "variables" to variables))
+  @@ -148,50 +201,17 @@ class SinemaApi(
+  -    suspend fun findAllScenes(page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> {
+  -        val query = """
+  -            query(${"$"}filter: FindFilterType) {
+  -                findScenes(filter: ${"$"}filter) {
+  -                    count
+  -                    scenes {
+  -                        id title play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  -                }
+  -            }
+  -        """.trimIndent()
+  -        val variables = mapOf(
+  -            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC")
+  -        )
+  -        val result = graphql(query, variables)
+  -        val data = result.getAsJsonObject("data").getAsJsonObject("findScenes")
+  -        val count = data.get("count").asInt
+  -        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  -        return Pair(count, scenes)
+  -    }
+  +    suspend fun findAllScenes(page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
+  +        findScenesInternal(page = page, perPage = perPage)
+   
+  -    suspend fun findScenesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> {
+  -        val query = """
+  -            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
+  -                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
+  -                    count
+  -                    scenes {
+  -                        id title play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  -                }
+  -            }
+  -        """.trimIndent()
+  -        val variables = mapOf(
+  -            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
+  -            "scene_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+  +    suspend fun findScenesByPath(
+  +        pathPrefix: String, page: Int = 1, perPage: Int = 100,
+  +        sort: String = "path", direction: String = "ASC"
+  +    ): Pair<Int, List<Scene>> =
+  +        findScenesInternal(
+  +            page = page, perPage = perPage, sort = sort, direction = direction,
+  +            sceneFilter = mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+           )
+  -        val result = graphql(query, variables)
+  -        val data = result.getAsJsonObject("data").getAsJsonObject("findScenes")
+  -        val count = data.get("count").asInt
+  -        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  -        return Pair(count, scenes)
+  -    }
+   
+       suspend fun findImagesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<ImageItem>> {
+           val query = """
+  @@ -294,27 +314,11 @@ class SinemaApi(
+  -    suspend fun searchScenes(searchTerm: String, page: Int = 1, perPage: Int = 40): Pair<Int, List<Scene>> {
+  -        val query = """
+  -            query(${"$"}filter: FindFilterType) {
+  -                findScenes(filter: ${"$"}filter) {
+  -                    count
+  -                    scenes {
+  -                        id title play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  -                }
+  -            }
+  -        """.trimIndent()
+  -        val variables = mapOf(
+  -            "filter" to mapOf("q" to searchTerm, "page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC")
+  -        )
+  -        val result = graphql(query, variables)
+  -        val data = result.getAsJsonObject("data").getAsJsonObject("findScenes")
+  -        val count = data.get("count").asInt
+  -        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  -        return Pair(count, scenes)
+  -    }
+  +    suspend fun searchScenes(
+  +        searchTerm: String, page: Int = 1, perPage: Int = 40,
+  +        sort: String = "path", direction: String = "ASC"
+  +    ): Pair<Int, List<Scene>> =
+  +        findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, searchTerm = searchTerm)
+   
+       suspend fun setSceneRating(sceneId: String, rating: Int?): Boolean {
+           val query = """
+  @@ -339,45 +343,14 @@ class SinemaApi(
+  -    suspend fun findFavoriteScenes(): List<Scene> {
+  -        val query = """
+  -            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
+  -                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
+  -                    count
+  -                    scenes {
+  -                        id title play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  -                }
+  -            }
+  -        """.trimIndent()
+  -        val variables = mapOf(
+  -            "filter" to mapOf("per_page" to 100, "sort" to "updated_at", "direction" to "DESC"),
+  -            "scene_filter" to mapOf("rating100" to mapOf("value" to 1, "modifier" to "GREATER_THAN"))
+  -        )
+  -        val result = graphql(query, variables)
+  -        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
+  -        return data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  -    }
+  +    suspend fun findFavoriteScenes(sort: String = "updated_at", direction: String = "DESC"): List<Scene> =
+  +        findScenesInternal(
+  +            perPage = 100, sort = sort, direction = direction,
+  +            sceneFilter = mapOf("rating100" to mapOf("value" to 1, "modifier" to "GREATER_THAN"))
+  +        ).second
+   
+  -    suspend fun findRecentScenes(perPage: Int = 25): List<Scene> {
+  -        val query = """
+  -            query(${"$"}filter: FindFilterType) {
+  -                findScenes(filter: ${"$"}filter) {
+  -                    scenes {
+  -                        id title play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  -                }
+  -            }
+  -        """.trimIndent()
+  -        val variables = mapOf(
+  -            "filter" to mapOf("per_page" to perPage, "sort" to "created_at", "direction" to "DESC")
+  -        )
+  -        val result = graphql(query, variables)
+  -        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
+  -        return data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  -    }
+  +    suspend fun findRecentScenes(perPage: Int = 25): List<Scene> =
+  +        findScenesInternal(perPage = perPage, sort = "created_at", direction = "DESC").second
+   
+       suspend fun findTopLevelFolders(): List<Pair<String, String>> {
+           val idQuery = """
+  @@ -463,10 +436,7 @@ class SinemaApi(
+  -                    scenes {
+  -                        id title play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  +                    scenes { $SCENE_FIELDS }
+                   }
+               }
+           """.trimIndent()
+  @@ -507,37 +477,22 @@ class SinemaApi(
+  -    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> {
+  -        val query = """
+  -            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
+  -                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
+  -                    scenes {
+  -                        id title play_count last_played_at resume_time rating100
+  -                        files { path size duration width height }
+  -                    }
+  -                }
+  -            }
+  -        """.trimIndent()
+  -        val variables = mapOf(
+  -            "filter" to mapOf("per_page" to perPage, "sort" to "last_played_at", "direction" to "DESC"),
+  -            "scene_filter" to mapOf(
+  +    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> =
+  +        findScenesInternal(
+  +            perPage = perPage,
+  +            sort = "last_played_at",
+  +            direction = "DESC",
+  +            sceneFilter = mapOf(
+                   "play_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN"),
+                   "resume_time" to mapOf("value" to 0, "modifier" to "EQUALS")
+               )
+  -        )
+  -        val result = graphql(query, variables)
+  -        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
+  -        return data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  -    }
+  +        ).second
+   
+       suspend fun findContinuePlaying(): List<Pair<Scene, Double>> {
+           val query = """
+               query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
+                   findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
+  -                    scenes {
+  -                        id title resume_time play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  +                    scenes { $SCENE_FIELDS resume_time }
+                   }
+               }
+           """.trimIndent()
+  @@ -609,47 +564,172 @@ class SinemaApi(
+  -    suspend fun findScenesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<Scene>> {
+  -        val query = """
+  -            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
+  -                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
+  -                    count
+  -                    scenes {
+  -                        id title play_count rating100
+  -                        files { path size duration width height }
+  -                    }
+  -                }
+  -            }
+  -        """.trimIndent()
+  -        val variables = mapOf(
+  -            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
+  -            "scene_filter" to mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
+  +    suspend fun findScenesInFolderDirect(
+  +        folderPath: String, page: Int = 1, perPage: Int = 500,
+  +        sort: String = "path", direction: String = "ASC"
+  +    ): Pair<Int, List<Scene>> =
+  +        findScenesInternal(
+  +            page = page, perPage = perPage, sort = sort, direction = direction,
+  +            sceneFilter = mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
+  +        )
+  +
+  +    private fun parseTagRefs(arr: JsonArray): List<TagRef> = arr.map { el ->
+  +        val t = el.asJsonObject
+  +        TagRef(
+  +            id = t.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+  +            name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+  +        )
+  +    }
+  +
+  +    private fun parsePerformerRefs(arr: JsonArray): List<PerformerRef> = arr.map { el ->
+  +        val p = el.asJsonObject
+  +        PerformerRef(
+  +            id = p.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+  +            name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+           )
+  -        val result = graphql(query, variables)
+  -        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return Pair(0, emptyList())
+  -        val count = data.get("count").asInt
+  -        val scenes = data.getAsJsonArray("scenes").map { parseScene(it.asJsonObject) }
+  -        return Pair(count, scenes)
+       }
+   
+  -    private fun parseScene(obj: JsonObject): Scene {
+  -        val id = obj.get("id").asString
+  -        val title = obj.get("title")?.asString ?: ""
+  +    private fun parseCaptionRefs(arr: JsonArray): List<CaptionRef> = arr.map { el ->
+  +        val c = el.asJsonObject
+  +        CaptionRef(
+  +            languageCode = c.get("language_code")?.takeIf { !it.isJsonNull }?.asString ?: "",
+  +            captionType = c.get("caption_type")?.takeIf { !it.isJsonNull }?.asString ?: ""
+  +        )
+  +    }
+  +
+  +    @VisibleForTesting
+  +    internal fun parseScene(obj: JsonObject): Scene {
+           val files = obj.getAsJsonArray("files")
+           val file = if (files != null && files.size() > 0) files[0].asJsonObject else null
+  +        // Optional metadata — only present in SCENE_FIELDS_FULL queries; guarded to keep lean list queries working.
+  +        val studioObj = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
+           return Scene(
+  -            id = id,
+  -            title = title,
+  +            id = obj.get("id").asString,
+  +            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+               path = file?.get("path")?.asString ?: "",
+               size = file?.get("size")?.asLong ?: 0L,
+               duration = file?.get("duration")?.asDouble ?: 0.0,
+               width = file?.get("width")?.asInt ?: 0,
+               height = file?.get("height")?.asInt ?: 0,
+  -            playCount = obj.get("play_count")?.asInt ?: 0,
+  -            rating100 = if (obj.has("rating100") && !obj.get("rating100").isJsonNull) obj.get("rating100").asInt else null
+  +            playCount = obj.get("play_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+  +            rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt,
+  +            date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
+  +            studio = studioObj?.let { s ->
+  +                StudioRef(
+  +                    id = s.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+  +                    name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+  +                )
+  +            },
+  +            tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
+  +            performers = (obj.get("performers") as? JsonArray)?.let(::parsePerformerRefs) ?: emptyList(),
+  +            captions = (obj.get("captions") as? JsonArray)?.let(::parseCaptionRefs) ?: emptyList()
+  +        )
+  +    }
+  +
+  +    /**
+  +     * Fetch a paginated list of tags, performers, or studios sorted by scene count descending.
+  +     * Note: sort field is "scenes_count" (plural) — confirmed in stashapp/stash pkg/sqlite tag.go, performer.go, studio.go.
+  +     */
+  +    suspend fun findEntities(kind: EntityItem.Kind, page: Int = 1, perPage: Int = 100): Pair<Int, List<EntityItem>> {
+  +        val (queryName, listKey) = when (kind) {
+  +            EntityItem.Kind.TAG -> "findTags" to "tags"
+  +            EntityItem.Kind.PERFORMER -> "findPerformers" to "performers"
+  +            EntityItem.Kind.STUDIO -> "findStudios" to "studios"
+  +        }
+  +        val query = """
+  ... (90 lines truncated)
+  +235 -155
+
+app/src/main/java/com/sinema/model/Models.kt
+  @@ -1,5 +1,29 @@
+  +data class TagRef(val id: String, val name: String)
+  +data class PerformerRef(val id: String, val name: String)
+  +data class StudioRef(val id: String, val name: String)
+  +data class CaptionRef(val languageCode: String, val captionType: String)
+  +data class MarkerRef(val id: String, val title: String, val seconds: Double, val primaryTag: String)
+  +
+  +/** A browsable Stash entity (tag, performer, or studio). */
+  +data class EntityItem(
+  +    val id: String,
+  +    val name: String,
+  +    val sceneCount: Int,
+  +    val imagePath: String?,   // absolute URL from Stash, needs auth headers
+  +    val kind: Kind
+  +) {
+  +    enum class Kind(val label: String) { TAG("Tags"), PERFORMER("Performers"), STUDIO("Studios") }
+  +}
+  +
+  +/** Full single-scene payload for the detail screen and player. */
+  +data class SceneDetails(
+  +    val scene: Scene,
+  +    val resumeTime: Double,
+  +    val markers: List<MarkerRef>
+  +)
+  +
+   data class Scene(
+       val id: String,
+       val title: String,
+  @@ -9,21 +33,20 @@ data class Scene(
+  -    val rating100: Int? = null
+  +    val rating100: Int? = null,
+  +    // Metadata below is empty/null on list-query results; populated only by the full scene query.
+  +    val date: String? = null,
+  +    val studio: StudioRef? = null,
+  +    val tags: List<TagRef> = emptyList(),
+  +    val performers: List<PerformerRef> = emptyList(),
+  +    val captions: List<CaptionRef> = emptyList()
+   ) {
+       val isWatched: Boolean get() = playCount > 0
+       val isFavorite: Boolean get() = (rating100 ?: 0) > 0
+       val filename: String get() = path.substringAfterLast('/')
+       val folder: String get() = path.substringBeforeLast('/')
+       
+  -    fun formatDuration(): String {
+  -        val totalSecs = duration.toInt()
+  -        val h = totalSecs / 3600
+  -        val m = (totalSecs % 3600) / 60
+  -        val s = totalSecs % 60
+  -        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+  -        else String.format("%d:%02d", m, s)
+  -    }
+  +    fun formatDuration(): String = com.sinema.util.TimeFormat.formatSeconds(duration)
+       
+       fun formatSize(): String {
+           val mb = size / (1024.0 * 1024.0)
+  +32 -9
 
 app/src/main/java/com/sinema/model/ServerProfile.kt
-  @@ -0,0 +1,14 @@
-  +package com.sinema.model
-  +
-  +import java.util.UUID
-  +
-  +data class ServerProfile(
-  +    val id: String = UUID.randomUUID().toString(),
-  +    val name: String = "",
-  +    val serverUrl: String = "",
-  +    val apiKey: String = "",
-  +    val sessionCookie: String = "",
-  +    val authMode: String = "apikey",
-  +    val stashUsername: String = "",
-  +    val stashPassword: String = ""
-  +)
-  +14 -0
 
-app/src/main/java/com/sinema/ui/ServerProfileSection.kt
-  @@ -0,0 +1,176 @@
-  +package com.sinema.ui
-  +
-  +import android.app.AlertDialog
-  +import android.content.Context
-  +import android.content.Intent
-  +import android.view.View
-  +import android.widget.Button
-  +import android.widget.EditText
-  +import android.widget.LinearLayout
-  +import android.widget.Toast
-  +import com.sinema.SinemaApp
-  +import com.sinema.model.ServerProfile
-  +
-  +object ServerProfileSection {
-  +
-  +    fun build(ctx: Context, layout: LinearLayout, onAddServer: () -> Unit) {
-  +        val app = SinemaApp.instance
-  +
-  +        val serversLabel = android.widget.TextView(ctx).apply {
-  +            text = "\nServers:"
-  +            textSize = 18f
-  +            setTextColor(0xFFCCCCCC.toInt())
-  +        }
-  +        layout.addView(serversLabel)
-  +
-  +        val profiles = app.prefs.profiles
-  +        val activeId = app.prefs.activeProfileId
-  +
-  +        profiles.forEach { profile ->
-  +            addProfileRow(ctx, layout, profile, profile.id == activeId, profiles.size <= 1)
-  +        }
-  +
-  +        val addServerBtn = Button(ctx).apply {
-  +            text = "+ Add Server"
-  +            isFocusable = true
-  +            setBackgroundColor(0xFF333333.toInt())
-  +            setTextColor(0xFFFFFFFF.toInt())
-  +            setOnFocusChangeListener { _, hasFocus ->
-  +                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-  +            }
-  +            setOnClickListener { onAddServer() }
-  +        }
-  +        layout.addView(addServerBtn, LinearLayout.LayoutParams(
-  +            LinearLayout.LayoutParams.MATCH_PARENT,
-  +            LinearLayout.LayoutParams.WRAP_CONTENT
-  +        ).apply { topMargin = 8; bottomMargin = 16 })
-  +    }
-  +
-  +    private fun addProfileRow(ctx: Context, layout: LinearLayout, profile: ServerProfile, isActive: Boolean, isLast: Boolean) {
-  +        val app = SinemaApp.instance
-  +        val rowLayout = LinearLayout(ctx).apply {
-  +            orientation = LinearLayout.HORIZONTAL
-  +            setBackgroundColor(0xFF333333.toInt())
-  +            isFocusable = false
-  +        }
-  +
-  +        val btn = Button(ctx).apply {
-  +            text = "${profile.name}${if (isActive) " ✓" else ""}\n${profile.serverUrl}"
-  +            textSize = 14f
-  +            isFocusable = true
-  +            setBackgroundColor(0xFF333333.toInt())
-  +            setTextColor(0xFFFFFFFF.toInt())
-  +            setOnFocusChangeListener { _, hasFocus ->
-  +                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-  +                rowLayout.setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-  +            }
-  +            setOnClickListener {
-  +                if (isActive) {
-  +                    Toast.makeText(ctx, "${profile.name} is already active", Toast.LENGTH_SHORT).show()
-  +                } else {
-  +                    AlertDialog.Builder(ctx)
-  +                        .setTitle("Switch Server")
-  +                        .setMessage("Switch to ${profile.name}?")
-  +                        .setPositiveButton("Switch") { _, _ ->
-  +                            app.prefs.applyProfile(profile)
-  +                            app.refreshApi()
-  +                            val intent = Intent(ctx, MainActivity::class.java)
-  +                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-  +                            ctx.startActivity(intent)
-  +                            (ctx as? android.app.Activity)?.finish()
-  +                        }
-  +                        .setNegativeButton("Cancel", null)
-  +                        .show()
-  +                }
-  +            }
-  +        }
-  +        rowLayout.addView(btn, LinearLayout.LayoutParams(
-  +            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-  +        ))
-  +
-  +        val optionsBtn = Button(ctx).apply {
-  +            text = "..."
-  +            textSize = 14f
-  +            isFocusable = true
-  +            setBackgroundColor(0xFF333333.toInt())
-  +            setTextColor(0xFFFFFFFF.toInt())
-  +            setOnFocusChangeListener { _, hasFocus ->
-  +                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-  +            }
-  +            setOnClickListener {
-  ... (76 lines truncated)
-  +176 -0
-
-app/src/main/java/com/sinema/ui/SettingsActivity.kt
-  @@ -55,6 +55,33 @@ class SettingsFragment : Fragment() {
-  +    private val setupLauncher = registerForActivityResult(
-  +        ActivityResultContracts.StartActivityForResult()
-  +    ) { result ->
-  +        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
-  +
-  +        val app = SinemaApp.instance
-  +        val prefs = app.prefs
-  +
-  +        // SetupActivity wrote credentials into legacy prefs; wrap them into a new profile
-  +        val name = try { java.net.URI(prefs.serverUrl).host ?: prefs.serverUrl } catch (_: Exception) { prefs.serverUrl }
-  +        val p = com.sinema.model.ServerProfile(
-  +            name = name,
-  +            serverUrl = prefs.serverUrl,
-  +            apiKey = prefs.apiKey,
-  +            sessionCookie = prefs.sessionCookie,
-  +            authMode = prefs.authMode,
-  +            stashUsername = prefs.stashUsername,
-  +            stashPassword = prefs.stashPassword
-  +        )
-  +        prefs.profiles = prefs.profiles + p
-  +        prefs.applyProfile(p)
-  +        app.refreshApi()
-  +
-  +        Toast.makeText(requireContext(), "Server added: ${p.name}", Toast.LENGTH_SHORT).show()
-  +        requireActivity().recreate()
-  +    }
-  +
-       override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-           val app = SinemaApp.instance
-           val ctx = requireContext()
-  @@ -201,6 +228,12 @@ class SettingsFragment : Fragment() {
-  +        ServerProfileSection.build(ctx, layout) {
-  +            val intent = Intent(ctx, SetupActivity::class.java)
-  +            intent.putExtra("add_profile", true)
-  +            setupLauncher.launch(intent)
-  +        }
-  +
-           val pm = ctx.packageManager
-           if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
-               val channelsToggle = Button(ctx).apply {
-  @@ -240,6 +273,19 @@ class SettingsFragment : Fragment() {
-  +                // Also update the active profile so the change survives switches
-  +                val active = app.prefs.activeProfile
-  +                if (active != null) {
-  +                    val updated = active.copy(
-  +                        serverUrl = app.prefs.serverUrl,
-  +                        apiKey = app.prefs.apiKey,
-  +                        sessionCookie = app.prefs.sessionCookie,
-  +                        authMode = app.prefs.authMode,
-  +                        stashUsername = app.prefs.stashUsername,
-  +                        stashPassword = app.prefs.stashPassword
-  +                    )
-  +                    app.prefs.profiles = app.prefs.profiles.map { if (it.id == updated.id) updated else it }
-  +                }
-                   app.refreshApi()
-                   Toast.makeText(ctx, "Settings saved!", Toast.LENGTH_SHORT).show()
-                   requireActivity().finish()
-  +46 -0
-
-app/src/main/java/com/sinema/ui/SetupActivity.kt
-  @@ -26,11 +26,22 @@ class SetupActivity : FragmentActivity() {
-  +    private val isAddProfile get() = intent.getBooleanExtra("add_profile", false)
-       
-       override fun onCreate(savedInstanceState: Bundle?) {
-           super.onCreate(savedInstanceState)
-           showMenuScreen()
-       }
-  +
-  +    private fun finishWithSuccess() {
-  +        if (isAddProfile) {
-  +            setResult(RESULT_OK)
-  +            finish()
-  +        } else {
-  +            startActivity(Intent(this, MainActivity::class.java))
-  +            finish()
-  +        }
-  +    }
-       
-       override fun onDestroy() {
-           super.onDestroy()
-  @@ -87,7 +98,18 @@ class SetupActivity : FragmentActivity() {
-  -        
-  +
-  +        if (isAddProfile) {
-  +            val cancelBtn = createButton("Cancel") {
-  +                setResult(RESULT_CANCELED)
-  +                finish()
-  +            }
-  +            layout.addView(cancelBtn, LinearLayout.LayoutParams(
-  +                LinearLayout.LayoutParams.MATCH_PARENT,
-  +                LinearLayout.LayoutParams.WRAP_CONTENT
-  +            ).apply { topMargin = 40 })
-  +        }
-  +
-           val scrollView = ScrollView(this).apply {
-               isFocusable = false
-               setBackgroundColor(0xFF1B1B1B.toInt())
-  @@ -365,8 +387,7 @@ class SetupActivity : FragmentActivity() {
-  -                        startActivity(Intent(this@SetupActivity, MainActivity::class.java))
-  -                        finish()
-  +                        finishWithSuccess()
-                       }
-                   } catch (e: Exception) {
-                       withContext(Dispatchers.Main) {
-  @@ -420,8 +441,7 @@ class SetupActivity : FragmentActivity() {
-  -            startActivity(Intent(this, MainActivity::class.java))
-  -            finish()
-  +            finishWithSuccess()
-           }
-           layout.addView(sessionBtn, LinearLayout.LayoutParams(
-               LinearLayout.LayoutParams.MATCH_PARENT,
-  @@ -676,8 +696,7 @@ class SetupActivity : FragmentActivity() {
-  -                                        startActivity(Intent(this, MainActivity::class.java))
-  -                                        finish()
-  +                                        finishWithSuccess()
-                                       }
-                                       
-                                       val successHtml = """
-  @@ -800,8 +819,7 @@ class SetupActivity : FragmentActivity() {
-  -            startActivity(Intent(this, MainActivity::class.java))
-  -            finish()
-  +            finishWithSuccess()
-           }
-           layout.addView(saveBtn, LinearLayout.LayoutParams(
-               LinearLayout.LayoutParams.MATCH_PARENT,
-  +27 -9
-
-app/src/main/java/com/sinema/util/Prefs.kt
-  @@ -46,6 +46,48 @@ class Prefs(context: Context) {
-  +    // Server profiles (stored in secure prefs)
-  +    var profiles: List<com.sinema.model.ServerProfile>
-  +        get() = ProfileCodec.fromJson(getSecureString("server_profiles"))
-  +        set(value) = putSecureString("server_profiles", ProfileCodec.toJson(value))
-  +
-  +    var activeProfileId: String
-  +        get() = prefs.getString("active_profile_id", "") ?: ""
-  +        set(value) = prefs.edit().putString("active_profile_id", value).apply()
-  +
-  +    val activeProfile: com.sinema.model.ServerProfile?
-  +        get() = profiles.firstOrNull { it.id == activeProfileId }
-  +
-  +    /** Migrate legacy single-server fields into a profile on first use.
-  +     *  Legacy accessors remain the live config; profiles act as a switcher
-  +     *  behind them. applyProfile() writes the selected profile back into
-  +     *  the legacy fields so all existing consumers keep working. */
-  +    fun migrateToProfilesIfNeeded() {
-  +        if (profiles.isNotEmpty() || !isConfigured) return
-  +        val p = com.sinema.model.ServerProfile(
-  +            name = "Default",
-  +            serverUrl = serverUrl,
-  +            apiKey = apiKey,
-  +            sessionCookie = sessionCookie,
-  +            authMode = authMode,
-  +            stashUsername = stashUsername,
-  +            stashPassword = stashPassword
-  +        )
-  +        profiles = listOf(p)
-  +        activeProfileId = p.id
-  +    }
-  +
-  +    /** Persist the active profile's fields back into the legacy accessors. */
-  +    fun applyProfile(p: com.sinema.model.ServerProfile) {
-  +        serverUrl = p.serverUrl
-  +        apiKey = p.apiKey
-  +        sessionCookie = p.sessionCookie
-  +        authMode = p.authMode
-  +        stashUsername = p.stashUsername
-  +        stashPassword = p.stashPassword
-  +        activeProfileId = p.id
-  +    }
-  +
-       val isConfigured: Boolean
-           get() = apiKey.isNotBlank() || sessionCookie.isNotBlank()
-   
-  +42 -0
-
-app/src/main/java/com/sinema/util/ProfileCodec.kt
-  @@ -0,0 +1,20 @@
-  +package com.sinema.util
-  +
-  +import com.google.gson.Gson
-  +import com.google.gson.reflect.TypeToken
-  +import com.sinema.model.ServerProfile
-  +
-  +object ProfileCodec {
-  +    private val gson = Gson()
-  +    private val listType = object : TypeToken<List<ServerProfile>>() {}.type
-  +
-  +    fun toJson(profiles: List<ServerProfile>): String = gson.toJson(profiles, listType)
-  +
-  +    fun fromJson(json: String): List<ServerProfile> {
-  +        return try {
-  +            gson.fromJson(json, listType) ?: emptyList()
-  +        } catch (e: Exception) {
-  +            emptyList()
-  +        }
-  +    }
-  +}
-  +20 -0
-
-app/src/test/java/com/sinema/util/ServerProfileTest.kt
-  @@ -0,0 +1,56 @@
-  +package com.sinema.util
-  +
-  +import com.sinema.model.ServerProfile
-  +import org.junit.Assert.assertEquals
-  +import org.junit.Assert.assertNotNull
-  +import org.junit.Test
-  +
-  +class ServerProfileTest {
-  +    @Test
-  +    fun `round trips profile list through json`() {
-  +        val list = listOf(ServerProfile("u1", "A", "http://a", "k", "", "apikey", "", ""))
-  +        assertEquals(list, ProfileCodec.fromJson(ProfileCodec.toJson(list)))
-  +    }
-  +
-  +    @Test
-  +    fun `fromJson tolerates garbage`() {
-  +        assertEquals(emptyList<ServerProfile>(), ProfileCodec.fromJson("not json"))
-  +    }
-  +
-  +    @Test
-  +    fun `round trips multi-profile list`() {
-  +        val list = listOf(
-  +            ServerProfile("u1", "Home", "http://home", "k1", "", "apikey", "u", "p"),
-  +            ServerProfile("u2", "Office", "http://office", "", "sid=abc", "session", "", "")
-  +        )
-  +        val json = ProfileCodec.toJson(list)
-  +        val decoded = ProfileCodec.fromJson(json)
-  +        assertEquals(2, decoded.size)
-  +        assertEquals("Home", decoded[0].name)
-  +        assertEquals("Office", decoded[1].name)
-  +        assertEquals(list, decoded)
-  +    }
-  +
-  +    @Test
-  +    fun `round trips empty list`() {
-  +        assertEquals(emptyList<ServerProfile>(), ProfileCodec.fromJson(ProfileCodec.toJson(emptyList())))
-  +    }
-  +
-  +    @Test
-  +    fun `default values work for forward compatibility`() {
-  +        val p = ServerProfile()
-  +        assertNotNull(p.id)
-  +        assertEquals("", p.name)
-  +        assertEquals("apikey", p.authMode)
-  +    }
-  +
-  +    @Test
-  +    fun `partial json fills defaults`() {
-  +        val json = """[{"name":"Partial"}]"""
-  +        val decoded = ProfileCodec.fromJson(json)
-  +        assertEquals(1, decoded.size)
-  +        assertEquals("Partial", decoded[0].name)
-  +        assertEquals("", decoded[0].serverUrl)
-  +        assertEquals("apikey", decoded[0].authMode)
-  +    }
-  +}
-  +56 -0
+... (more changes truncated)
 [full diff: rtk git diff --no-compact]

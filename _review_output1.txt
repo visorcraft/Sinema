@@ -1,0 +1,37 @@
+[0m
+> build · k2p6
+[0m
+[0m→ [0mRead _review_diff.txt
+[0m
+[0m$ [0mrtk ls -la /work/repos/visorcraft/Sinema/
+755  .claude/
+755  .git/
+755  .github/
+755  .gradle/
+755  app/
+755  assets/
+755  gradle/
+644  .gitignore  373B
+644  CONTRIBUTING.md  10.2K
+644  Dockerfile.build  753B
+644  LICENSE  34.3K
+644  PLAN.md  64.1K
+644  README.md  6.9K
+644  SECURITY.md  8.2K
+644  _review_diff.txt  25.5K
+644  _review_output.txt  3.2K
+644  _review_output1.txt  60B
+644  _review_prompt.txt  411B
+644  _review_prompt1.txt  448B
+644  build.gradle.kts  142B
+644  debug.keystore  2.6K
+644  gradle.properties  226B
+755  gradlew  8.5K
+644  gradlew.bat  2.8K
+644  local.properties  34B
+644  settings.gradle.kts  326B
+[0m
+[0m$ [0mrtk wc -l /work/repos/visorcraft/Sinema/_review_diff.txt
+552
+[0m
+[0m• [0mRead-only Android TV code review[90m Explore Agent[0m
