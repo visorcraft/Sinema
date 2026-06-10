@@ -3,6 +3,7 @@ package com.sinema.api
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.sinema.model.EntityItem
 import com.sinema.model.ImageItem
 import com.sinema.model.Scene
 import kotlinx.coroutines.Dispatchers
@@ -187,10 +188,12 @@ class SinemaApi(
     suspend fun findAllScenes(page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
         findScenesInternal(page = page, perPage = perPage)
 
-    suspend fun findScenesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
+    suspend fun findScenesByPath(
+        pathPrefix: String, page: Int = 1, perPage: Int = 100,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> =
         findScenesInternal(
-            page = page,
-            perPage = perPage,
+            page = page, perPage = perPage, sort = sort, direction = direction,
             sceneFilter = mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
         )
 
@@ -295,8 +298,11 @@ class SinemaApi(
         )
     }
 
-    suspend fun searchScenes(searchTerm: String, page: Int = 1, perPage: Int = 40): Pair<Int, List<Scene>> =
-        findScenesInternal(page = page, perPage = perPage, searchTerm = searchTerm)
+    suspend fun searchScenes(
+        searchTerm: String, page: Int = 1, perPage: Int = 40,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> =
+        findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, searchTerm = searchTerm)
 
     suspend fun setSceneRating(sceneId: String, rating: Int?): Boolean {
         val query = """
@@ -321,11 +327,9 @@ class SinemaApi(
         return if (scene.get("rating100")?.isJsonNull != false) null else scene.get("rating100").asInt
     }
 
-    suspend fun findFavoriteScenes(): List<Scene> =
+    suspend fun findFavoriteScenes(sort: String = "updated_at", direction: String = "DESC"): List<Scene> =
         findScenesInternal(
-            perPage = 100,
-            sort = "updated_at",
-            direction = "DESC",
+            perPage = 100, sort = sort, direction = direction,
             sceneFilter = mapOf("rating100" to mapOf("value" to 1, "modifier" to "GREATER_THAN"))
         ).second
 
@@ -544,10 +548,12 @@ class SinemaApi(
         return result.getAsJsonObject("data")?.getAsJsonObject("findScenes")?.get("count")?.asInt ?: 0
     }
 
-    suspend fun findScenesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<Scene>> =
+    suspend fun findScenesInFolderDirect(
+        folderPath: String, page: Int = 1, perPage: Int = 500,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> =
         findScenesInternal(
-            page = page,
-            perPage = perPage,
+            page = page, perPage = perPage, sort = sort, direction = direction,
             sceneFilter = mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
         )
 
@@ -567,6 +573,63 @@ class SinemaApi(
             playCount = obj.get("play_count")?.asInt ?: 0,
             rating100 = if (obj.has("rating100") && !obj.get("rating100").isJsonNull) obj.get("rating100").asInt else null
         )
+    }
+
+    /**
+     * Fetch a paginated list of tags, performers, or studios sorted by scene count descending.
+     * Note: sort field is "scenes_count" (plural) — confirmed in stashapp/stash pkg/sqlite tag.go, performer.go, studio.go.
+     */
+    suspend fun findEntities(kind: EntityItem.Kind, page: Int = 1, perPage: Int = 100): Pair<Int, List<EntityItem>> {
+        val (queryName, listKey) = when (kind) {
+            EntityItem.Kind.TAG -> "findTags" to "tags"
+            EntityItem.Kind.PERFORMER -> "findPerformers" to "performers"
+            EntityItem.Kind.STUDIO -> "findStudios" to "studios"
+        }
+        val query = """
+            query(${"$"}filter: FindFilterType) {
+                $queryName(filter: ${"$"}filter) {
+                    count
+                    $listKey { id name scene_count image_path }
+                }
+            }
+        """.trimIndent()
+        val variables = mapOf(
+            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "scenes_count", "direction" to "DESC")
+        )
+        val result = graphql(query, variables)
+        val data = result.getAsJsonObject("data")?.getAsJsonObject(queryName) ?: return Pair(0, emptyList())
+        val count = data.get("count").asInt
+        val items = data.getAsJsonArray(listKey).map { el ->
+            val obj = el.asJsonObject
+            EntityItem(
+                id = obj.get("id").asString,
+                name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+                sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+                imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
+                kind = kind
+            )
+        }
+        return Pair(count, items)
+    }
+
+    /**
+     * Fetch scenes filtered by a tag, performer, or studio entity.
+     * performers uses MultiCriterionInput (no depth); tags/studios use HierarchicalMultiCriterionInput (depth supported).
+     */
+    suspend fun findScenesForEntity(
+        kind: EntityItem.Kind, entityId: String,
+        page: Int = 1, perPage: Int = 100,
+        sort: String = "path", direction: String = "ASC"
+    ): Pair<Int, List<Scene>> {
+        val sceneFilter = when (kind) {
+            EntityItem.Kind.TAG ->
+                mapOf("tags" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES", "depth" to 0))
+            EntityItem.Kind.PERFORMER ->
+                mapOf("performers" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES"))
+            EntityItem.Kind.STUDIO ->
+                mapOf("studios" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES", "depth" to 0))
+        }
+        return findScenesInternal(page, perPage, sort, direction, sceneFilter = sceneFilter)
     }
 
     suspend fun resetPlayCount(sceneId: String) {
