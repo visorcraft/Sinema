@@ -12,7 +12,7 @@ enum class SortOption(val label: String, val field: String, val direction: Strin
     RANDOM("Random", "random", "ASC");
 
     /** Stash paginates random sorts stably when the seed is part of the field name. */
-    fun apiSort(seed: Int): String = if (this == RANDOM) "random_$seed" else field
+    fun apiSort(seed: Int): String = if (this == RANDOM) "random_${seed.coerceAtLeast(0)}" else field
 
     companion object {
         fun fromName(name: String?): SortOption =

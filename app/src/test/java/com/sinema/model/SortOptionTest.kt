@@ -18,4 +18,20 @@ class SortOptionTest {
     fun `fromName falls back to default on unknown value`() {
         assertEquals(SortOption.PATH_ASC, SortOption.fromName("garbage"))
     }
+
+    @Test
+    fun `negative seed is clamped to digits-only suffix`() {
+        assertEquals("random_0", SortOption.RANDOM.apiSort(-123))
+    }
+
+    @Test
+    fun `fromName handles null and empty as default`() {
+        assertEquals(SortOption.PATH_ASC, SortOption.fromName(null))
+        assertEquals(SortOption.PATH_ASC, SortOption.fromName(""))
+    }
+
+    @Test
+    fun `fromName round trips a real entry`() {
+        assertEquals(SortOption.RANDOM, SortOption.fromName("RANDOM"))
+    }
 }
