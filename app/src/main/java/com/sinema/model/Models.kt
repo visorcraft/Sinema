@@ -34,6 +34,7 @@ data class Scene(
     val height: Int,
     val playCount: Int = 0,
     val rating100: Int? = null,
+    // Metadata below is empty/null on list-query results; populated only by the full scene query.
     val date: String? = null,
     val studio: StudioRef? = null,
     val tags: List<TagRef> = emptyList(),
