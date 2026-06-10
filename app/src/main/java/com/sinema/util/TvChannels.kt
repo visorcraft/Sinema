@@ -28,13 +28,13 @@ object TvChannels {
             val helper = PreviewChannelHelper(context)
             val resolver = context.contentResolver
             val uri = TvContractCompat.WatchNextPrograms.CONTENT_URI
-            // Delete only our own Watch Next entries
+            // Delete only our own Watch Next entries (prefix with "sinema:")
             val internalIdCol = TvContractCompat.WatchNextPrograms.COLUMN_INTERNAL_PROVIDER_ID
             resolver.query(uri, null, null, null, null)?.use { c: Cursor ->
                 while (c.moveToNext()) {
                     val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
                     val internalId = c.getString(c.getColumnIndexOrThrow(internalIdCol))
-                    if (!internalId.isNullOrBlank()) {
+                    if (internalId?.startsWith("sinema:") == true) {
                         resolver.delete(ContentUris.withAppendedId(uri, id), null, null)
                     }
                 }
@@ -48,7 +48,7 @@ object TvChannels {
                     .setDurationMillis((scene.duration * 1000).toInt())
                     .setLastPlaybackPositionMillis((resumeSec * 1000).toInt())
                     .setIntentUri(intentUri)
-                    .setInternalProviderId(scene.id)
+                    .setInternalProviderId("sinema:${scene.id}")
 
                 val artwork = artworkUri(app, scene)
                 if (artwork != null) builder.setPosterArtUri(artwork)
@@ -90,7 +90,7 @@ object TvChannels {
                     .setTitle(scene.title)
                     .setDurationMillis((scene.duration * 1000).toInt())
                     .setIntentUri(intentUri)
-                    .setInternalProviderId(scene.id)
+                    .setInternalProviderId("sinema:${scene.id}")
 
                 val artwork = artworkUri(app, scene)
                 if (artwork != null) builder.setPosterArtUri(artwork)
@@ -106,10 +106,14 @@ object TvChannels {
         try {
             val resolver = context.contentResolver
             val watchUri = TvContractCompat.WatchNextPrograms.CONTENT_URI
+            val internalIdCol = TvContractCompat.WatchNextPrograms.COLUMN_INTERNAL_PROVIDER_ID
             resolver.query(watchUri, null, null, null, null)?.use { c: Cursor ->
                 while (c.moveToNext()) {
                     val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
-                    resolver.delete(ContentUris.withAppendedId(watchUri, id), null, null)
+                    val internalId = c.getString(c.getColumnIndexOrThrow(internalIdCol))
+                    if (internalId?.startsWith("sinema:") == true) {
+                        resolver.delete(ContentUris.withAppendedId(watchUri, id), null, null)
+                    }
                 }
             }
 

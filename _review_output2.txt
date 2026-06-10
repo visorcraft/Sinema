@@ -1,0 +1,62 @@
+[0m
+> build · k2p6
+[0m
+[0m→ [0mRead _review_diff.txt
+[0m✗ [0mRead _review_diff.txt failed[90m [offset=553][0m
+[91m[1mError: [0mOffset 553 is out of range for this file (552 lines)
+[0m→ [0mRead app/src/main/java/com/sinema/api/SinemaApi.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/DeepLinkActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/TvChannelInitReceiver.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/TvChannels.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/SceneIntents.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/Prefs.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/PlaybackActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/SceneDetailActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/PlaybackQueue.kt
+[0m→ [0mRead app/src/main/java/com/sinema/util/ProfileCodec.kt
+[0m→ [0mRead app/src/main/java/com/sinema/model/ServerProfile.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/EntityScenesActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/EntityGridActivity.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/ServerProfileSection.kt
+[0m→ [0mRead app/src/main/AndroidManifest.xml
+[0m→ [0mRead app/src/test/java/com/sinema/api/SinemaApiTest.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/SceneGridFragment.kt
+[0m→ [0mRead app/src/main/java/com/sinema/ui/SettingsActivity.kt
+## Review Findings
+
+### 1. CRITICAL: `TvChannels.clearAll()` deletes ALL system Watch Next entries
+**File:** `app/src/main/java/com/sinema/util/TvChannels.kt:105-114`
+
+`clearAll()` queries `TvContractCompat.WatchNextPrograms.CONTENT_URI` and deletes **every** entry without filtering by `COLUMN_INTERNAL_PROVIDER_ID` or any app-specific identifier. This destroys other apps' watch-next data system-wide.
+
+Fix: Filter deletions to only rows where `internal_provider_id` matches Sinema scene IDs, mirroring the logic in `syncWatchNext()`.
+
+---
+
+### 2. `TvChannels.syncWatchNext()` deletes other apps' Watch Next entries
+**File:** `app/src/main/java/com/sinema/util/TvChannels.kt:33-41`
+
+The deletion loop checks `!internalId.isNullOrBlank()` — any app that sets an internal provider ID will have its entries deleted by Sinema on every sync. Other apps (e.g., Netflix, Plex) may use this column.
+
+Fix: Delete only entries whose `internal_provider_id` is a known Sinema scene ID, or prefix Sinema IDs and filter on that prefix.
+
+---
+
+### 3. SECURITY: API key leaked in artwork URIs passed to system launcher
+**File:** `app/src/main/java/com/sinema/util/TvChannels.kt:166-173`
+
+`artworkUri()` embeds the raw API key as a query parameter:  
+`…/screenshot?apikey=${app.prefs.apiKey}`
+
+This URI is passed to `setPosterArtUri()`, which the Android TV launcher processes. The launcher may cache, log, or persist this URI, exposing the key.
+
+Fix: Use a content provider or download/cache thumbnails locally, then pass a `content://` URI. Alternatively, skip artwork for session mode and rely on launcher-side caching without credentials.
+
+---
+
+### Minor notes
+- `PlaybackActivity.playDurationMs` calculation (`System.currentTimeMillis() - startTimeMs`) includes background/paused time because `startTimeMs` is only set in `onStart()` and never adjusted on resume. Inflated durations are sent to the server.
+- `findScenesInternal` NPE risk: `data.get("count").asInt` throws if `count` is absent (pre-existing, now centralized).
+- `SceneDetailActivity.loadRelatedScenes()` swallows all exceptions silently (`catch (_: Exception) {}`).
+
+VERDICT approved issues=3
