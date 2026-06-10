@@ -10,6 +10,7 @@ import com.bumptech.glide.Glide
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
+import com.sinema.model.EntityItem
 import com.sinema.model.FolderItem
 import com.sinema.model.Scene
 import com.sinema.util.GlideAuth
@@ -35,10 +36,31 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE
                 val url = api.getScreenshotUrl(item.id)
+                image.scaleType = ImageView.ScaleType.CENTER_CROP
+                image.setBackgroundColor(0xFF333333.toInt())
                 Glide.with(view.context)
                     .load(GlideAuth.url(api, url))
                     .centerCrop()
                     .into(image)
+            }
+            is EntityItem -> {
+                title.text = item.name
+                content.text = "${item.sceneCount} " + if (item.sceneCount == 1) "scene" else "scenes"
+                heart?.visibility = View.GONE
+                checkmark?.visibility = View.GONE
+                if (item.imagePath != null) {
+                    image.scaleType = ImageView.ScaleType.CENTER_CROP
+                    image.setBackgroundColor(0xFF333333.toInt())
+                    Glide.with(view.context)
+                        .load(GlideAuth.url(api, item.imagePath))
+                        .centerCrop()
+                        .into(image)
+                } else {
+                    Glide.with(view.context).clear(image)
+                    image.setImageResource(android.R.drawable.ic_menu_agenda)
+                    image.scaleType = ImageView.ScaleType.CENTER
+                    image.setBackgroundColor(0xFF444444.toInt())
+                }
             }
         }
     }
@@ -77,11 +99,14 @@ class FolderCardPresenter : Presenter() {
                         else -> null
                     }
                     if (thumbUrl != null) {
+                        image.scaleType = ImageView.ScaleType.CENTER_CROP
+                        image.setBackgroundColor(0xFF333333.toInt())
                         Glide.with(view.context)
                             .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
                             .centerCrop()
                             .into(image)
                     } else {
+                        Glide.with(view.context).clear(image)
                         image.setImageResource(android.R.drawable.ic_menu_agenda)
                         image.scaleType = ImageView.ScaleType.CENTER
                         image.setBackgroundColor(0xFF444444.toInt())
@@ -104,6 +129,8 @@ class FolderCardPresenter : Presenter() {
                         }
                     }
                     if (thumbUrl != null) {
+                        image.scaleType = ImageView.ScaleType.CENTER_CROP
+                        image.setBackgroundColor(0xFF333333.toInt())
                         Glide.with(view.context)
                             .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
                             .centerCrop()
@@ -171,6 +198,27 @@ class SettingsPresenter : Presenter() {
                 title.text = "🔒 Log Out"
                 content.text = "Lock app"
                 image.setImageResource(android.R.drawable.ic_lock_lock)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Tags" -> {
+                title.text = "🏷️ Tags"
+                content.text = "Browse by tag"
+                image.setImageResource(android.R.drawable.ic_menu_agenda)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Performers" -> {
+                title.text = "👤 Performers"
+                content.text = "Browse by performer"
+                image.setImageResource(android.R.drawable.ic_menu_agenda)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Studios" -> {
+                title.text = "🎬 Studios"
+                content.text = "Browse by studio"
+                image.setImageResource(android.R.drawable.ic_menu_agenda)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }

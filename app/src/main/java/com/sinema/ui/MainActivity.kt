@@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.model.EntityItem
 import com.sinema.model.Scene
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.launch
@@ -119,6 +120,9 @@ class MainFragment : RowsSupportFragment() {
                         "Search" -> startActivity(Intent(requireContext(), SearchActivity::class.java))
                         "Favorites" -> startActivity(Intent(requireContext(), FavoritesActivity::class.java))
                         "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
+                        "Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))
+                        "Performers" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.PERFORMER))
+                        "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))
                         "Log Out" -> {
                             app.pinVerifiedThisSession = false
                             requireActivity().finishAffinity()
@@ -170,11 +174,14 @@ class MainFragment : RowsSupportFragment() {
                 Log.d("Sinema", "loadContent starting")
                 rowsAdapter.clear()
 
-                // 1. Top row: Search | Favorites | Browse Folders
+                // 1. Top row: Search | Favorites | Browse Folders | Tags | Performers | Studios (+ Log Out)
                 val topAdapter = ArrayObjectAdapter(SettingsPresenter())
                 topAdapter.add("Search")
                 topAdapter.add("Favorites")
                 topAdapter.add("Browse Folders")
+                topAdapter.add("Tags")
+                topAdapter.add("Performers")
+                topAdapter.add("Studios")
                 if (app.prefs.hasPinSet()) {
                     topAdapter.add("Log Out")
                 }
