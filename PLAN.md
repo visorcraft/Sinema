@@ -44,6 +44,12 @@ adb -s 192.168.68.121:5555 install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s 192.168.68.121:5555 shell monkey -p com.sinema -c android.intent.category.LEANBACK_LAUNCHER 1
 ```
 
+> **REALITY (2026-06-10):** All on-device steps (sideload, smoke tests, remote-key checks) are
+> **deferred by maintainer instruction** — do not install or launch Sinema on any device unless
+> explicitly asked. Verification for every phase = build + unit tests + lint + two-stage agent
+> review + opencode gate. Every "Sideload + verify on TV" step below inherits this deferral; the
+> accumulated manual checks are listed in Task 10.1 for a single user-driven sweep.
+
 ### Git & commits
 
 - Each phase happens on a branch: `git checkout -b feature/phase-N-<slug>` from up-to-date `main`. Merge to `main` only after the phase's review gate passes.
@@ -58,7 +64,10 @@ All phase work must be committed first (the reviewer agent can edit files; a cle
 cd /work/repos/visorcraft/Sinema
 git diff main..HEAD -- app/ > _review_diff.txt    # diff MUST live inside the repo
 
-cat > /tmp/prompt.txt <<'EOF'
+# COLLISION WARNING: never use the generic /tmp/prompt.txt — concurrent agent sessions on this
+# machine clobber it and the review silently runs against another project's brief (happened
+# 2026-06-10). Use the repo-unique paths below (or mktemp).
+cat > /tmp/sinema-oc-prompt.txt <<'EOF'
 READ-ONLY: do not modify/create/delete files. Read ./_review_diff.txt and any files it
 references under app/src/. Review this Android TV (Leanback, Kotlin, Media3) change for:
 1. Correctness bugs and crash risks (null JSON fields, unhandled exceptions in coroutines).
@@ -72,14 +81,16 @@ End with EXACTLY: VERDICT approved issues=N
 EOF
 
 # Backgrounded (slow); MUST pipe </dev/null or it hangs forever on a permission prompt.
-timeout 280 opencode run "$(cat /tmp/prompt.txt)" --variant high < /dev/null > /tmp/oc.out 2>&1 &
+timeout 280 opencode run "$(cat /tmp/sinema-oc-prompt.txt)" --variant high < /dev/null > /tmp/sinema-oc.out 2>&1 &
 ```
 
 Then, once it exits:
 
 ```bash
-cat /tmp/oc.out      # must be non-empty and end with: VERDICT approved issues=N
-                     # empty output = it never reached the model — RERUN, do not treat as a pass
+cat /tmp/sinema-oc.out   # must be non-empty and end with: VERDICT approved issues=N
+                         # empty output = it never reached the model — RERUN, do not treat as a pass
+                         # output discussing files that don't exist in this repo = prompt-file
+                         # clobbering by a concurrent session — fix the path and RERUN
 rm _review_diff.txt
 git status           # must be clean; if the agent edited anything: git restore .
 ```
@@ -356,6 +367,13 @@ private suspend fun findScenesInternal(
 # Phase 1 — API & model groundwork
 
 **Goal:** Everything later phases need from Stash, in one reviewed layer: metadata-bearing models, entity queries (tags/performers/studios), entity-filtered scene queries, sort options, and a full single-scene query (metadata + captions + markers + resume time).
+
+> **REALITY:** the "curl-verify against the live server" steps below were executed as **static
+> schema verification against the published Stash v0.31.1 sources on GitHub** (graphql/schema/
+> plus pkg/sqlite sort code, incl. the caption route in internal/api/routes_scene.go) instead —
+> the live server requires auth, no API key was available, and generating one would invalidate
+> the TV app's key. All fields/sorts/filters used were confirmed there, twice (implementer +
+> independent spec-review spot-checks).
 
 ### Task 1.1: Extend models
 
@@ -879,7 +897,7 @@ Clear rows before repopulating (onResume runs repeatedly). Show rows only when n
 - Modify: `app/src/main/java/com/sinema/ui/PlaybackActivity.kt`
 - Modify: `app/src/main/java/com/sinema/ui/SceneDetailActivity.kt` (pass captions through)
 
-- [ ] **Step 1: Pass captions via intent extras** (small strings — no binder-size risk). In `SceneIntents`, add:
+- [x] **Step 1: Pass captions via intent extras** (small strings — no binder-size risk). In `SceneIntents`, add:
 
 ```kotlin
 fun putCaptions(intent: Intent, captions: List<CaptionRef>) {
@@ -896,7 +914,7 @@ fun captionsFrom(intent: Intent): List<CaptionRef> {
 
 `SceneDetailActivity` calls `SceneIntents.putCaptions(intent, details.scene.captions)` when launching playback (both Play and Resume paths — they should share one `launchPlayback(resumeMs: Long)` helper; create it now if Phase 4 didn't).
 
-- [ ] **Step 2: Build the MediaItem with subtitle configurations** in `PlaybackActivity.initPlayer()`:
+- [x] **Step 2: Build the MediaItem with subtitle configurations** in `PlaybackActivity.initPlayer()`:
 
 ```kotlin
 import androidx.media3.common.C
@@ -920,7 +938,7 @@ exo.setMediaItem(mediaItem)
 
 Caption HTTP requests reuse the same `DefaultHttpDataSource.Factory` and therefore the same auth headers — no extra work, but verify in session mode.
 
-- [ ] **Step 3: Commit** — `feat: load Stash captions as subtitle tracks`
+- [x] **Step 3: Commit** — `feat: load Stash captions as subtitle tracks`
 
 ### Task 5.2: Controller buttons — subtitles, audio, speed
 
@@ -928,21 +946,29 @@ Caption HTTP requests reuse the same `DefaultHttpDataSource.Factory` and therefo
 - Modify: `app/src/main/java/com/sinema/ui/PlaybackActivity.kt`
 - Modify: `app/src/main/res/layout/activity_playback.xml`
 
-- [ ] **Step 1: Enable Media3's built-in controls.** On the `PlayerView` in `activity_playback.xml` set `app:show_subtitle_button="true"`. Media3 1.2.1's default controller already includes the settings (gear) menu with playback speed and audio track selection; the subtitle (CC) button toggles/picks text tracks. No custom dialogs unless the on-device check fails.
+- [x] **Step 1: Enable Media3's built-in controls.** On the `PlayerView` in `activity_playback.xml` set `app:show_subtitle_button="true"`. Media3 1.2.1's default controller already includes the settings (gear) menu with playback speed and audio track selection; the subtitle (CC) button toggles/picks text tracks. No custom dialogs unless the on-device check fails. *(Attribute verified valid against the media3-ui 1.2.1 AAR.)*
 
-- [ ] **Step 2: Sideload + verify on TV with a captioned scene** (add an `.srt` next to a file in Stash if none exists; Stash picks it up on scan):
+- [ ] **Step 2: Sideload + verify on TV with a captioned scene** *(deferred to maintainer — no device installs without explicit permission)* (add an `.srt` next to a file in Stash if none exists; Stash picks it up on scan):
   - DPAD_DOWN/center brings up the controller; CC button reachable and toggles subs.
   - Gear menu → speed 1.5x audibly works; audio track list shows for multi-audio files.
   - Subtitles render during playback; resume/play-count behavior unchanged.
   - **If** the default controller proves unusable by D-pad on this device, fall back to: `dispatchKeyEvent` on `KEYCODE_MENU` → `AlertDialog` listing "Subtitles / Audio / Speed", each applying `TrackSelectionOverride` / `setTrackTypeDisabled(C.TRACK_TYPE_TEXT, …)` / `setPlaybackSpeed(…)`. Implement the fallback only if needed; record the outcome in the commit message.
 
-- [ ] **Step 3: Commit** — `feat: expose subtitle, audio track, and playback speed controls`
+- [x] **Step 3: Commit** — `feat: expose subtitle, audio track, and playback speed controls`
 
 ### Phase 5 Close-out
 
 - [ ] **Refactor Pass** — `PlaybackActivity` should still be a single small file (~150 lines); `initPlayer` stays under 40 lines (extract `buildMediaItem()`).
 - [ ] **Close-out** checklist. Manual smoke: playback in both auth modes, with and without captions.
 - [ ] **Review Gate.**
+
+> **STATUS (work paused here 2026-06-10 by maintainer instruction):** Tasks 5.1 and 5.2 are
+> implemented, two-stage agent-reviewed (spec + quality, all findings fixed), and committed on
+> `feature/phase-5-player-tracks` (`2470c36`, `4ce66c2`, `bc8660a`) with build + unit tests
+> green. The Phase 5 close-out (refactor pass, lint, opencode Review Gate, merge to `main`) has
+> NOT been run. Phases 0–4 are merged to `main` (nothing pushed to origin; v1.11.0 bump is
+> local, release publication deferred — see Task 4.2). Resume point: run this close-out, then
+> continue with Phase 6.
 
 ---
 
