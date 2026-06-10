@@ -1021,9 +1021,9 @@ override fun dispatchKeyEvent(event: KeyEvent): Boolean {
 
 ### Phase 6 Close-out
 
-- [ ] **Refactor Pass** — confirm the `TimeFormat` consolidation landed and no third duration formatter exists (`grep -rn "%d:%02d" app/src/main/java/` → only TimeFormat).
-- [ ] **Close-out** checklist.
-- [ ] **Review Gate.**
+- [x] **Refactor Pass** — `TimeFormat` consolidated; grep confirms only TimeFormat.kt contains `%d:%02d`.
+- [x] **Close-out** checklist. Build + unit tests + lint all green.
+- [x] **Review Gate** — VERDICT approved issues=0 (earlier passes found dialog leak and TimeFormat duplication, both fixed).
 
 ---
 
