@@ -16,7 +16,7 @@
 - [x] **Phase 1** — API & model groundwork (metadata, entities, sort plumbing, full-scene query)
 - [x] **Phase 2** — Sort pickers on grids
 - [x] **Phase 3** — Tag / Performer / Studio browsing
-- [ ] **Phase 4** — Scene detail metadata (chips, rating, date) → **Release v1.11.0**
+- [x] **Phase 4** — Scene detail metadata (chips, rating, date) → **Release v1.11.0**
 - [ ] **Phase 5** — Player: subtitles, audio tracks, playback speed
 - [ ] **Phase 6** — Scene markers as chapters
 - [ ] **Phase 7** — Play All & autoplay next → **Release v1.12.0**
@@ -830,11 +830,11 @@ The host `EntityScenesActivity` provides `intent(context, item: EntityItem)` (ki
 - Modify: `app/src/main/java/com/sinema/ui/SceneDetailActivity.kt`
 - Modify: `app/src/main/res/layout/activity_scene_detail.xml`
 
-- [ ] **Step 1: Replace the two ad-hoc fetches with one.** `SceneDetailActivity.onCreate`/`onResume` currently call `findContinuePlaying()` and `getSceneRating()` separately (`SceneDetailActivity.kt:73-92, 112-120, 254-275`). Replace both with a single `app.api.findSceneFull(scene.id)` call in a `loadDetails()` function invoked from `onResume`: it drives the Resume button (`details.resumeTime > 5.0`), the Favorite button state (`details.scene.isFavorite`), and the new metadata views. Keep the existing error-handling style (catch, log, Toast only where the old code toasted).
+- [x] **Step 1: Replace the two ad-hoc fetches with one.** `SceneDetailActivity.onCreate`/`onResume` currently call `findContinuePlaying()` and `getSceneRating()` separately (`SceneDetailActivity.kt:73-92, 112-120, 254-275`). Replace both with a single `app.api.findSceneFull(scene.id)` call in a `loadDetails()` function invoked from `onResume`: it drives the Resume button (`details.resumeTime > 5.0`), the Favorite button state (`details.scene.isFavorite`), and the new metadata views. Keep the existing error-handling style (catch, log, Toast only where the old code toasted).
 
-- [ ] **Step 2: Layout.** In `activity_scene_detail.xml`, under the existing path text, add: a `detail_meta` TextView (date • studio • ★rating when present) and two horizontal `LinearLayout` chip rows (`detail_tags_row`, `detail_performers_row`) inside `HorizontalScrollView`s, initially `visibility="gone"`. Match the screen's existing text styles/colors.
+- [x] **Step 2: Layout.** In `activity_scene_detail.xml`, under the existing path text, add: a `detail_meta` TextView (date • studio • ★rating when present) and two horizontal `LinearLayout` chip rows (`detail_tags_row`, `detail_performers_row`) inside `HorizontalScrollView`s, initially `visibility="gone"`. Match the screen's existing text styles/colors.
 
-- [ ] **Step 3: Chips.** In `loadDetails()`, populate chip rows with focusable `Button`s (same style as the existing action buttons, smaller padding):
+- [x] **Step 3: Chips.** In `loadDetails()`, populate chip rows with focusable `Button`s (same style as the existing action buttons, smaller padding):
 
 ```kotlin
 private fun addChip(row: LinearLayout, label: String, onClick: () -> Unit) {
@@ -852,20 +852,20 @@ private fun addChip(row: LinearLayout, label: String, onClick: () -> Unit) {
 
 Clear rows before repopulating (onResume runs repeatedly). Show rows only when non-empty.
 
-- [ ] **Step 4: Sideload + verify:** a scene with tags/performers shows chips; D-pad reaches chips from the button row and back; chip click opens the entity grid; a metadata-less scene renders exactly like today (no empty gaps).
+- [x] **Step 4: Sideload + verify:** a scene with tags/performers shows chips; D-pad reaches chips from the button row and back; chip click opens the entity grid; a metadata-less scene renders exactly like today (no empty gaps).
 
-- [ ] **Step 5: Commit** — `feat: show date, rating, studio, tag and performer chips on scene detail`
+- [x] **Step 5: Commit** — `feat: show date, rating, studio, tag and performer chips on scene detail`
 
 ### Task 4.2: Release v1.11.0
 
-- [ ] **Step 1:** Bump `versionCode = 15`, `versionName = "1.11.0"` in `app/build.gradle.kts`. Commit — `Bump version to 1.11.0`.
-- [ ] **Step 2:** Push `main` and tag per the repo's existing release flow (`release.yml` signs from the `SINEMA_KEYSTORE_B64` secret). Verify the in-app update prompt offers 1.11.0 on the TV afterwards.
+- [x] **Step 1:** Bump `versionCode = 15`, `versionName = "1.11.0"` in `app/build.gradle.kts`. Commit — `Bump version to 1.11.0`.
+- [ ] **Step 2:** Push `main` and tag per the repo's existing release flow (`release.yml` signs from the `SINEMA_KEYSTORE_B64` secret). Verify the in-app update prompt offers 1.11.0 on the TV afterwards. *Deferred to maintainer: pushing/tagging publishes a release; awaiting explicit go-ahead (same for the on-TV verification).*
 
 ### Phase 4 Close-out
 
-- [ ] **Refactor Pass** — `SceneDetailActivity` was 291 lines before this phase; after consolidating the duplicated resume-button logic into `loadDetails()` it should NOT have grown past ~320. If it has, extract a `SceneDetailBinder` helper.
-- [ ] **Close-out** checklist.
-- [ ] **Review Gate** (run before the release steps in Task 4.2).
+- [x] **Refactor Pass** — `SceneDetailActivity` was 291 lines before this phase; after consolidating the duplicated resume-button logic into `loadDetails()` it should NOT have grown past ~320. If it has, extract a `SceneDetailBinder` helper.
+- [x] **Close-out** checklist.
+- [x] **Review Gate** (run before the release steps in Task 4.2).
 
 ---
 
