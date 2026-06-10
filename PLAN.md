@@ -1164,9 +1164,9 @@ protected fun playAll(scenes: List<Scene>, startAt: Int = 0) {
 
 ### Phase 7 Close-out
 
-- [ ] **Refactor Pass** — `PlaybackActivity` has accumulated three phases of changes; verify the field-based captions/markers refactor (Task 7.2) removed the intent-only paths instead of duplicating them.
-- [ ] **Close-out** checklist (run `PlaybackQueueTest` etc.).
-- [ ] **Review Gate** (before release in 7.4).
+- [x] **Refactor Pass** — PlaybackActivity uses field-based captions/markers; intent paths only in onCreate.
+- [x] **Close-out** checklist. Build + unit tests + lint all green; PlaybackQueueTest passes.
+- [x] **Review Gate** — VERDICT approved issues=0 (earlier pass found 3 issues: finish-on-end logic, playAll duplication, GridMenuDialog indices; all fixed).
 
 ---
 
