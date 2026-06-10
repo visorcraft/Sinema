@@ -1,6 +1,7 @@
 package com.sinema.ui
 
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.leanback.app.SearchSupportFragment
@@ -10,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.Scene
+import com.sinema.model.SortOption
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,12 +27,35 @@ class SearchActivity : FragmentActivity() {
                 .commit()
         }
     }
+
+    // MENU-key opens the sort picker; on-device fallback (remotes lacking MENU) is deferred.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SinemaSearchFragment)
+                ?.showSortDialog()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 }
 
 class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.SearchResultProvider {
     private val app get() = SinemaApp.instance
     private lateinit var rowsAdapter: ArrayObjectAdapter
     private var searchJob: Job? = null
+
+    private var sort: SortOption = SortOption.PATH_ASC
+    private val randomSeed: Int = (0..99_999_999).random()
+    private var currentQuery: String = ""
+
+    fun showSortDialog() {
+        SortDialog.show(requireContext(), sort) { chosen ->
+            sort = chosen
+            app.prefs.setSortFor("search", chosen.name)
+            // Re-run the current query with the new sort; if blank, just persist the sort.
+            if (currentQuery.length >= 2) search(currentQuery)
+        }
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -43,6 +68,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        sort = SortOption.fromName(app.prefs.sortFor("search"))
         val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
         lrp.shadowEnabled = false
         rowsAdapter = ArrayObjectAdapter(lrp)
@@ -65,6 +91,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     }
 
     private fun search(query: String) {
+        currentQuery = query
         searchJob?.cancel()
         if (query.length < 2) {
             rowsAdapter.clear()
@@ -73,7 +100,11 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         searchJob = lifecycleScope.launch {
             delay(300)
             try {
-                val (count, scenes) = app.api.searchScenes(query)
+                val (count, scenes) = app.api.searchScenes(
+                    query,
+                    sort = sort.apiSort(randomSeed),
+                    direction = sort.direction
+                )
                 rowsAdapter.clear()
                 // Chunk into rows of 3 for a vertical-scroll grid feel
                 val chunks = scenes.chunked(3)
