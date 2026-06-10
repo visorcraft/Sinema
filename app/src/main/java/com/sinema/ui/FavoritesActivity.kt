@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.Scene
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class FavoritesActivity : FragmentActivity() {
@@ -100,6 +101,8 @@ class FavoritesGridFragment : VerticalGridSupportFragment() {
                 if (scenes.isEmpty()) {
                     Toast.makeText(requireContext(), "No favorites yet", Toast.LENGTH_SHORT).show()
                 }
+            } catch (e: CancellationException) {
+                throw e // back-press cancels the scope; not a real error
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }

@@ -13,6 +13,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
 import com.sinema.util.FolderHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
@@ -130,6 +131,8 @@ class FolderGridFragment : VerticalGridSupportFragment() {
                         "Large folder: showing the first $MAX_ITEMS videos/pictures",
                         Toast.LENGTH_LONG).show()
                 }
+            } catch (e: CancellationException) {
+                throw e // back-press cancels the scope; not a real error
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
