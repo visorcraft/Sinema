@@ -136,6 +136,45 @@
                     android:textSize="12sp"
                     android:maxLines="2"
                     android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/detail_meta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#AAAAAA"
+                    android:textSize="13sp"
+                    android:layout_marginTop="6dp"
+                    android:visibility="gone" />
+
+                <!-- Studio + tag chips -->
+                <HorizontalScrollView
+                    android:id="@+id/detail_tags_scroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:focusable="false"
+                    android:visibility="gone">
+                    <LinearLayout
+                        android:id="@+id/detail_tags_row"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <!-- Performer chips -->
+                <HorizontalScrollView
+                    android:id="@+id/detail_performers_scroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:focusable="false"
+                    android:visibility="gone">
+                    <LinearLayout
+                        android:id="@+id/detail_performers_row"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
             </LinearLayout>
         </LinearLayout>
 
