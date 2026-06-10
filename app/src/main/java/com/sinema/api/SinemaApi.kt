@@ -1,7 +1,9 @@
 package com.sinema.api
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.sinema.model.CaptionRef
 import com.sinema.model.EntityItem
@@ -570,28 +572,26 @@ class SinemaApi(
             sceneFilter = mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath)}/[^/]+$", "modifier" to "MATCHES_REGEX"))
         )
 
-    private fun parseTagRefs(obj: JsonObject): List<TagRef> =
-        obj.getAsJsonArray("tags")?.map { el ->
-            val t = el.asJsonObject
-            TagRef(id = t.get("id").asString, name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
-        } ?: emptyList()
+    private fun parseTagRefs(arr: JsonArray): List<TagRef> = arr.map { el ->
+        val t = el.asJsonObject
+        TagRef(id = t.get("id").asString, name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+    }
 
-    private fun parsePerformerRefs(obj: JsonObject): List<PerformerRef> =
-        obj.getAsJsonArray("performers")?.map { el ->
-            val p = el.asJsonObject
-            PerformerRef(id = p.get("id").asString, name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
-        } ?: emptyList()
+    private fun parsePerformerRefs(arr: JsonArray): List<PerformerRef> = arr.map { el ->
+        val p = el.asJsonObject
+        PerformerRef(id = p.get("id").asString, name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
+    }
 
-    private fun parseCaptionRefs(obj: JsonObject): List<CaptionRef> =
-        obj.getAsJsonArray("captions")?.map { el ->
-            val c = el.asJsonObject
-            CaptionRef(
-                languageCode = c.get("language_code")?.takeIf { !it.isJsonNull }?.asString ?: "",
-                captionType = c.get("caption_type")?.takeIf { !it.isJsonNull }?.asString ?: ""
-            )
-        } ?: emptyList()
+    private fun parseCaptionRefs(arr: JsonArray): List<CaptionRef> = arr.map { el ->
+        val c = el.asJsonObject
+        CaptionRef(
+            languageCode = c.get("language_code")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            captionType = c.get("caption_type")?.takeIf { !it.isJsonNull }?.asString ?: ""
+        )
+    }
 
-    private fun parseScene(obj: JsonObject): Scene {
+    @VisibleForTesting
+    internal fun parseScene(obj: JsonObject): Scene {
         val files = obj.getAsJsonArray("files")
         val file = if (files != null && files.size() > 0) files[0].asJsonObject else null
         // Optional metadata — only present in SCENE_FIELDS_FULL queries; guarded to keep lean list queries working.
@@ -610,14 +610,11 @@ class SinemaApi(
             studio = studioObj?.let { s ->
                 StudioRef(id = s.get("id").asString, name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "")
             },
-            tags = obj.get("tags")?.takeIf { it.isJsonArray }?.let { parseTagRefs(obj) } ?: emptyList(),
-            performers = obj.get("performers")?.takeIf { it.isJsonArray }?.let { parsePerformerRefs(obj) } ?: emptyList(),
-            captions = obj.get("captions")?.takeIf { it.isJsonArray }?.let { parseCaptionRefs(obj) } ?: emptyList()
+            tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
+            performers = (obj.get("performers") as? JsonArray)?.let(::parsePerformerRefs) ?: emptyList(),
+            captions = (obj.get("captions") as? JsonArray)?.let(::parseCaptionRefs) ?: emptyList()
         )
     }
-
-    // test seam — allows unit tests to call the private parseScene without reflection
-    internal fun parseSceneForTest(obj: JsonObject): Scene = parseScene(obj)
 
     /**
      * Fetch a paginated list of tags, performers, or studios sorted by scene count descending.
@@ -676,6 +673,11 @@ class SinemaApi(
         return findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, sceneFilter = sceneFilter)
     }
 
+    /**
+     * Fetches the full metadata payload for one scene.
+     * @return scene details, or null if the scene does not exist.
+     * @throws IOException on transport or GraphQL errors (callers must catch, as with every method here).
+     */
     suspend fun findSceneFull(sceneId: String): SceneDetails? {
         val query = """
             query(${"$"}id: ID!) {
@@ -693,7 +695,7 @@ class SinemaApi(
         val obj = result.getAsJsonObject("data")
             ?.get("findScene")?.takeIf { !it.isJsonNull }?.asJsonObject
             ?: return null
-        val markers = obj.getAsJsonArray("scene_markers")?.map { m ->
+        val markers = (obj.get("scene_markers") as? JsonArray)?.map { m ->
             val mo = m.asJsonObject
             MarkerRef(
                 id = mo.get("id").asString,
@@ -710,8 +712,8 @@ class SinemaApi(
         )
     }
 
-    fun getCaptionUrl(sceneId: String, c: CaptionRef): String =
-        "$serverUrl/scene/$sceneId/caption?lang=${c.languageCode}&type=${c.captionType}"
+    fun getCaptionUrl(sceneId: String, caption: CaptionRef): String =
+        "$serverUrl/scene/$sceneId/caption?lang=${caption.languageCode}&type=${caption.captionType}"
 
     suspend fun resetPlayCount(sceneId: String) {
         val query = """
