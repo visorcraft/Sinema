@@ -41,32 +41,33 @@ class SinemaApiTest {
     }
 
     @Test
-    fun `parseScene tolerates JSON-null captions`() {
+    fun `parseScene tolerates JSON-null tags, performers, and captions`() {
         val api = SinemaApi("http://server", "k", "", "apikey")
         val obj = com.google.gson.JsonParser.parseString(
             """{"id":"1","title":"t","captions":null,"tags":null,"performers":null,"files":[]}"""
         ).asJsonObject
-        val scene = api.parseSceneForTest(obj)
+        val scene = api.parseScene(obj)
+        assertEquals(emptyList<com.sinema.model.TagRef>(), scene.tags)
+        assertEquals(emptyList<com.sinema.model.PerformerRef>(), scene.performers)
         assertEquals(emptyList<CaptionRef>(), scene.captions)
     }
 
     @Test
-    fun `parseScene tolerates JSON-null tags`() {
+    fun `parseScene reads full metadata payload`() {
         val api = SinemaApi("http://server", "k", "", "apikey")
         val obj = com.google.gson.JsonParser.parseString(
-            """{"id":"1","title":"t","captions":null,"tags":null,"performers":null,"files":[]}"""
+            """{"id":"7","title":"t","date":"2024-01-02",
+                "studio":{"id":"3","name":"St"},
+                "tags":[{"id":"1","name":"a"},{"id":"2","name":"b"}],
+                "performers":[{"id":"9","name":"P"}],
+                "captions":[{"language_code":"en","caption_type":"srt"}],
+                "files":[{"path":"/data/x.mp4","size":10,"duration":5.0,"width":1,"height":2}]}"""
         ).asJsonObject
-        val scene = api.parseSceneForTest(obj)
-        assertEquals(emptyList<com.sinema.model.TagRef>(), scene.tags)
-    }
-
-    @Test
-    fun `parseScene tolerates JSON-null performers`() {
-        val api = SinemaApi("http://server", "k", "", "apikey")
-        val obj = com.google.gson.JsonParser.parseString(
-            """{"id":"1","title":"t","captions":null,"tags":null,"performers":null,"files":[]}"""
-        ).asJsonObject
-        val scene = api.parseSceneForTest(obj)
-        assertEquals(emptyList<com.sinema.model.PerformerRef>(), scene.performers)
+        val s = api.parseScene(obj)
+        assertEquals("2024-01-02", s.date)
+        assertEquals("St", s.studio?.name)
+        assertEquals(listOf("a", "b"), s.tags.map { it.name })
+        assertEquals("P", s.performers.single().name)
+        assertEquals("en", s.captions.single().languageCode)
     }
 }
