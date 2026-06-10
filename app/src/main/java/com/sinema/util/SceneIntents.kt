@@ -5,7 +5,10 @@ import android.content.Intent
 import com.sinema.model.Scene
 import com.sinema.ui.SceneDetailActivity
 
-/** Single source of truth for passing a Scene between activities via Intent extras. */
+/**
+ * Single source of truth for passing a Scene between activities via Intent extras.
+ * Scene metadata (tags/performers/captions/etc.) is NOT carried across the round-trip — receivers needing it must refetch via the full scene query.
+ */
 object SceneIntents {
     private const val KEY_ID = "scene_id"
     private const val KEY_TITLE = "scene_title"
