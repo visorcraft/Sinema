@@ -13,11 +13,10 @@ import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.model.GlideUrl
-import com.bumptech.glide.load.model.LazyHeaders
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.Scene
+import com.sinema.util.GlideAuth
 import kotlinx.coroutines.launch
 
 class SceneDetailActivity : FragmentActivity() {
@@ -64,11 +63,8 @@ class SceneDetailActivity : FragmentActivity() {
 
         // Load screenshot
         val url = app.api.getScreenshotUrl(scene.id)
-        val glideUrl = GlideUrl(url, LazyHeaders.Builder()
-            .addHeader("ApiKey", app.prefs.apiKey)
-            .build())
         Glide.with(this)
-            .load(glideUrl)
+            .load(GlideAuth.url(app.api, url))
             .centerCrop()
             .into(screenshot)
 
@@ -114,21 +110,31 @@ class SceneDetailActivity : FragmentActivity() {
 
         // Favorite
         lifecycleScope.launch {
-            val rating = app.api.getSceneRating(scene.id)
-            val isFav = rating != null && rating > 0
-            btnFavorite.text = if (isFav) "❤️ Unfavorite" else "🤍 Favorite"
+            try {
+                val rating = app.api.getSceneRating(scene.id)
+                val isFav = rating != null && rating > 0
+                btnFavorite.text = if (isFav) "❤️ Unfavorite" else "🤍 Favorite"
+            } catch (e: Exception) {
+                Log.e("Sinema", "Failed to fetch favorite state", e)
+            }
         }
 
         btnFavorite.setOnClickListener {
             lifecycleScope.launch {
-                val currentRating = app.api.getSceneRating(scene.id)
-                val isFavNow = currentRating != null && currentRating > 0
-                val newFav = !isFavNow
-                app.api.setSceneRating(scene.id, if (newFav) 100 else null)
-                btnFavorite.text = if (newFav) "❤️ Unfavorite" else "🤍 Favorite"
-                Toast.makeText(this@SceneDetailActivity,
-                    if (newFav) "Added to favorites" else "Removed from favorites",
-                    Toast.LENGTH_SHORT).show()
+                try {
+                    val currentRating = app.api.getSceneRating(scene.id)
+                    val isFavNow = currentRating != null && currentRating > 0
+                    val newFav = !isFavNow
+                    app.api.setSceneRating(scene.id, if (newFav) 100 else null)
+                    btnFavorite.text = if (newFav) "❤️ Unfavorite" else "🤍 Favorite"
+                    Toast.makeText(this@SceneDetailActivity,
+                        if (newFav) "Added to favorites" else "Removed from favorites",
+                        Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e("Sinema", "Failed to toggle favorite", e)
+                    Toast.makeText(this@SceneDetailActivity,
+                        "Failed to update favorite: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
 
@@ -210,11 +216,8 @@ class SceneDetailActivity : FragmentActivity() {
                     content.text = s.formatDuration()
 
                     val url = app.api.getScreenshotUrl(s.id)
-                    val glideUrl = GlideUrl(url, LazyHeaders.Builder()
-                        .addHeader("ApiKey", app.prefs.apiKey)
-                        .build())
                     Glide.with(this@SceneDetailActivity)
-                        .load(glideUrl)
+                        .load(GlideAuth.url(app.api, url))
                         .centerCrop()
                         .into(img)
 

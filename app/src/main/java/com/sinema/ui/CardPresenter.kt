@@ -7,13 +7,12 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.leanback.widget.Presenter
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.model.GlideUrl
-import com.bumptech.glide.load.model.LazyHeaders
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
 import com.sinema.model.FolderItem
 import com.sinema.model.Scene
+import com.sinema.util.GlideAuth
 
 class CardPresenter(private val api: SinemaApi) : Presenter() {
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
@@ -36,11 +35,8 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE
                 val url = api.getScreenshotUrl(item.id)
-                val glideUrl = GlideUrl(url, LazyHeaders.Builder()
-                    .addHeader("ApiKey", SinemaApp.instance.prefs.apiKey)
-                    .build())
                 Glide.with(view.context)
-                    .load(glideUrl)
+                    .load(GlideAuth.url(api, url))
                     .centerCrop()
                     .into(image)
             }
@@ -81,11 +77,8 @@ class FolderCardPresenter : Presenter() {
                         else -> null
                     }
                     if (thumbUrl != null) {
-                        val glideUrl = GlideUrl(thumbUrl, LazyHeaders.Builder()
-                            .addHeader("ApiKey", SinemaApp.instance.prefs.apiKey)
-                            .build())
                         Glide.with(view.context)
-                            .load(glideUrl)
+                            .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
                             .centerCrop()
                             .into(image)
                     } else {
@@ -111,11 +104,8 @@ class FolderCardPresenter : Presenter() {
                         }
                     }
                     if (thumbUrl != null) {
-                        val glideUrl = GlideUrl(thumbUrl, LazyHeaders.Builder()
-                            .addHeader("ApiKey", SinemaApp.instance.prefs.apiKey)
-                            .build())
                         Glide.with(view.context)
-                            .load(glideUrl)
+                            .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
                             .centerCrop()
                             .into(image)
                     }

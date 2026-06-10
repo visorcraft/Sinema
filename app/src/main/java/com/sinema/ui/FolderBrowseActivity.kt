@@ -106,29 +106,56 @@ class FolderGridFragment : VerticalGridSupportFragment() {
         val imageItems = (0 until gridAdapter.size())
             .mapNotNull { (gridAdapter.get(it) as? FolderItem)?.image }
         val index = imageItems.indexOfFirst { it.id == item.image?.id }
-        val intent = Intent(requireContext(), ImageViewActivity::class.java)
-        intent.putStringArrayListExtra("image_ids", ArrayList(imageItems.map { it.id }))
-        intent.putStringArrayListExtra("image_names", ArrayList(imageItems.map { it.filename }))
-        intent.putExtra("index", index.coerceAtLeast(0))
-        startActivity(intent)
+        startActivity(ImageViewActivity.intentFor(requireContext(), imageItems, index))
     }
 
     private fun loadFolder() {
         lifecycleScope.launch {
             try {
-                val scenesJob = async { app.api.findScenesByPath(currentPath, 1, 1000) }
-                val imagesJob = async { app.api.findImagesByPath(currentPath, 1, 1000) }
-                val (_, scenes) = scenesJob.await()
-                val (_, images) = imagesJob.await()
+                val scenesJob = async {
+                    fetchAllPages { page -> app.api.findScenesByPath(currentPath, page, PAGE_SIZE) }
+                }
+                val imagesJob = async {
+                    fetchAllPages { page -> app.api.findImagesByPath(currentPath, page, PAGE_SIZE) }
+                }
+                val (scenes, scenesTruncated) = scenesJob.await()
+                val (images, imagesTruncated) = imagesJob.await()
                 val items = FolderHelper.buildFolderContents(scenes, images, currentPath)
                 gridAdapter.clear()
                 items.forEach { gridAdapter.add(it) }
                 if (items.isEmpty()) {
                     Toast.makeText(requireContext(), "Empty folder", Toast.LENGTH_SHORT).show()
+                } else if (scenesTruncated || imagesTruncated) {
+                    Toast.makeText(requireContext(),
+                        "Large folder: showing the first $MAX_ITEMS videos/pictures",
+                        Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    /**
+     * Fetches every page of a (count, items) query up to MAX_ITEMS.
+     * Returns the items and whether the result was truncated.
+     */
+    private suspend fun <T> fetchAllPages(
+        fetch: suspend (page: Int) -> Pair<Int, List<T>>
+    ): Pair<List<T>, Boolean> {
+        val all = mutableListOf<T>()
+        var page = 1
+        while (true) {
+            val (count, batch) = fetch(page)
+            all.addAll(batch)
+            if (all.size >= MAX_ITEMS) return Pair(all.take(MAX_ITEMS), all.size > MAX_ITEMS || all.size < count)
+            if (all.size >= count || batch.isEmpty()) return Pair(all, false)
+            page++
+        }
+    }
+
+    companion object {
+        private const val PAGE_SIZE = 1000
+        private const val MAX_ITEMS = 10_000
     }
 }

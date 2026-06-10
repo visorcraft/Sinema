@@ -245,14 +245,21 @@ class MainFragment : RowsSupportFragment() {
                 rowsAdapter.add(ListRow(HeaderItem(""), settingsAdapter))
 
                 isLoading = false
+            }
 
-                // Check for updates (once per session)
-                if (!app.updateCheckedThisSession) {
-                    app.updateCheckedThisSession = true
-                    val update = com.sinema.util.UpdateChecker.checkForUpdate(requireContext())
-                    if (update != null) {
-                        com.sinema.util.UpdateChecker.promptUpdate(requireContext(), update)
+            // Check for updates (once per session). Outside the finally so
+            // the 401→Setup path skips it, and guarded against the fragment
+            // detaching while the check is in flight.
+            if (!app.updateCheckedThisSession) {
+                app.updateCheckedThisSession = true
+                try {
+                    val ctx = context ?: return@launch
+                    val update = com.sinema.util.UpdateChecker.checkForUpdate(ctx)
+                    if (update != null && isAdded && activity?.isFinishing == false) {
+                        com.sinema.util.UpdateChecker.promptUpdate(requireActivity(), update)
                     }
+                } catch (e: Exception) {
+                    Log.e("Sinema", "Update check failed", e)
                 }
             }
         }

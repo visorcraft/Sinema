@@ -78,11 +78,7 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
                         val imageItems = (0 until gridAdapter.size())
                             .mapNotNull { (gridAdapter.get(it) as? FolderItem)?.image }
                         val index = imageItems.indexOfFirst { it.id == item.image.id }
-                        val intent = Intent(requireContext(), ImageViewActivity::class.java)
-                        intent.putStringArrayListExtra("image_ids", ArrayList(imageItems.map { it.id }))
-                        intent.putStringArrayListExtra("image_names", ArrayList(imageItems.map { it.filename }))
-                        intent.putExtra("index", index.coerceAtLeast(0))
-                        startActivity(intent)
+                        startActivity(ImageViewActivity.intentFor(requireContext(), imageItems, index))
                     } else if (item.scene != null) {
                         val scene = item.scene
                         val intent = Intent(requireContext(), SceneDetailActivity::class.java)
