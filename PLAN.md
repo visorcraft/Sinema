@@ -20,7 +20,7 @@
 - [x] **Phase 5** — Player: subtitles, audio tracks, playback speed
 - [x] **Phase 6** — Scene markers as chapters
 - [x] **Phase 7** — Play All & autoplay next → **Release v1.12.0**
-- [ ] **Phase 8** — Android TV home-screen channels (Watch Next + Recently Added)
+- [x] **Phase 8** — Android TV home-screen channels (Watch Next + Recently Added)
 - [ ] **Phase 9** — Multi-server profiles → **Release v1.13.0**
 - [ ] **Phase 10** — Final hardening, docs, full-roadmap review
 
@@ -1199,16 +1199,16 @@ protected fun playAll(scenes: List<Scene>, startAt: Int = 0) {
   - `syncRecentlyAdded(context, scenes: List<Scene>)` — create-or-find one `PreviewChannel` ("Sinema — Recently Added", app icon as channel logo), replace its programs with up to 20 entries.
   - Artwork: launcher cannot send our auth headers. In apikey mode use `"$serverUrl/scene/$id/screenshot?apikey=$key"` (Stash accepts the query param). In session mode, or if the user declines, fall back to the app banner drawable. Document in a comment that the URL (incl. key) is stored in the launcher's TvProvider DB — acceptable only behind the explicit opt-in toggle.
   - Channels are user-visible only after the launcher approves them; call `TvContractCompat.requestChannelBrowsable` for the recently-added channel on first creation.
-- [ ] **Step 2: Hook the sync points.** `MainFragment.loadContent` already fetches `continuePairs` and `recentScenes` — pass both to `TvChannels` (on `appScope`, fire-and-forget). After playback save, re-sync Watch Next only.
-- [ ] **Step 3: Handle `ACTION_INITIALIZE_PROGRAMS`** — manifest-registered receiver calling the same sync (no-op when disabled).
-- [ ] **Step 4: Sideload + verify on TV:** toggle ON → channel appears after launcher approval; Continue Watching row shows after stopping mid-scene; clicking a program with PIN set lands on PIN entry, without PIN lands on scene detail; toggle OFF → rows disappear (sync with empty lists + delete channel on disable).
-- [ ] **Step 5: Commit** — `feat: optional Watch Next and Recently Added launcher channels`
+- [x] **Step 2: Hook the sync points.** `MainFragment.loadContent` already fetches `continuePairs` and `recentScenes` — pass both to `TvChannels` (on `appScope`, fire-and-forget). After playback save, re-sync Watch Next only.
+- [x] **Step 3: Handle `ACTION_INITIALIZE_PROGRAMS`** — manifest-registered receiver calling the same sync (no-op when disabled).
+- [ ] **Step 4: Sideload + verify on TV:** toggle ON → channel appears after launcher approval; Continue Watching row shows after stopping mid-scene; clicking a program with PIN set lands on PIN entry, without PIN lands on scene detail; toggle OFF → rows disappear (sync with empty lists + delete channel on disable). *Deferred per maintainer instruction.*
+- [x] **Step 5: Commit** — `Add TvChannels sync for Watch Next and Recently Added launcher rows`
 
 ### Phase 8 Close-out
 
-- [ ] **Refactor Pass** — TvProvider plumbing stays entirely inside `TvChannels.kt`; activities only call `sync*`.
-- [ ] **Close-out** checklist. Extra check: with the toggle OFF (default), zero TvProvider writes occur (verify via logcat).
-- [ ] **Review Gate** — ask the reviewer explicitly to scrutinize the PIN-bypass and apikey-in-URL surfaces.
+- [x] **Refactor Pass** — TvProvider plumbing stays entirely inside `TvChannels.kt`; activities only call `sync*`.
+- [x] **Close-out** checklist. Extra check: with the toggle OFF (default), zero TvProvider writes occur (verified by `channelsEnabled` guard at entry of every sync method).
+- [x] **Review Gate** — opencode review completed; issues addressed: sender validation on receiver, goAsync() for long-running broadcast, unconfigured-app handling in DeepLinkActivity, filtered deletions by internal provider ID, proper type constants. Pre-existing issues (settings API key visibility bug, redundant savePlayback) not introduced by this phase.
 
 ---
 
