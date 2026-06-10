@@ -49,6 +49,34 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
     private val randomSeed: Int = (0..99_999_999).random()
     private var loadJob: Job? = null
 
+    override fun showGridMenu() {
+        GridMenuDialog.show(requireContext(), sort, canPlayAll = true,
+            onSort = { chosen ->
+                sort = chosen
+                app.prefs.setSortFor("folder", chosen.name)
+                updateTitle()
+                loadFolder()
+            },
+            onPlayAll = { playAll() }
+        )
+    }
+
+    private fun playAll() {
+        val scenes = (0 until gridAdapter.size())
+            .mapNotNull { (gridAdapter.get(it) as? FolderItem)?.scene }
+            .take(500)
+        if (scenes.isEmpty()) return
+        if (scenes.size == 500) {
+            Toast.makeText(requireContext(), "Queued first 500", Toast.LENGTH_SHORT).show()
+        }
+        com.sinema.util.PlaybackQueue.start(scenes.map { it.id }, startAt = 0)
+        val first = scenes[0]
+        val intent = Intent(requireContext(), PlaybackActivity::class.java)
+        intent.putExtra("scene_id", first.id)
+        intent.putExtra("resume_position_ms", 0L)
+        startActivity(intent)
+    }
+
     override fun showSortDialog() {
         SortDialog.show(requireContext(), sort) { chosen ->
             sort = chosen
