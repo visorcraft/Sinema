@@ -504,7 +504,7 @@ class SinemaApi(
         val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
         return data.getAsJsonArray("scenes").map { obj ->
             val scene = parseScene(obj.asJsonObject)
-            val resumeTime = obj.asJsonObject.get("resume_time")?.asDouble ?: 0.0
+            val resumeTime = obj.asJsonObject.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
             Pair(scene, resumeTime)
         }
     }

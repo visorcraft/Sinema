@@ -17,12 +17,19 @@ class EntityGridActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         if (savedInstanceState == null) {
-            val kind = EntityItem.Kind.valueOf(intent.getStringExtra("kind") ?: EntityItem.Kind.TAG.name)
+            val kind = parseKind(intent.getStringExtra("kind"))
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_frame, EntityGridFragment.create(kind))
                 .commit()
         }
     }
+
+    private fun parseKind(raw: String?): EntityItem.Kind =
+        try {
+            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
+        } catch (_: IllegalArgumentException) {
+            EntityItem.Kind.TAG
+        }
 }
 
 class EntityGridFragment : SceneGridFragment() {
@@ -32,7 +39,14 @@ class EntityGridFragment : SceneGridFragment() {
         }
     }
 
-    private val kind get() = EntityItem.Kind.valueOf(requireArguments().getString("kind")!!)
+    private val kind get() = parseKind(requireArguments().getString("kind"))
+
+    private fun parseKind(raw: String?): EntityItem.Kind =
+        try {
+            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
+        } catch (_: IllegalArgumentException) {
+            EntityItem.Kind.TAG
+        }
     override val columns = 4
     override val gridTitle get() = kind.label
     override val emptyMessage get() = "No ${kind.label.lowercase()} found"

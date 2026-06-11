@@ -25,4 +25,16 @@ class PlaybackQueueTest {
         PlaybackQueue.start(listOf("a", "b", "c"), startAt = 1)
         assertEquals("c", PlaybackQueue.next())
     }
+
+    @Test
+    fun `start at last item, next returns null`() {
+        PlaybackQueue.start(listOf("a", "b"), startAt = 1)
+        assertNull(PlaybackQueue.next())
+    }
+
+    @Test
+    fun `start beyond last index clamps to last, next returns null`() {
+        PlaybackQueue.start(listOf("a", "b"), startAt = 99)
+        assertNull(PlaybackQueue.next())
+    }
 }

@@ -277,11 +277,10 @@ class SceneDetailActivity : FragmentActivity() {
     }
 
     private fun launchPlayback(resumeMs: Long) {
-        val intent = Intent(this, PlaybackActivity::class.java)
-        intent.putExtra("scene_id", scene.id)
-        intent.putExtra("resume_position_ms", resumeMs)
-        SceneIntents.putCaptions(intent, captions)
-        SceneIntents.putMarkers(intent, markers)
+        val intent = SceneIntents.playback(this, scene.id, resumeMs).apply {
+            SceneIntents.putCaptions(this, captions)
+            SceneIntents.putMarkers(this, markers)
+        }
         startActivity(intent)
     }
 
@@ -328,7 +327,9 @@ class SceneDetailActivity : FragmentActivity() {
                     card.layoutParams = params
                     relatedRow.addView(card)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w("Sinema", "Failed to load related scenes for ${scene.folder}", e)
+            }
         }
     }
 

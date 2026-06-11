@@ -10,7 +10,7 @@ object PlaybackQueue {
     @Synchronized
     fun start(sceneIds: List<String>, startAt: Int) {
         ids = sceneIds.toList()
-        index = startAt.coerceIn(-1, ids.size)
+        index = startAt.coerceIn(-1, ids.size - 1)
     }
 
     @Synchronized
