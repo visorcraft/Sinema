@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import android.content.Intent
+import androidx.core.content.ContextCompat
 import com.sinema.model.Scene
 import com.sinema.model.SortOption
 import com.sinema.util.PlaybackQueue
@@ -37,7 +38,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open val sortScreenKey: String? = null
     protected open val defaultSort: SortOption = SortOption.PATH_ASC
     protected var sort: SortOption = SortOption.PATH_ASC
-    protected val randomSeed: Int = (0..99_999_999).random()
+    protected var randomSeed: Int = 0
     private var loadJob: Job? = null
 
     override fun showSortDialog() {
@@ -73,6 +74,11 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         SceneIntents.playAll(requireContext(), scenes)
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt("random_seed", randomSeed)
+    }
+
     private fun updateTitle() {
         title = if (sortScreenKey != null) "$gridTitle  •  ${sort.label}" else gridTitle
     }
@@ -84,9 +90,11 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        randomSeed = savedInstanceState?.getInt("random_seed")
+            ?: (0..99_999_999).random()
         sortScreenKey?.let { sort = SortOption.fromName(app.prefs.sortFor(it), defaultSort) }
         updateTitle()
-        badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
+        badgeDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.sinema_logo)
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
         gridPresenter.numberOfColumns = columns
         setGridPresenter(gridPresenter)

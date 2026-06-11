@@ -3,6 +3,7 @@ package com.sinema.ui
 import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -31,13 +32,14 @@ class PlaybackActivity : FragmentActivity() {
     private var captions: List<CaptionRef> = emptyList()
     private var markers: List<Pair<String, Double>> = emptyList()
     private var chaptersDialog: android.app.AlertDialog? = null
+    private var isControllerVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_playback)
         playerView = findViewById(R.id.player_view)
-        sceneId = intent.getStringExtra("scene_id") ?: ""
-        resumePositionMs = intent.getLongExtra("resume_position_ms", 0L)
+        sceneId = SceneIntents.sceneIdFrom(intent)
+        resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
     }
@@ -51,6 +53,8 @@ class PlaybackActivity : FragmentActivity() {
     override fun onPause() {
         super.onPause()
         savePlayback()
+        chaptersDialog?.dismiss()
+        chaptersDialog = null
     }
 
     override fun onStop() {
@@ -63,7 +67,11 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun savePlayback() {
         val exo = player ?: return
-        if (sceneId.isEmpty()) return
+        // Snapshot the id now: auto-advance reassigns sceneId synchronously
+        // after this call, but the save below runs asynchronously, so reading
+        // the field there could attribute the save to the next scene.
+        val savedSceneId = sceneId
+        if (savedSceneId.isEmpty()) return
         val pos = exo.currentPosition
         val duration = exo.duration
         val playDurationMs = System.currentTimeMillis() - startTimeMs
@@ -90,16 +98,17 @@ class PlaybackActivity : FragmentActivity() {
         // Run in the app scope: lifecycleScope is cancelled when the
         // activity is destroyed (the common back-press exit), which would
         // drop the save mid-flight and lose resume/watched state.
+        val appCtx = applicationContext
         app.appScope.launch {
             try {
-                app.api.saveSceneActivity(sceneId, resumeTimeSec, playDurationSec)
+                app.api.saveSceneActivity(savedSceneId, resumeTimeSec, playDurationSec)
                 if (shouldIncrement) {
-                    app.api.incrementPlayCount(sceneId)
+                    app.api.incrementPlayCount(savedSceneId)
                 }
                 // Refresh Watch Next after saving playback state
                 if (resumeTimeSec > 0) {
                     val continuePairs = app.api.findContinuePlaying()
-                    com.sinema.util.TvChannels.syncWatchNext(this@PlaybackActivity, continuePairs)
+                    com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
                 }
             } catch (e: Exception) {
                 android.util.Log.e("Sinema", "Failed to save playback state", e)
@@ -112,8 +121,13 @@ class PlaybackActivity : FragmentActivity() {
         val streamUrl = app.api.getStreamUrl(sceneId)
         // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
         val subs = captions.map { c ->
+            val mime = when (c.captionType.lowercase()) {
+                "vtt" -> MimeTypes.TEXT_VTT
+                "ass", "ssa" -> MimeTypes.TEXT_SSA
+                else -> MimeTypes.APPLICATION_SUBRIP
+            }
             MediaItem.SubtitleConfiguration.Builder(Uri.parse(app.api.getCaptionUrl(sceneId, c)))
-                .setMimeType(if (c.captionType.equals("vtt", true)) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP)
+                .setMimeType(mime)
                 .setLanguage(c.languageCode.takeIf { it.isNotBlank() })
                 .setLabel("${c.languageCode.uppercase().ifBlank { "UNKNOWN" }} (${c.captionType})")
                 .build()
@@ -137,6 +151,9 @@ class PlaybackActivity : FragmentActivity() {
             .build()
             .also { exo ->
                 playerView.player = exo
+                playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                    isControllerVisible = visibility == View.VISIBLE
+                })
                 exo.setMediaItem(buildMediaItem())
                 exo.prepare()
                 if (resumePositionMs > 0) {
@@ -158,10 +175,12 @@ class PlaybackActivity : FragmentActivity() {
                                 val details = app.api.findSceneFull(nextId)
                                 captions = details?.scene?.captions ?: emptyList()
                                 markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
-                            } catch (_: Exception) {
+                            } catch (e: Exception) {
+                                android.util.Log.w("Sinema", "Failed to fetch next scene metadata, playing without captions/markers", e)
                                 captions = emptyList()
                                 markers = emptyList()
                             }
+                            if (isFinishing) return@launch
                             sceneId = nextId
                             resumePositionMs = 0L
                             playCountSent = false
@@ -196,7 +215,7 @@ class PlaybackActivity : FragmentActivity() {
         val exo = player ?: return
         val posSec = exo.currentPosition / 1000.0
         val target = if (forward)
-            markers.firstOrNull { it.second > posSec + 1 }
+            markers.firstOrNull { it.second > posSec + 3 }
         else
             markers.lastOrNull { it.second < posSec - 3 }
         target?.let { exo.seekTo((it.second * 1000).toLong()) }
@@ -208,6 +227,16 @@ class PlaybackActivity : FragmentActivity() {
                 KeyEvent.KEYCODE_MENU -> { showChapters(); return true }
                 KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (isControllerVisible && markers.isNotEmpty()) {
+                        seekToAdjacentMarker(true); return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (isControllerVisible && markers.isNotEmpty()) {
+                        seekToAdjacentMarker(false); return true
+                    }
+                }
             }
         }
         return super.dispatchKeyEvent(event)

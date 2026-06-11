@@ -21,15 +21,23 @@ class EntityScenesActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         if (savedInstanceState == null) {
+            val kind = parseKind(intent.getStringExtra("kind"))
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_frame, EntityScenesFragment.create(
-                    EntityItem.Kind.valueOf(intent.getStringExtra("kind") ?: EntityItem.Kind.TAG.name),
+                    kind,
                     intent.getStringExtra("id") ?: "",
                     intent.getStringExtra("name") ?: ""
                 ))
                 .commit()
         }
     }
+
+    private fun parseKind(raw: String?): EntityItem.Kind =
+        try {
+            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
+        } catch (_: IllegalArgumentException) {
+            EntityItem.Kind.TAG
+        }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
         if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
@@ -44,10 +52,17 @@ class EntityScenesFragment : SceneGridFragment() {
         }
     }
 
-    private val kind get() = EntityItem.Kind.valueOf(requireArguments().getString("kind")!!)
-    override val sortScreenKey = "entity_scenes"
+    private val kind get() = parseKind(requireArguments().getString("kind"))
+    override val sortScreenKey: String? get() = "entity_scenes_${kind.name}_${requireArguments().getString("id")}"
     override val gridTitle get() = requireArguments().getString("name") ?: ""
     override val emptyMessage = "No scenes"
+
+    private fun parseKind(raw: String?): EntityItem.Kind =
+        try {
+            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
+        } catch (_: IllegalArgumentException) {
+            EntityItem.Kind.TAG
+        }
 
     override suspend fun loadItems(): List<Any> {
         // TODO: paginate; silently capped at 200 (server count available in .first)

@@ -221,10 +221,15 @@ class MainFragment : RowsSupportFragment() {
 
                 Log.d("Sinema", "Rows loaded: ${rowsAdapter.size()}")
 
-                // Sync TV channels (fire-and-forget on appScope)
+                // Sync TV channels (fire-and-forget on appScope). Capture the
+                // application context now, while the fragment is attached:
+                // appScope outlives this fragment, so calling requireContext()
+                // inside the coroutine would throw if the user navigated away
+                // before it ran.
+                val appCtx = requireContext().applicationContext
                 app.appScope.launch {
-                    com.sinema.util.TvChannels.syncWatchNext(requireContext(), continuePairs)
-                    com.sinema.util.TvChannels.syncRecentlyAdded(requireContext(), recentScenes)
+                    com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
+                    com.sinema.util.TvChannels.syncRecentlyAdded(appCtx, recentScenes)
                 }
 
             } catch (e: Exception) {

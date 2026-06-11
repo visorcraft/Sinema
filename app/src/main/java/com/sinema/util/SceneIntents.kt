@@ -27,6 +27,7 @@ object SceneIntents {
     private const val KEY_CAPTION_TYPES = "caption_types"
     private const val KEY_MARKER_TITLES = "marker_titles"
     private const val KEY_MARKER_SECONDS = "marker_seconds"
+    private const val KEY_RESUME_MS = "resume_position_ms"
 
     fun detail(context: Context, scene: Scene): Intent =
         Intent(context, SceneDetailActivity::class.java).apply {
@@ -40,6 +41,8 @@ object SceneIntents {
             putExtra(KEY_PLAY_COUNT, scene.playCount)
             putExtra(KEY_RATING, scene.rating100 ?: -1)
         }
+
+    fun sceneIdFrom(intent: Intent): String = intent.getStringExtra(KEY_ID) ?: ""
 
     fun sceneFrom(intent: Intent): Scene = Scene(
         id = intent.getStringExtra(KEY_ID) ?: "",
@@ -78,18 +81,23 @@ object SceneIntents {
         return titles.zip(seconds.toList())
     }
 
+    /** Build a playback intent for a single scene (not queued). */
+    fun playback(context: Context, sceneId: String, resumeMs: Long = 0L): Intent =
+        Intent(context, PlaybackActivity::class.java).apply {
+            putExtra(KEY_ID, sceneId)
+            putExtra(KEY_RESUME_MS, resumeMs)
+        }
+
+    fun resumeMsFrom(intent: Intent): Long = intent.getLongExtra(KEY_RESUME_MS, 0L)
+
     /** Launch playback for the first scene in a list, seeding the queue with up to 500 ids. */
     fun playAll(context: Context, scenes: List<Scene>) {
         val capped = scenes.take(500)
         if (capped.isEmpty()) return
-        if (capped.size == 500) {
+        if (scenes.size > 500) {
             Toast.makeText(context, "Queued first 500", Toast.LENGTH_SHORT).show()
         }
         PlaybackQueue.start(capped.map { it.id }, startAt = 0)
-        val first = capped[0]
-        val intent = Intent(context, PlaybackActivity::class.java)
-        intent.putExtra("scene_id", first.id)
-        intent.putExtra("resume_position_ms", 0L)
-        context.startActivity(intent)
+        context.startActivity(playback(context, capped[0].id, resumeMs = 0L))
     }
 }
