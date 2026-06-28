@@ -702,7 +702,7 @@ class SinemaApi(
         """.trimIndent()
         val result = graphql(query, mapOf("id" to sceneId))
         // Use .get().takeIf{!isJsonNull}.asJsonObject rather than getAsJsonObject() because
-        // Gson 2.10.1's getAsJsonObject(String) does a raw checkcast and throws ClassCastException
+        // Gson's getAsJsonObject(String) does a raw checkcast and throws ClassCastException
         // when the value is JsonNull (scene not found). The safe accessor avoids that.
         val obj = result.getAsJsonObject("data")
             ?.get("findScene")?.takeIf { !it.isJsonNull }?.asJsonObject

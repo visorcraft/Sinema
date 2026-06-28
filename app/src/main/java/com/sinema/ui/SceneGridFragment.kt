@@ -11,11 +11,9 @@ import androidx.leanback.widget.VerticalGridPresenter
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
-import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.sinema.model.Scene
 import com.sinema.model.SortOption
-import com.sinema.util.PlaybackQueue
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job

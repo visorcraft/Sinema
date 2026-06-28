@@ -1,1 +1,1 @@
-# StashTV proguard rules
+# Sinema proguard rules

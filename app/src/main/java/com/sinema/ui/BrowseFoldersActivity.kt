@@ -14,7 +14,6 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
-import com.sinema.util.FolderHelper
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -45,16 +44,6 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
         val vPad = (20 * density).toInt()
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
-    }
-
-    private fun findGridView(vg: ViewGroup?): androidx.leanback.widget.VerticalGridView? {
-        if (vg == null) return null
-        for (i in 0 until vg.childCount) {
-            val child = vg.getChildAt(i)
-            if (child is androidx.leanback.widget.VerticalGridView) return child
-            if (child is ViewGroup) findGridView(child)?.let { return it }
-        }
-        return null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

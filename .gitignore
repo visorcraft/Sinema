@@ -1,6 +1,7 @@
 # Build
 *.iml
 .gradle/
+.kotlin/
 /build/
 /app/build/
 *.apk

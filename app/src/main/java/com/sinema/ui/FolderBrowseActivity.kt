@@ -90,18 +90,6 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         (view as? ViewGroup)?.clipToPadding = false
     }
 
-    private fun findGridView(vg: ViewGroup?): androidx.leanback.widget.VerticalGridView? {
-        if (vg == null) return null
-        for (i in 0 until vg.childCount) {
-            val child = vg.getChildAt(i)
-            if (child is androidx.leanback.widget.VerticalGridView) return child
-            if (child is ViewGroup) {
-                findGridView(child)?.let { return it }
-            }
-        }
-        return null
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         currentPath = arguments?.getString("path") ?: "/data"

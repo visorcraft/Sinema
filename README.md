@@ -68,13 +68,19 @@ adb -s <TV_IP>:5555 shell am start -n com.sinema/.ui.MainActivity
 1. Open Sinema on your TV
 2. You’ll be guided through a setup wizard with **3 options**:
    - **Sign in to Stash** (username/password) — recommended for most users
-   - **Web Setup** — enter a short code shown on the TV into a browser to send settings to the device
+   - **Web Setup** — open a temporary browser form from the URL shown on the TV
    - **Manual setup** — enter the server URL + API key directly
 3. After setup, Sinema stores settings locally and you can browse immediately.
 
 Notes:
 - Stash default port is usually **6969** (e.g. `http://192.168.1.100:6969`).
 - If you use the sign-in flow, Sinema will prompt you to choose an auth mode (session cookie vs API key) depending on your Stash configuration.
+
+## Documentation
+
+Full usage documentation lives in [`docs/`](docs/), including setup, browsing, playback, settings, privacy, troubleshooting, and developer reference guides.
+
+Dependency acknowledgements and license details are tracked in [`CREDITS.md`](CREDITS.md) and [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
 
 ---
 
@@ -137,22 +143,25 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 |---|---:|
 | compileSdk / targetSdk | **36** |
 | minSdk | **24** |
-| Android Gradle Plugin | **8.6.1** |
-| Gradle | **8.9** |
-| Kotlin | **1.9.24** |
+| Android Gradle Plugin | **9.2.1** |
+| Gradle | **9.6.1** |
+| Kotlin runtime | **2.2.21** |
 | Java | **17** |
 
 ### Key library versions
 
 | Library | Version |
 |---|---:|
-| Media3 (ExoPlayer) | **1.2.1** |
-| Glide | **4.16.0** |
-| OkHttp | **4.12.0** |
-| Gson | **2.10.1** |
-| Coroutines | **1.7.3** |
-| Lifecycle Runtime KTX | **2.7.0** |
-| Security Crypto | **1.1.0-alpha06** |
+| AndroidX Core KTX | **1.18.0** |
+| AndroidX Leanback | **1.2.0** |
+| Media3 (ExoPlayer) | **1.10.1** |
+| Glide | **5.0.7** |
+| OkHttp | **5.4.0** |
+| Gson | **2.14.0** |
+| Coroutines | **1.11.0** |
+| Lifecycle Runtime KTX | **2.11.0** |
+| Security Crypto | **1.1.0** |
+| TVProvider | **1.1.0** |
 
 ---
 

@@ -102,9 +102,9 @@ Install the toolchain versions Sinema targets:
 | Component | Version |
 | --- | --- |
 | JDK | **17** (Temurin or any GraalVM-free build) |
-| Android Gradle Plugin | **8.7.3** |
+| Android Gradle Plugin | **9.2.1** |
 | Gradle wrapper | bundled (`./gradlew`) |
-| Kotlin | **1.9.24** |
+| Kotlin runtime | **2.2.21** |
 | compileSdk / targetSdk | **36** |
 | minSdk | **24** |
 
@@ -135,7 +135,8 @@ encrypted preferences are stored on the device.
 
 ## Coding standards
 
-- Target **Kotlin 1.9.24** with Java 17 source/target compatibility.
+- Target Java 17 source/target compatibility. Kotlin support is provided
+  by the Android Gradle Plugin.
 - Use Kotlin idioms (data classes, sealed classes, scope functions,
   null-safety) — avoid Java-style getters/setters or `Object`-typed
   fields.
@@ -227,6 +228,8 @@ A good pull request:
   confirming D-pad navigation still works.
 - Updates `README.md` when behavior, features, or requirements
   change.
+- Updates `CREDITS.md` and `THIRD_PARTY_LICENSES.md` when dependencies
+  change.
 - Passes `./gradlew lint` and `./gradlew assembleDebug`.
 - Avoids unrelated formatting or refactoring churn.
 
@@ -239,6 +242,9 @@ Sinema is GPL-3.0-only. New Gradle dependencies must use licenses
 compatible with GPL-3.0 (Apache-2.0, MIT, BSD-*, MPL-2.0 case-by-case,
 etc.). If a dependency needs license clarification, explain the
 reason in the pull request.
+
+Every dependency change must keep `README.md`, `CREDITS.md`, and
+`THIRD_PARTY_LICENSES.md` in sync with the resolved Gradle versions.
 
 Avoid new dependencies unless they clearly reduce complexity or
 provide well-tested domain behavior that should not be maintained

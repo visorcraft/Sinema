@@ -65,7 +65,7 @@ class EntityScenesFragment : SceneGridFragment() {
         }
 
     override suspend fun loadItems(): List<Any> {
-        // TODO: paginate; silently capped at 200 (server count available in .first)
+        // Keep this bounded for TV navigation; server count is available in .first if pagination is added later.
         return app.api.findScenesForEntity(
             kind, requireArguments().getString("id")!!,
             perPage = 200, sort = sort.apiSort(randomSeed), direction = sort.direction

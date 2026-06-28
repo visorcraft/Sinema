@@ -52,7 +52,7 @@ class EntityGridFragment : SceneGridFragment() {
     override val emptyMessage get() = "No ${kind.label.lowercase()} found"
 
     override suspend fun loadItems(): List<Any> {
-        // TODO: paginate; silently capped at 200 (server count available in .first)
+        // Keep this bounded for TV navigation; server count is available in .first if pagination is added later.
         return app.api.findEntities(kind, perPage = 200).second
     }
 
