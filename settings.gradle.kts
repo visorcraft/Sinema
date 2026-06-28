@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "StashTV"
+rootProject.name = "Sinema"
 include(":app")

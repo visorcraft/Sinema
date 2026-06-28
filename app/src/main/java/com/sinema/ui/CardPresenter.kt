@@ -22,7 +22,7 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val view = viewHolder.view
         val image = view.findViewById<ImageView>(R.id.card_image)
         val title = view.findViewById<TextView>(R.id.card_title)
@@ -78,7 +78,7 @@ class FolderCardPresenter : Presenter() {
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val view = viewHolder.view
         val image = view.findViewById<ImageView>(R.id.card_image)
         val title = view.findViewById<TextView>(R.id.card_title)
@@ -154,7 +154,7 @@ class SettingsPresenter : Presenter() {
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val title = viewHolder.view.findViewById<TextView>(R.id.card_title)
         val content = viewHolder.view.findViewById<TextView>(R.id.card_content)
         val image = viewHolder.view.findViewById<ImageView>(R.id.card_image)
@@ -230,27 +230,6 @@ class SettingsPresenter : Presenter() {
                 image.setBackgroundColor(0xFF444444.toInt())
             }
         }
-    }
-
-    override fun onUnbindViewHolder(viewHolder: ViewHolder) {}
-}
-
-class SearchCardPresenter : Presenter() {
-    override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.view_folder_card, parent, false)
-        return ViewHolder(view)
-    }
-
-    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
-        val title = viewHolder.view.findViewById<TextView>(R.id.card_title)
-        val content = viewHolder.view.findViewById<TextView>(R.id.card_content)
-        val image = viewHolder.view.findViewById<ImageView>(R.id.card_image)
-        title.text = "🔍 Search"
-        content.text = "Find scenes"
-        image.setImageResource(android.R.drawable.ic_menu_search)
-        image.scaleType = ImageView.ScaleType.CENTER
-        image.setBackgroundColor(0xFF444444.toInt())
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {}
