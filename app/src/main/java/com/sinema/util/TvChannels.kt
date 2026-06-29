@@ -50,9 +50,6 @@ object TvChannels {
                     .setIntentUri(intentUri)
                     .setInternalProviderId("sinema:${scene.id}")
 
-                val artwork = artworkUri(app, scene)
-                if (artwork != null) builder.setPosterArtUri(artwork)
-
                 helper.publishWatchNextProgram(builder.build())
             }
         } catch (e: Exception) {
@@ -91,9 +88,6 @@ object TvChannels {
                     .setDurationMillis((scene.duration * 1000).toInt())
                     .setIntentUri(intentUri)
                     .setInternalProviderId("sinema:${scene.id}")
-
-                val artwork = artworkUri(app, scene)
-                if (artwork != null) builder.setPosterArtUri(artwork)
 
                 helper.publishPreviewProgram(builder.build())
             }
@@ -165,14 +159,5 @@ object TvChannels {
             return ContentUris.withAppendedId(TvContractCompat.Channels.CONTENT_URI, channelId)
         }
         return null
-    }
-
-    private fun artworkUri(app: SinemaApp, scene: Scene): Uri? {
-        return if (app.prefs.authMode == "apikey" && app.prefs.apiKey.isNotBlank()) {
-            val url = "${app.prefs.serverUrl}/scene/${scene.id}/screenshot?apikey=${app.prefs.apiKey}"
-            Uri.parse(url)
-        } else {
-            null
-        }
     }
 }

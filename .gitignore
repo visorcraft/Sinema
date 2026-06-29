@@ -4,10 +4,13 @@
 .kotlin/
 /build/
 /app/build/
+/dist/
 *.apk
 *.aab
 *.dex
 *.class
+*.log
+*.tmp
 
 # IDE
 /.idea/
@@ -18,6 +21,8 @@
 # Local config
 /local.properties
 local.properties
+local.env
+*.local.properties
 
 # Android
 .externalNativeBuild/
@@ -26,18 +31,39 @@ local.properties
 /app/release/
 
 # Signing
+debug.keystore
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
 signing.properties
+key.properties
+keystore.properties
+release.properties
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Secrets — never commit these
+# Secrets - never commit these
 *.secret
 *.env
 .env
-debug.keystore
+.env.*
+!.env.example
+!.env.*.example
+secrets.properties
+secret.properties
+credentials.properties
+credentials.json
+client_secret*.json
+service-account*.json
+*-service-account.json
+google-services.json
+app/google-services.json
 AGENTS.md
 .aider*
