@@ -201,6 +201,7 @@ class PlaybackActivity : FragmentActivity() {
                     exo.seekTo(resumePositionMs)
                 }
                 exo.playWhenReady = true
+                exo.repeatMode = if (prefs.loopEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                 exo.addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         isPaused = !isPlaying
@@ -218,6 +219,10 @@ class PlaybackActivity : FragmentActivity() {
                         if (state != Player.STATE_ENDED) return
                         handler.removeCallbacks(hideRunnable)
                         savePlayback()
+                        // Skip the queue advance when loop-one is on; Media3's
+                        // auto-seek-to-0 will replay this video and the
+                        // queue advance would race with it and break the loop.
+                        if (exo.repeatMode != Player.REPEAT_MODE_OFF) return
                         val wasActive = PlaybackQueue.isActive
                         val nextId = PlaybackQueue.next()
                         if (nextId == null) {
