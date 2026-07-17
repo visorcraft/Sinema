@@ -199,6 +199,7 @@ class PlaybackActivity : FragmentActivity() {
 
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state != Player.STATE_ENDED) return
+                        handler.removeCallbacks(hideRunnable)
                         savePlayback()
                         val wasActive = PlaybackQueue.isActive
                         val nextId = PlaybackQueue.next()
@@ -280,7 +281,8 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onUserInteraction() {
         super.onUserInteraction()
-        if (!isPaused) return
+        val exo = player ?: return
+        if (exo.playWhenReady || exo.playbackState != Player.STATE_READY) return
         handler.removeCallbacks(hideRunnable)
         if (!isControllerVisible) playerView.showController()
     }
