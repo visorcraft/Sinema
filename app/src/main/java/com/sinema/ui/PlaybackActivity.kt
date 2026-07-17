@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -48,6 +49,19 @@ class PlaybackActivity : FragmentActivity() {
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val exo = player
+                if (exo != null && !exo.playWhenReady && !isControllerVisible) {
+                    playerView.showController()
+                    handler.removeCallbacks(hideRunnable)
+                    handler.postDelayed(hideRunnable, hideDelayMs)
+                } else {
+                    finish()
+                }
+            }
+        })
     }
 
     override fun onStart() {
