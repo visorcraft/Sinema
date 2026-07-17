@@ -263,4 +263,11 @@ class PlaybackActivity : FragmentActivity() {
         }
         return super.dispatchKeyEvent(event)
     }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        if (!isPaused) return
+        handler.removeCallbacks(hideRunnable)
+        if (!isControllerVisible) playerView.showController()
+    }
 }
