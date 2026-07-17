@@ -218,6 +218,10 @@ class PlaybackActivity : FragmentActivity() {
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state != Player.STATE_ENDED) return
                         handler.removeCallbacks(hideRunnable)
+                        // Subsequent loop iterations re-fire STATE_ENDED; skip savePlayback
+                        // because its finished-clear branch would overwrite the user's actual
+                        // resume position with "completed".
+                        if (exo.repeatMode == Player.REPEAT_MODE_ONE && playCountSent) return
                         savePlayback()
                         // Skip the queue advance when loop-one is on; Media3's
                         // auto-seek-to-0 will replay this video and the
