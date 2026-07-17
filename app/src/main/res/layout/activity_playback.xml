@@ -11,4 +11,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:show_subtitle_button="true" />
+
+    <ImageButton
+        android:id="@+id/loop_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="24dp"
+        android:padding="12dp"
+        android:src="@drawable/ic_loop"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/loop_video" />
 </FrameLayout>
