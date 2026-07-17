@@ -46,6 +46,10 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("channels_enabled", false)
         set(value) = prefs.edit().putBoolean("channels_enabled", value).apply()
 
+    var loopEnabled: Boolean
+        get() = prefs.getBoolean("loop_enabled", false)
+        set(value) = prefs.edit().putBoolean("loop_enabled", value).apply()
+
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
         get() = ProfileCodec.fromJson(getSecureString("server_profiles"))

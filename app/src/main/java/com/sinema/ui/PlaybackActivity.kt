@@ -6,7 +6,9 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
+import android.widget.ImageButton
 import androidx.activity.OnBackPressedCallback
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -36,6 +38,8 @@ class PlaybackActivity : FragmentActivity() {
     private var markers: List<Pair<String, Double>> = emptyList()
     private var chaptersDialog: android.app.AlertDialog? = null
     private var isControllerVisible = false
+    private lateinit var loopButton: ImageButton
+    private val prefs by lazy { SinemaApp.instance.prefs }
     private var isPaused = false
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { playerView.hideController() }
@@ -49,6 +53,9 @@ class PlaybackActivity : FragmentActivity() {
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
+        loopButton = findViewById(R.id.loop_button)
+        applyLoopTint(prefs.loopEnabled)
+        wireLoopButton()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -89,6 +96,14 @@ class PlaybackActivity : FragmentActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(hideRunnable)
         super.onDestroy()
+    }
+
+    private fun applyLoopTint(enabled: Boolean) {
+        val color = ContextCompat.getColor(
+            this,
+            if (enabled) android.R.color.holo_blue_bright else android.R.color.darker_gray
+        )
+        loopButton.setColorFilter(color)
     }
 
     private fun savePlayback() {
@@ -230,6 +245,16 @@ class PlaybackActivity : FragmentActivity() {
                     }
                 })
             }
+    }
+
+    private fun wireLoopButton() {
+        loopButton.setOnClickListener {
+            val exo = player ?: return@setOnClickListener
+            val nowEnabled = !prefs.loopEnabled
+            prefs.loopEnabled = nowEnabled
+            exo.repeatMode = if (nowEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            applyLoopTint(nowEnabled)
+        }
     }
 
     private fun releasePlayer() {
