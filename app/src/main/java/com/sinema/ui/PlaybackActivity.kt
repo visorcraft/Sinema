@@ -2,6 +2,8 @@ package com.sinema.ui
 
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import androidx.fragment.app.FragmentActivity
@@ -33,6 +35,10 @@ class PlaybackActivity : FragmentActivity() {
     private var markers: List<Pair<String, Double>> = emptyList()
     private var chaptersDialog: android.app.AlertDialog? = null
     private var isControllerVisible = false
+    private var isPaused = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val hideRunnable = Runnable { playerView.hideController() }
+    private val hideDelayMs = 3000L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,11 +64,17 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     override fun onStop() {
+        handler.removeCallbacks(hideRunnable)
         super.onStop()
         chaptersDialog?.dismiss()
         chaptersDialog = null
         releasePlayer()
         if (isFinishing) PlaybackQueue.clear()
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacks(hideRunnable)
+        super.onDestroy()
     }
 
     private fun savePlayback() {
@@ -161,6 +173,16 @@ class PlaybackActivity : FragmentActivity() {
                 }
                 exo.playWhenReady = true
                 exo.addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        isPaused = !isPlaying
+                        if (isPaused) {
+                            handler.removeCallbacks(hideRunnable)
+                            handler.postDelayed(hideRunnable, hideDelayMs)
+                        } else {
+                            handler.removeCallbacks(hideRunnable)
+                        }
+                    }
+
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state != Player.STATE_ENDED) return
                         savePlayback()
