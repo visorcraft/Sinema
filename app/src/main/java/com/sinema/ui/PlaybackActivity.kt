@@ -189,7 +189,9 @@ class PlaybackActivity : FragmentActivity() {
                 exo.addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         isPaused = !isPlaying
-                        if (isPaused) {
+                        val exo = player
+                        val isEnded = exo != null && exo.playbackState == Player.STATE_ENDED
+                        if (isPaused && !isEnded) {
                             handler.removeCallbacks(hideRunnable)
                             handler.postDelayed(hideRunnable, hideDelayMs)
                         } else {
