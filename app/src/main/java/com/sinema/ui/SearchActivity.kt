@@ -55,8 +55,8 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val density = resources.displayMetrics.density
-        val hPad = (48 * density).toInt()
-        val vPad = (27 * density).toInt()
+        val hPad = (36 * density).toInt()
+        val vPad = (20 * density).toInt()
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
     }
