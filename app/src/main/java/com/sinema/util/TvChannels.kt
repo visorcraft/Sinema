@@ -43,7 +43,8 @@ object TvChannels {
             continuePairs.take(MAX_WATCH_NEXT).forEach { (scene, resumeSec) ->
                 val intentUri = Uri.parse("com.sinema://app/scene/${scene.id}")
                 val builder = WatchNextProgram.Builder()
-                    .setType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+                    .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+                    .setType(TvContractCompat.PreviewProgramColumns.TYPE_MOVIE)
                     .setTitle(scene.title)
                     .setDurationMillis((scene.duration * 1000).toInt())
                     .setLastPlaybackPositionMillis((resumeSec * 1000).toInt())

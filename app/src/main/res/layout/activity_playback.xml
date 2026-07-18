@@ -21,6 +21,6 @@
         android:layout_marginBottom="24dp"
         android:padding="12dp"
         android:src="@drawable/ic_loop"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/loop_video" />
 </FrameLayout>
