@@ -39,7 +39,10 @@ data class Scene(
     val studio: StudioRef? = null,
     val tags: List<TagRef> = emptyList(),
     val performers: List<PerformerRef> = emptyList(),
-    val captions: List<CaptionRef> = emptyList()
+    val captions: List<CaptionRef> = emptyList(),
+    // ISO-8601 timestamp populated only when the query asked for `last_played_at`
+    // (currently just the Recently Played row). Null if unscored.
+    val lastPlayedAt: String? = null
 ) {
     val isWatched: Boolean get() = playCount > 0
     val isFavorite: Boolean get() = (rating100 ?: 0) > 0

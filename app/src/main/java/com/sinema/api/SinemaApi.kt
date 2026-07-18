@@ -477,16 +477,32 @@ class SinemaApi(
         graphql(query, mapOf("id" to sceneId))
     }
 
-    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> =
-        findScenesInternal(
+    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> {
+        // Two-layer defense against Stash returning scenes in arbitrary order:
+        // 1) Server-side filter `last_played_at IS_NOT_NULL` so we never see
+        //    scenes whose timestamp is missing (Stash sorts nulls
+        //    unpredictably on its own).
+        // 2) Client-side sort by `last_played_at` desc with nulls last — if
+        //    Stash's filter grammar differs from `IS_NOT_NULL` and silently
+        //    passes everything through, the client sort still produces a
+        //    correct recency order.
+        val scenes = findScenesInternal(
             perPage = perPage,
             sort = "last_played_at",
             direction = "DESC",
             sceneFilter = mapOf(
                 "play_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN"),
-                "resume_time" to mapOf("value" to 0, "modifier" to "EQUALS")
-            )
+                "resume_time" to mapOf("value" to 0, "modifier" to "EQUALS"),
+                "last_played_at" to mapOf("modifier" to "IS_NOT_NULL")
+            ),
+            fields = SCENE_FIELDS + " last_played_at"
         ).second
+        // Sorted with nulls LAST (defensive: if Stash's IS_NOT_NULL modifier
+        // fails silently, unscored scenes sink to the bottom rather than
+        // dominating the head of the list).
+        val (withTs, withoutTs) = scenes.partition { it.lastPlayedAt != null }
+        return withTs.sortedByDescending { it.lastPlayedAt } + withoutTs
+    }
 
     suspend fun findContinuePlaying(): List<Pair<Scene, Double>> {
         val query = """
@@ -622,7 +638,8 @@ class SinemaApi(
             },
             tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
             performers = (obj.get("performers") as? JsonArray)?.let(::parsePerformerRefs) ?: emptyList(),
-            captions = (obj.get("captions") as? JsonArray)?.let(::parseCaptionRefs) ?: emptyList()
+            captions = (obj.get("captions") as? JsonArray)?.let(::parseCaptionRefs) ?: emptyList(),
+            lastPlayedAt = obj.get("last_played_at")?.takeIf { !it.isJsonNull }?.asString
         )
     }
 
