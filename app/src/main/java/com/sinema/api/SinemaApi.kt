@@ -45,6 +45,26 @@ class SinemaApi(
             " tags { id name }" +
             " performers { id name }" +
             " captions { language_code caption_type }"
+
+        /**
+         * Scene filter for Recently Played.
+         *
+         * Intentionally does **not** filter on `last_played_at`:
+         * - That SceneFilterType field only exists on Stash ≥ 0.26; Sinema
+         *   targets 0.24+ (see README). Sending it 422s older servers.
+         * - Even on ≥ 0.26, Stash implements the filter as
+         *   `IFNULL(last_played_at, datetime(0)) …`, so `NOT_NULL` is a no-op.
+         * - 1.17.0 shipped `modifier: IS_NOT_NULL` (invalid CriterionModifier
+         *   enum; real value is `NOT_NULL`) which 422'd every home load.
+         *
+         * Recency is enforced client-side from the `last_played_at` field
+         * (available on Scene since 0.24) after play_count/resume_time filter.
+         */
+        @VisibleForTesting
+        internal val RECENTLY_PLAYED_SCENE_FILTER: Map<String, Any?> = mapOf(
+            "play_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN"),
+            "resume_time" to mapOf("value" to 0, "modifier" to "EQUALS")
+        )
     }
 
     private val client = OkHttpClient.Builder()
@@ -478,28 +498,19 @@ class SinemaApi(
     }
 
     suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> {
-        // Two-layer defense against Stash returning scenes in arbitrary order:
-        // 1) Server-side filter `last_played_at IS_NOT_NULL` so we never see
-        //    scenes whose timestamp is missing (Stash sorts nulls
-        //    unpredictably on its own).
-        // 2) Client-side sort by `last_played_at` desc with nulls last — if
-        //    Stash's filter grammar differs from `IS_NOT_NULL` and silently
-        //    passes everything through, the client sort still produces a
-        //    correct recency order.
+        // Server sorts by last_played_at DESC, but Stash's row order is
+        // unpredictable for scenes whose last_played_at is NULL even when
+        // play_count > 0. Request the timestamp and re-sort client-side with
+        // nulls last so Recently Played is always true recency order.
+        // Do not send a last_played_at scene_filter — see
+        // RECENTLY_PLAYED_SCENE_FILTER for why (compat + Stash no-op).
         val scenes = findScenesInternal(
             perPage = perPage,
             sort = "last_played_at",
             direction = "DESC",
-            sceneFilter = mapOf(
-                "play_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN"),
-                "resume_time" to mapOf("value" to 0, "modifier" to "EQUALS"),
-                "last_played_at" to mapOf("modifier" to "IS_NOT_NULL")
-            ),
+            sceneFilter = RECENTLY_PLAYED_SCENE_FILTER,
             fields = SCENE_FIELDS + " last_played_at"
         ).second
-        // Sorted with nulls LAST (defensive: if Stash's IS_NOT_NULL modifier
-        // fails silently, unscored scenes sink to the bottom rather than
-        // dominating the head of the list).
         val (withTs, withoutTs) = scenes.partition { it.lastPlayedAt != null }
         return withTs.sortedByDescending { it.lastPlayedAt } + withoutTs
     }

@@ -258,10 +258,12 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun wireLoopButton() {
         loopButton.setOnClickListener {
-            val exo = player ?: return@setOnClickListener
+            // Persist even if the player is not ready yet; initPlayer reads
+            // prefs.loopEnabled when it attaches the ExoPlayer.
             val nowEnabled = !prefs.loopEnabled
             prefs.loopEnabled = nowEnabled
-            exo.repeatMode = if (nowEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            player?.repeatMode =
+                if (nowEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             applyLoopTint(nowEnabled)
         }
     }

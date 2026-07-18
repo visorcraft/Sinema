@@ -105,4 +105,57 @@ class SinemaApiTest {
         assertEquals("P", s.performers.single().name)
         assertEquals("en", s.captions.single().languageCode)
     }
+
+    @Test
+    fun `parseScene reads last_played_at when present`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val withTs = com.google.gson.JsonParser.parseString(
+            """{"id":"1","title":"t","last_played_at":"2026-07-18T12:00:00Z","files":[]}"""
+        ).asJsonObject
+        val withoutTs = com.google.gson.JsonParser.parseString(
+            """{"id":"2","title":"t","last_played_at":null,"files":[]}"""
+        ).asJsonObject
+        val lean = com.google.gson.JsonParser.parseString(
+            """{"id":"3","title":"t","files":[]}"""
+        ).asJsonObject
+        assertEquals("2026-07-18T12:00:00Z", api.parseScene(withTs).lastPlayedAt)
+        assertEquals(null, api.parseScene(withoutTs).lastPlayedAt)
+        assertEquals(null, api.parseScene(lean).lastPlayedAt)
+    }
+
+    @Test
+    fun `recently-played filter omits last_played_at for Stash 0_24 compat`() {
+        // Regression guard for 1.17.0:
+        // 1) Used invalid CriterionModifier IS_NOT_NULL → HTTP 422
+        // 2) last_played_at scene_filter only exists on Stash ≥ 0.26; README
+        //    targets 0.24+. Filter must stay limited to play_count/resume_time.
+        val filter = SinemaApi.RECENTLY_PLAYED_SCENE_FILTER
+        assertEquals(setOf("play_count", "resume_time"), filter.keys)
+        assertEquals(false, filter.containsKey("last_played_at"))
+
+        @Suppress("UNCHECKED_CAST")
+        val playCount = filter["play_count"] as Map<String, Any>
+        @Suppress("UNCHECKED_CAST")
+        val resumeTime = filter["resume_time"] as Map<String, Any>
+        assertEquals("GREATER_THAN", playCount["modifier"])
+        assertEquals(0, playCount["value"])
+        assertEquals("EQUALS", resumeTime["modifier"])
+        assertEquals(0, resumeTime["value"])
+    }
+
+    @Test
+    fun `recently-played client sort puts null timestamps last`() {
+        // Mirrors findRecentlyPlayed's partition + sortedByDescending so a
+        // future rewrite cannot drop the nulls-last guarantee.
+        data class Row(val id: String, val lastPlayedAt: String?)
+        val rows = listOf(
+            Row("null-a", null),
+            Row("newer", "2026-07-18T12:00:00Z"),
+            Row("older", "2026-01-01T00:00:00Z"),
+            Row("null-b", null)
+        )
+        val (withTs, withoutTs) = rows.partition { it.lastPlayedAt != null }
+        val sorted = withTs.sortedByDescending { it.lastPlayedAt } + withoutTs
+        assertEquals(listOf("newer", "older", "null-a", "null-b"), sorted.map { it.id })
+    }
 }

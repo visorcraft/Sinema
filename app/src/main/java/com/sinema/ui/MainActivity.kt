@@ -17,6 +17,7 @@ import com.sinema.model.EntityItem
 import com.sinema.model.Scene
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 class MainActivity : FragmentActivity() {
     private val app get() = SinemaApp.instance
@@ -187,36 +188,62 @@ class MainFragment : RowsSupportFragment() {
                 }
                 rowsAdapter.add(ListRow(HeaderItem(""), topAdapter))
 
-                // 2. Continue Playing (from Stash resume_time)
-                val continuePairs = app.api.findContinuePlaying()
-                if (continuePairs.isNotEmpty()) {
-                    val continueAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    continuePairs.forEach { (scene, _) -> continueAdapter.add(scene) }
-                    rowsAdapter.add(ListRow(HeaderItem("Continue Playing"), continueAdapter))
+                // Each content row is loaded independently so one failed Stash
+                // query cannot blank the rest of the dashboard (seen when a
+                // single bad CriterionModifier made findRecentlyPlayed throw
+                // 422 and aborted Recently Added + Favorites).
+                var continuePairs: List<Pair<Scene, Double>> = emptyList()
+                var recentScenes: List<Scene> = emptyList()
+                var firstError: Exception? = null
+
+                fun noteError(label: String, e: Exception) {
+                    if (e is CancellationException) throw e
+                    Log.e("Sinema", "loadContent $label failed", e)
+                    if (firstError == null) firstError = e
                 }
 
-                // 3. Recently Played (from Stash play history)
-                val recentlyPlayed = app.api.findRecentlyPlayed(25)
-                if (recentlyPlayed.isNotEmpty()) {
-                    val watchedAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    recentlyPlayed.forEach { watchedAdapter.add(it) }
-                    rowsAdapter.add(ListRow(HeaderItem("Recently Played"), watchedAdapter))
+                try {
+                    continuePairs = app.api.findContinuePlaying()
+                    if (continuePairs.isNotEmpty()) {
+                        val continueAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                        continuePairs.forEach { (scene, _) -> continueAdapter.add(scene) }
+                        rowsAdapter.add(ListRow(HeaderItem("Continue Playing"), continueAdapter))
+                    }
+                } catch (e: Exception) {
+                    noteError("Continue Playing", e)
                 }
 
-                // 3. Recently Added
-                val recentScenes = app.api.findRecentScenes(25)
-                if (recentScenes.isNotEmpty()) {
-                    val recentAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    recentScenes.forEach { recentAdapter.add(it) }
-                    rowsAdapter.add(ListRow(HeaderItem("Recently Added"), recentAdapter))
+                try {
+                    val recentlyPlayed = app.api.findRecentlyPlayed(25)
+                    if (recentlyPlayed.isNotEmpty()) {
+                        val watchedAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                        recentlyPlayed.forEach { watchedAdapter.add(it) }
+                        rowsAdapter.add(ListRow(HeaderItem("Recently Played"), watchedAdapter))
+                    }
+                } catch (e: Exception) {
+                    noteError("Recently Played", e)
                 }
 
-                // 4. Favorites from Stash (rated scenes)
-                val favScenes = app.api.findFavoriteScenes()
-                if (favScenes.isNotEmpty()) {
-                    val favAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    favScenes.take(20).forEach { favAdapter.add(it) }
-                    rowsAdapter.add(ListRow(HeaderItem("Favorites"), favAdapter))
+                try {
+                    recentScenes = app.api.findRecentScenes(25)
+                    if (recentScenes.isNotEmpty()) {
+                        val recentAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                        recentScenes.forEach { recentAdapter.add(it) }
+                        rowsAdapter.add(ListRow(HeaderItem("Recently Added"), recentAdapter))
+                    }
+                } catch (e: Exception) {
+                    noteError("Recently Added", e)
+                }
+
+                try {
+                    val favScenes = app.api.findFavoriteScenes()
+                    if (favScenes.isNotEmpty()) {
+                        val favAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                        favScenes.take(20).forEach { favAdapter.add(it) }
+                        rowsAdapter.add(ListRow(HeaderItem("Favorites"), favAdapter))
+                    }
+                } catch (e: Exception) {
+                    noteError("Favorites", e)
                 }
 
                 Log.d("Sinema", "Rows loaded: ${rowsAdapter.size()}")
@@ -225,15 +252,32 @@ class MainFragment : RowsSupportFragment() {
                 // application context now, while the fragment is attached:
                 // appScope outlives this fragment, so calling requireContext()
                 // inside the coroutine would throw if the user navigated away
-                // before it ran.
-                val appCtx = requireContext().applicationContext
-                app.appScope.launch {
-                    com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
-                    com.sinema.util.TvChannels.syncRecentlyAdded(appCtx, recentScenes)
+                // before it ran. context may already be null after a long load.
+                val appCtx = context?.applicationContext
+                if (appCtx != null) {
+                    app.appScope.launch {
+                        com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
+                        com.sinema.util.TvChannels.syncRecentlyAdded(appCtx, recentScenes)
+                    }
+                }
+
+                firstError?.let { e ->
+                    if (!isAdded) return@let
+                    val message = e.message ?: "Unknown error"
+                    if (message.contains("401")) {
+                        Toast.makeText(requireContext(), "Authentication failed. Please sign in again.", Toast.LENGTH_LONG).show()
+                        startActivity(Intent(requireContext(), SetupActivity::class.java))
+                        requireActivity().finish()
+                        return@launch
+                    } else {
+                        Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
+                    }
                 }
 
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 Log.e("Sinema", "loadContent failed", e)
+                if (!isAdded) return@launch
                 val message = e.message ?: "Unknown error"
                 if (message.contains("401")) {
                     Toast.makeText(requireContext(), "Authentication failed. Please sign in again.", Toast.LENGTH_LONG).show()
