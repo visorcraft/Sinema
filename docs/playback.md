@@ -63,6 +63,17 @@ The default ExoPlayer controller provides the settings menu for:
 
 Availability depends on the media file and Android TV system player UI.
 
+## Aspect ratio
+
+Use the aspect-ratio button next to the Settings gear to choose:
+
+- Auto (source), which uses the video geometry reported by ExoPlayer.
+- 16:9.
+- 4:3.
+- 9:16 for portrait video.
+
+Every option fits the selected shape on screen without cropping, with black bars filling unused space. The choice applies immediately and is reused for later videos until you change it.
+
 ## Scene markers as chapters
 
 Sinema reads Stash scene markers and exposes them during playback.

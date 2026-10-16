@@ -13,11 +13,13 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.model.PlaybackAspectRatio
 import com.sinema.model.CaptionRef
 import com.sinema.util.PlaybackQueue
 import com.sinema.util.SceneIntents
@@ -27,7 +29,7 @@ import kotlinx.coroutines.launch
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackActivity : FragmentActivity() {
     private var player: ExoPlayer? = null
-    private lateinit var playerView: PlayerView
+    private lateinit var playerView: AspectRatioPlayerView
     private var sceneId: String = ""
     private var resumePositionMs: Long = 0L
     private var startTimeMs: Long = 0L
@@ -35,6 +37,8 @@ class PlaybackActivity : FragmentActivity() {
     private var captions: List<CaptionRef> = emptyList()
     private var markers: List<Pair<String, Double>> = emptyList()
     private var chaptersDialog: android.app.AlertDialog? = null
+    private var aspectRatioDialog: android.app.AlertDialog? = null
+    private var aspectRatio = PlaybackAspectRatio.AUTO
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
     private var isPaused = false
@@ -46,6 +50,11 @@ class PlaybackActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_playback)
         playerView = findViewById(R.id.player_view)
+        aspectRatio = PlaybackAspectRatio.fromName(prefs.playbackAspectRatio)
+        playerView.playbackAspectRatio = aspectRatio
+        playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
+            showAspectRatioDialog()
+        }
         sceneId = SceneIntents.sceneIdFrom(intent)
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
@@ -74,6 +83,8 @@ class PlaybackActivity : FragmentActivity() {
     override fun onPause() {
         super.onPause()
         savePlayback()
+        aspectRatioDialog?.dismiss()
+        aspectRatioDialog = null
         chaptersDialog?.dismiss()
         chaptersDialog = null
     }
@@ -81,6 +92,8 @@ class PlaybackActivity : FragmentActivity() {
     override fun onStop() {
         handler.removeCallbacks(hideRunnable)
         super.onStop()
+        aspectRatioDialog?.dismiss()
+        aspectRatioDialog = null
         chaptersDialog?.dismiss()
         chaptersDialog = null
         releasePlayer()
@@ -168,6 +181,7 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun initPlayer() {
         if (sceneId.isEmpty()) return
+        playerView.playbackAspectRatio = aspectRatio
         val app = SinemaApp.instance
 
         val dataSourceFactory = DefaultHttpDataSource.Factory()
@@ -189,6 +203,17 @@ class PlaybackActivity : FragmentActivity() {
                 exo.playWhenReady = true
                 exo.repeatMode = if (prefs.loopEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                 exo.addListener(object : Player.Listener {
+                    @Suppress("DEPRECATION")
+                    override fun onVideoSizeChanged(videoSize: VideoSize) {
+                        android.util.Log.d(
+                            "Sinema",
+                            "Video size ${videoSize.width}x${videoSize.height}, " +
+                                "pixelRatio=${videoSize.pixelWidthHeightRatio}, " +
+                                "rotation=${videoSize.unappliedRotationDegrees}, " +
+                                "aspectRatio=$aspectRatio"
+                        )
+                    }
+
                     override fun onRepeatModeChanged(repeatMode: Int) {
                         prefs.loopEnabled = repeatMode == Player.REPEAT_MODE_ONE
                     }
@@ -249,6 +274,20 @@ class PlaybackActivity : FragmentActivity() {
     private fun releasePlayer() {
         player?.release()
         player = null
+    }
+
+    private fun showAspectRatioDialog() {
+        if (aspectRatioDialog?.isShowing == true) return
+        val dialog = AspectRatioDialog.show(this, aspectRatio) { chosen ->
+            aspectRatio = chosen
+            prefs.playbackAspectRatio = chosen.name
+            playerView.playbackAspectRatio = chosen
+        }
+        aspectRatioDialog = dialog
+        dialog.setOnDismissListener {
+            if (aspectRatioDialog === dialog) aspectRatioDialog = null
+            playerView.requestFocus()
+        }
     }
 
     private fun showChapters() {

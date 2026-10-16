@@ -5,11 +5,13 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- CC button toggles/picks text tracks; gear menu (default controller) provides speed + audio track selection -->
-    <androidx.media3.ui.PlayerView
+    <!-- Aspect button corrects display geometry; gear retains stock speed + audio controls -->
+    <com.sinema.ui.AspectRatioPlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        app:controller_layout_id="@layout/playback_controller"
         app:repeat_toggle_modes="one"
+        app:resize_mode="fit"
         app:show_subtitle_button="true" />
 </FrameLayout>
