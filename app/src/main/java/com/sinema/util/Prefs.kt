@@ -50,6 +50,10 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("loop_enabled", false)
         set(value) = prefs.edit().putBoolean("loop_enabled", value).apply()
 
+    var playbackAspectRatio: String
+        get() = prefs.getString("playback_aspect_ratio", "") ?: ""
+        set(value) = prefs.edit().putString("playback_aspect_ratio", value).apply()
+
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
         get() = ProfileCodec.fromJson(getSecureString("server_profiles"))
