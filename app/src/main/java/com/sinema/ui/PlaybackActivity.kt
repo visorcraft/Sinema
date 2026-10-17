@@ -203,13 +203,12 @@ class PlaybackActivity : FragmentActivity() {
                 exo.playWhenReady = true
                 exo.repeatMode = if (prefs.loopEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                 exo.addListener(object : Player.Listener {
-                    @Suppress("DEPRECATION")
                     override fun onVideoSizeChanged(videoSize: VideoSize) {
                         android.util.Log.d(
                             "Sinema",
                             "Video size ${videoSize.width}x${videoSize.height}, " +
                                 "pixelRatio=${videoSize.pixelWidthHeightRatio}, " +
-                                "rotation=${videoSize.unappliedRotationDegrees}, " +
+                                "rotation=${exo.videoFormat?.rotationDegrees}, " +
                                 "aspectRatio=$aspectRatio"
                         )
                     }
@@ -315,17 +314,22 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
+            val seekWithDpad = PlaybackKeyRouting.shouldSeekToAdjacentMarker(
+                controllerVisible = isControllerVisible,
+                hasMarkers = markers.isNotEmpty(),
+                playerSurfaceFocused = playerView.isFocused
+            )
             when (event.keyCode) {
                 KeyEvent.KEYCODE_MENU -> { showChapters(); return true }
                 KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (isControllerVisible && markers.isNotEmpty()) {
+                    if (seekWithDpad) {
                         seekToAdjacentMarker(true); return true
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (isControllerVisible && markers.isNotEmpty()) {
+                    if (seekWithDpad) {
                         seekToAdjacentMarker(false); return true
                     }
                 }

@@ -84,7 +84,7 @@ Add a string preference in `Prefs` using a stable key such as `playback_aspect_r
 
 ### Diagnostic geometry logging
 
-In the existing player listener, log `VideoSize.width`, `height`, `pixelWidthHeightRatio`, and `unappliedRotationDegrees` whenever ExoPlayer reports a size change. Include the active aspect-ratio option. Use the existing `Sinema` log tag. This distinguishes source geometry problems from downstream view/device scaling when the affected file is tested.
+In the existing player listener, log `VideoSize.width`, `height`, `pixelWidthHeightRatio`, and the current video format's `rotationDegrees` whenever ExoPlayer reports a size change. Include the active aspect-ratio option. Use the existing `Sinema` log tag. This distinguishes source geometry problems from downstream view/device scaling when the affected file is tested. (`VideoSize.unappliedRotationDegrees` is deprecated and always zero in Media3 1.10.1, so it is not useful diagnostic evidence.)
 
 ## Data flow
 

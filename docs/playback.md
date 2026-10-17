@@ -83,8 +83,9 @@ Controls:
 - Menu: open the chapter list.
 - Media Next: jump to the next marker.
 - Media Previous: jump to the previous marker.
-- D-pad Right while player controls are visible: jump to the next marker.
-- D-pad Left while player controls are visible: jump to the previous marker.
+- D-pad Right while the player surface is focused and controls are visible: jump to the next marker.
+- D-pad Left while the player surface is focused and controls are visible: jump to the previous marker.
+- When a playback button is focused, D-pad Left and Right move between buttons instead.
 
 The chapter list label uses the marker title. If the title is blank, Sinema uses the marker's primary tag name.
 
