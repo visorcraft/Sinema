@@ -114,7 +114,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **🔍 Search** — Find scenes by filename with sortable results.
 - **▶️ Resume Playback** — Pause anywhere, pick up where you left off (persisted to Stash).
 - **🎬 Scene Detail** — Thumbnail, metadata, date, rating, studio, tag/performer chips. Tap chips to browse related scenes.
-- **📝 Subtitles & Tracks** — Select subtitle tracks (SRT/VTT), audio tracks, and playback speed.
+- **📝 Subtitles, Tracks & Aspect Ratio** — Select subtitles and audio tracks, adjust playback speed, and choose Auto, 16:9, 4:3, or 9:16 display ratios.
 - **📑 Scene Markers as Chapters** — Jump between markers via chapters dialog or media keys.
 - **▶️ Play All & Autoplay** — Queue all scenes in a folder or entity grid; auto-advances when one ends.
 - **❤️ Favorites** — One-tap favorite/unfavorite, synced with Stash ratings. Folders with favorited content show a heart overlay.
