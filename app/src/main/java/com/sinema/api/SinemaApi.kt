@@ -78,6 +78,7 @@ class SinemaApi(
         })
         .build()
     private val gson = Gson()
+    private val gsonWithNulls = com.google.gson.GsonBuilder().serializeNulls().create()
 
     var stashUsername: String = ""
     var stashPassword: String = ""
@@ -138,9 +139,14 @@ class SinemaApi(
         return Pair(count, scenes)
     }
 
-    private suspend fun graphql(query: String, variables: Map<String, Any?> = emptyMap()): JsonObject {
+    private suspend fun graphql(
+        query: String,
+        variables: Map<String, Any?> = emptyMap(),
+        serializeNulls: Boolean = false
+    ): JsonObject {
         return withContext(Dispatchers.IO) {
-            val body = gson.toJson(mapOf("query" to query, "variables" to variables))
+            val requestGson = if (serializeNulls) gsonWithNulls else gson
+            val body = requestGson.toJson(mapOf("query" to query, "variables" to variables))
 
             val first = executeGraphql(body)
 
@@ -347,8 +353,8 @@ class SinemaApi(
             }
         """.trimIndent()
         val input = mutableMapOf<String, Any?>("id" to sceneId)
-        if (rating != null) input["rating100"] = rating else input["rating100"] = null
-        val result = graphql(query, mapOf("input" to input))
+        input["rating100"] = rating
+        val result = graphql(query, mapOf("input" to input), serializeNulls = true)
         return result.has("data")
     }
 

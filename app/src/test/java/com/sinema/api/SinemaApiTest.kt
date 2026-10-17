@@ -158,4 +158,32 @@ class SinemaApiTest {
         val sorted = withTs.sortedByDescending { it.lastPlayedAt } + withoutTs
         assertEquals(listOf("newer", "older", "null-a", "null-b"), sorted.map { it.id })
     }
+
+    @Test
+    fun `unfavorite sends explicit null rating`() {
+        val requestBody = java.util.concurrent.atomic.AtomicReference("")
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBody.set(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"sceneUpdate":{"id":"42","rating100":100}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            kotlinx.coroutines.runBlocking { api.setSceneRating("42", null) }
+            org.junit.Assert.assertTrue(
+                "Expected rating100:null in mutation body: ${requestBody.get()}",
+                requestBody.get().contains("\"rating100\":null")
+            )
+        } finally {
+            server.stop(0)
+        }
+    }
 }
