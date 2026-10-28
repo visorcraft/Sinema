@@ -5,7 +5,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
+import android.view.TextureView
 import android.view.View
+import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
@@ -31,6 +33,8 @@ class PlaybackActivity : FragmentActivity() {
     private var player: ExoPlayer? = null
     private lateinit var playerView: AspectRatioPlayerView
     private var sceneId: String = ""
+    private var videoWidth: Int = 0
+    private var videoHeight: Int = 0
     private var resumePositionMs: Long = 0L
     private var startTimeMs: Long = 0L
     private var playCountSent = false
@@ -41,6 +45,7 @@ class PlaybackActivity : FragmentActivity() {
     private var aspectRatio = PlaybackAspectRatio.AUTO
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
+    private val renderersFactory by lazy { PlaybackRenderersFactory(this) }
     private var isPaused = false
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { playerView.hideController() }
@@ -49,13 +54,10 @@ class PlaybackActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_playback)
-        playerView = findViewById(R.id.player_view)
         aspectRatio = PlaybackAspectRatio.fromName(prefs.playbackAspectRatio)
-        playerView.playbackAspectRatio = aspectRatio
-        playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
-            showAspectRatioDialog()
-        }
         sceneId = SceneIntents.sceneIdFrom(intent)
+        videoWidth = SceneIntents.videoWidthFrom(intent)
+        videoHeight = SceneIntents.videoHeightFrom(intent)
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
@@ -72,6 +74,7 @@ class PlaybackActivity : FragmentActivity() {
                 }
             }
         })
+        mountPlayerView()
     }
 
     override fun onStart() {
@@ -179,8 +182,42 @@ class PlaybackActivity : FragmentActivity() {
             .build()
     }
 
+    private fun mountPlayerView() {
+        val container = findViewById<FrameLayout>(R.id.player_container)
+        val wantTexture = videoFrameNeedsSoftwareOutput(videoWidth, videoHeight)
+        val existing = container.findViewById<AspectRatioPlayerView>(R.id.player_view)
+        if (existing != null && (existing.videoSurfaceView is TextureView) == wantTexture) {
+            playerView = existing
+            return
+        }
+        existing?.let {
+            it.player = null
+            container.removeView(it)
+        }
+        val layout = if (wantTexture) R.layout.playback_player_texture else R.layout.playback_player_surface
+        playerView = layoutInflater.inflate(layout, container, false) as AspectRatioPlayerView
+        container.addView(
+            playerView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        playerView.playbackAspectRatio = aspectRatio
+        playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
+            showAspectRatioDialog()
+        }
+        if (wantTexture) {
+            android.util.Log.d(
+                "Sinema",
+                "Texture output for ${videoWidth}x${videoHeight}; display tunnel drops this frame size"
+            )
+        }
+    }
+
     private fun initPlayer() {
         if (sceneId.isEmpty()) return
+        mountPlayerView()
         playerView.playbackAspectRatio = aspectRatio
         val app = SinemaApp.instance
 
@@ -188,6 +225,7 @@ class PlaybackActivity : FragmentActivity() {
             .setDefaultRequestProperties(app.api.mediaAuthHeaders())
 
         player = ExoPlayer.Builder(this)
+            .setRenderersFactory(renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
             .also { exo ->
@@ -229,6 +267,10 @@ class PlaybackActivity : FragmentActivity() {
                         }
                     }
 
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
+                    }
+
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state != Player.STATE_ENDED) return
                         handler.removeCallbacks(hideRunnable)
@@ -248,10 +290,14 @@ class PlaybackActivity : FragmentActivity() {
                             return
                         }
                         lifecycleScope.launch {
+                            var nextWidth = 0
+                            var nextHeight = 0
                             try {
                                 val details = app.api.findSceneFull(nextId)
                                 captions = details?.scene?.captions ?: emptyList()
                                 markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
+                                nextWidth = details?.scene?.width ?: 0
+                                nextHeight = details?.scene?.height ?: 0
                             } catch (e: Exception) {
                                 android.util.Log.w("Sinema", "Failed to fetch next scene metadata, playing without captions/markers", e)
                                 captions = emptyList()
@@ -259,6 +305,8 @@ class PlaybackActivity : FragmentActivity() {
                             }
                             if (isFinishing) return@launch
                             sceneId = nextId
+                            videoWidth = nextWidth
+                            videoHeight = nextHeight
                             resumePositionMs = 0L
                             playCountSent = false
                             startTimeMs = System.currentTimeMillis()

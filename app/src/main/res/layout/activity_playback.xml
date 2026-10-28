@@ -1,17 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Aspect button corrects display geometry; gear retains stock speed + audio controls -->
-    <com.sinema.ui.AspectRatioPlayerView
-        android:id="@+id/player_view"
+    <FrameLayout
+        android:id="@+id/player_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:controller_layout_id="@layout/playback_controller"
-        app:repeat_toggle_modes="one"
-        app:resize_mode="fit"
-        app:show_subtitle_button="true" />
+        android:layout_height="match_parent" />
 </FrameLayout>

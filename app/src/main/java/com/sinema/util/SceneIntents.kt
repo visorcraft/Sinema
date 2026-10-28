@@ -82,13 +82,25 @@ object SceneIntents {
     }
 
     /** Build a playback intent for a single scene (not queued). */
-    fun playback(context: Context, sceneId: String, resumeMs: Long = 0L): Intent =
+    fun playback(
+        context: Context,
+        sceneId: String,
+        resumeMs: Long = 0L,
+        width: Int = 0,
+        height: Int = 0
+    ): Intent =
         Intent(context, PlaybackActivity::class.java).apply {
             putExtra(KEY_ID, sceneId)
             putExtra(KEY_RESUME_MS, resumeMs)
+            putExtra(KEY_WIDTH, width)
+            putExtra(KEY_HEIGHT, height)
         }
 
     fun resumeMsFrom(intent: Intent): Long = intent.getLongExtra(KEY_RESUME_MS, 0L)
+
+    fun videoWidthFrom(intent: Intent): Int = intent.getIntExtra(KEY_WIDTH, 0)
+
+    fun videoHeightFrom(intent: Intent): Int = intent.getIntExtra(KEY_HEIGHT, 0)
 
     /** Launch playback for the first scene in a list, seeding the queue with up to 500 ids. */
     fun playAll(context: Context, scenes: List<Scene>) {
@@ -98,6 +110,7 @@ object SceneIntents {
             Toast.makeText(context, "Queued first 500", Toast.LENGTH_SHORT).show()
         }
         PlaybackQueue.start(capped.map { it.id }, startAt = 0)
-        context.startActivity(playback(context, capped[0].id, resumeMs = 0L))
+        val first = capped[0]
+        context.startActivity(playback(context, first.id, resumeMs = 0L, width = first.width, height = first.height))
     }
 }

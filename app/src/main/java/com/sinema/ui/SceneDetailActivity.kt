@@ -165,6 +165,7 @@ class SceneDetailActivity : FragmentActivity() {
         lifecycleScope.launch {
             try {
                 val details = app.api.findSceneFull(scene.id) ?: return@launch
+                scene = scene.copy(width = details.scene.width, height = details.scene.height)
                 captions = details.scene.captions
                 markers = details.markers
                 bindResume(details)
@@ -277,7 +278,7 @@ class SceneDetailActivity : FragmentActivity() {
     }
 
     private fun launchPlayback(resumeMs: Long) {
-        val intent = SceneIntents.playback(this, scene.id, resumeMs).apply {
+        val intent = SceneIntents.playback(this, scene.id, resumeMs, scene.width, scene.height).apply {
             SceneIntents.putCaptions(this, captions)
             SceneIntents.putMarkers(this, markers)
         }
