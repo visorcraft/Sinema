@@ -109,29 +109,26 @@ class SceneDetailActivity : FragmentActivity() {
 
         // Mark Watched / Unwatched toggle
         Log.d("Sinema", "SceneDetail: id=${scene.id} playCount=${scene.playCount} isWatched=${scene.isWatched} rating100=${scene.rating100}")
-        if (scene.isWatched) {
-            btnMarkWatched.text = "❌ Mark Unwatched"
-        }
+        btnMarkWatched.text = WatchedToggle.buttonLabel(scene.isWatched)
         btnMarkWatched.setOnClickListener {
             lifecycleScope.launch {
                 try {
-                    if (scene.isWatched) {
+                    val wasWatched = scene.isWatched
+                    if (wasWatched) {
                         Log.d("Sinema", "Mark Unwatched: resetting play count for scene ${scene.id}")
                         app.api.resetPlayCount(scene.id)
-                        runOnUiThread {
-                            Toast.makeText(this@SceneDetailActivity, "Marked as unwatched", Toast.LENGTH_SHORT).show()
-                            finish()
-                        }
                     } else {
                         Log.d("Sinema", "Mark Watched: clearing resume_time for scene ${scene.id}")
                         app.api.clearResumeTime(scene.id)
                         Log.d("Sinema", "Mark Watched: incrementing play count for scene ${scene.id}")
                         app.api.incrementPlayCount(scene.id)
-                        Log.d("Sinema", "Mark Watched: success for scene ${scene.id}")
-                        runOnUiThread {
-                            Toast.makeText(this@SceneDetailActivity, "Marked as watched", Toast.LENGTH_SHORT).show()
-                            finish()
-                        }
+                    }
+                    scene = scene.copy(playCount = WatchedToggle.nextPlayCount(scene.playCount, wasWatched))
+                    runOnUiThread {
+                        btnMarkWatched.text = WatchedToggle.buttonLabel(scene.isWatched)
+                        Toast.makeText(this@SceneDetailActivity,
+                            if (wasWatched) "Marked as unwatched" else "Marked as watched",
+                            Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     Log.e("Sinema", "Mark Watched/Unwatched FAILED for scene ${scene.id}", e)

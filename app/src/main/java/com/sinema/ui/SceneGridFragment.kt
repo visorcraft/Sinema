@@ -77,6 +77,20 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         outState.putInt("random_seed", randomSeed)
     }
 
+    private var pausedFocusIndex = -1
+    private var pausedFocusKey: String? = null
+
+    private val gridView get() = view?.let { findGridView(it as? ViewGroup) }
+
+    override fun onPause() {
+        super.onPause()
+        val idx = gridView?.focusedChild
+            ?.let { gridView!!.getChildAdapterPosition(it) } ?: -1
+        pausedFocusIndex = idx
+        pausedFocusKey = if (idx in 0 until gridAdapter.size())
+            gridAdapter.get(idx)?.let(FocusRestore::keyOf) else null
+    }
+
     private fun updateTitle() {
         title = if (sortScreenKey != null) "$gridTitle  •  ${sort.label}" else gridTitle
     }
@@ -122,6 +136,16 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     protected fun reload() {
         loadJob?.cancel()
+        var oldIndex = gridView?.focusedChild
+            ?.let { gridView!!.getChildAdapterPosition(it) } ?: -1
+        var oldKey: String? = null
+        if (oldIndex >= 0) {
+            oldKey = if (oldIndex < gridAdapter.size())
+                gridAdapter.get(oldIndex)?.let(FocusRestore::keyOf) else null
+        } else {
+            oldIndex = pausedFocusIndex
+            oldKey = pausedFocusKey
+        }
         loadJob = lifecycleScope.launch {
             try {
                 val items = loadItems()
@@ -129,6 +153,15 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 items.forEach { gridAdapter.add(it) }
                 if (items.isEmpty()) {
                     Toast.makeText(requireContext(), emptyMessage, Toast.LENGTH_SHORT).show()
+                }
+                if (oldIndex >= 0) {
+                    val newIndex = FocusRestore.positionAfterReload(oldKey, oldIndex,
+                        (0 until gridAdapter.size()).map { FocusRestore.keyOf(gridAdapter.get(it)!!) })
+                    if (newIndex >= 0) {
+                        gridView?.post {
+                            if (gridView != null) setSelectedPosition(newIndex)
+                        }
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e // back-press cancels the scope; not a real error

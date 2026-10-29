@@ -167,9 +167,52 @@ class MainFragment : RowsSupportFragment() {
         loadContent()
     }
 
+    private data class RowFocus(val rowIndex: Int, val rowKey: String?,
+                                val itemIndex: Int, val itemKey: String?)
+
+    private var pausedFocus = RowFocus(-1, null, -1, null)
+
+    override fun onPause() {
+        super.onPause()
+        pausedFocus = captureFocus()
+    }
+
+    private fun rowKey(row: ListRow): String {
+        val first = (row.adapter as? ArrayObjectAdapter)
+            ?.takeIf { it.size() > 0 }?.get(0)
+        return "${row.headerItem?.name ?: ""}|${first?.let(FocusRestore::keyOf) ?: ""}"
+    }
+
+    private fun captureFocus(): RowFocus {
+        val rowIndex = verticalGridView?.focusedChild
+            ?.let { verticalGridView!!.getChildAdapterPosition(it) } ?: -1
+        if (rowIndex !in 0 until rowsAdapter.size()) return RowFocus(-1, null, -1, null)
+        val row = rowsAdapter.get(rowIndex) as? ListRow
+        var itemIndex = -1
+        var itemKey: String? = null
+        val card = verticalGridView!!.focusedChild?.findFocus()
+        var child: View? = card
+        var ancestor = card?.parent as? View
+        while (ancestor != null && ancestor !is HorizontalGridView) {
+            child = ancestor
+            ancestor = ancestor.parent as? View
+        }
+        val hGrid = ancestor as? HorizontalGridView
+        if (hGrid != null && child != null) {
+            itemIndex = hGrid.getChildAdapterPosition(child)
+            val rowAdapter = row?.adapter as? ArrayObjectAdapter
+            if (itemIndex in 0 until (rowAdapter?.size() ?: 0)) {
+                itemKey = rowAdapter!!.get(itemIndex)?.let(FocusRestore::keyOf)
+            }
+        }
+        return RowFocus(rowIndex, row?.let { rowKey(it) }, itemIndex, itemKey)
+    }
+
     private fun loadContent() {
         if (isLoading) return
         isLoading = true
+        val live = captureFocus()
+        val focus = if (live.rowIndex >= 0) live else pausedFocus
         lifecycleScope.launch {
             try {
                 Log.d("Sinema", "loadContent starting")
@@ -296,6 +339,31 @@ class MainFragment : RowsSupportFragment() {
                 rowsAdapter.add(ListRow(HeaderItem(""), settingsAdapter))
 
                 isLoading = false
+            }
+
+            // Restore focus to the same row/item after the rebuild.
+            if (focus.rowIndex >= 0) {
+                val newRowIndex = FocusRestore.positionAfterReload(focus.rowKey, focus.rowIndex,
+                    (0 until rowsAdapter.size()).mapNotNull { i ->
+                        (rowsAdapter.get(i) as? ListRow)?.let { rowKey(it) }
+                    })
+                if (newRowIndex >= 0) {
+                    verticalGridView?.post {
+                        if (verticalGridView == null) return@post
+                        setSelectedPosition(newRowIndex)
+                        val rowAdapter = (rowsAdapter.get(newRowIndex) as? ListRow)
+                            ?.adapter as? ArrayObjectAdapter
+                        val itemKeys = (0 until (rowAdapter?.size() ?: 0))
+                            .map { FocusRestore.keyOf(rowAdapter!!.get(it)!!) }
+                        val newItemIndex = FocusRestore.positionAfterReload(
+                            focus.itemKey, focus.itemIndex, itemKeys)
+                        if (newItemIndex >= 0) {
+                            (verticalGridView?.findViewHolderForAdapterPosition(newRowIndex)
+                                as? ListRowPresenter.ViewHolder)?.gridView
+                                ?.setSelectedPosition(newItemIndex)
+                        }
+                    }
+                }
             }
 
             // Check for updates (once per session). Outside the finally so
