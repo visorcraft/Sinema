@@ -32,7 +32,7 @@ env:
 jobs:
   release:
     name: Build + publish release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency:
       group: release-${{ github.ref }}
       cancel-in-progress: false
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -118,7 +118,7 @@ jobs:
               break
             fi
           done
-          (cd dist && sha256sum * > sha256sums.txt)
+          (cd dist && sha256sum -- * > sha256sums.txt)
           echo "Release payload:" && ls -la dist/
 
       - name: Upload release artifacts (Actions backup)
