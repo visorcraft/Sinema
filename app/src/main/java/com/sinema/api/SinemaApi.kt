@@ -93,6 +93,8 @@ class SinemaApi(
 
     fun getScreenshotUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/screenshot"
     fun getStreamUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/stream"
+    fun getAlignedHlsStreamUrl(sceneId: String): String =
+        "$serverUrl/scene/$sceneId/stream.m3u8?resolution=STANDARD&align=16x8"
     fun getImageThumbnailUrl(imageId: String): String = "$serverUrl/image/$imageId/thumbnail"
     fun getImageUrl(imageId: String): String = "$serverUrl/image/$imageId/image"
 

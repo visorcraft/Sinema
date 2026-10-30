@@ -30,3 +30,15 @@ internal fun <T> orderDecodersForVideoFrame(
     if (decoders.none(softwareOnly)) return decoders
     return decoders.sortedBy { if (softwareOnly(it)) 0 else 1 }
 }
+
+internal enum class PlaybackStreamKind {
+    DIRECT,
+    ALIGNED_HLS
+}
+
+internal fun playbackStreamKindForFrame(width: Int, height: Int): PlaybackStreamKind =
+    if (videoFrameNeedsSoftwareOutput(width, height)) {
+        PlaybackStreamKind.ALIGNED_HLS
+    } else {
+        PlaybackStreamKind.DIRECT
+    }

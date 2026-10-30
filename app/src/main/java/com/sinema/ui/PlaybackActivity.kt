@@ -161,7 +161,12 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun buildMediaItem(): MediaItem {
         val app = SinemaApp.instance
-        val streamUrl = app.api.getStreamUrl(sceneId)
+        val streamKind = playbackStreamKindForFrame(videoWidth, videoHeight)
+        val streamUrl = when (streamKind) {
+            PlaybackStreamKind.DIRECT -> app.api.getStreamUrl(sceneId)
+            PlaybackStreamKind.ALIGNED_HLS -> app.api.getAlignedHlsStreamUrl(sceneId)
+        }
+        android.util.Log.d("Sinema", "Starting $streamKind for ${videoWidth}x$videoHeight")
         // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
         val subs = captions.map { c ->
             val mime = when (c.captionType.lowercase()) {

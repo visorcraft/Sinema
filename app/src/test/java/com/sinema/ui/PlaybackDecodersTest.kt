@@ -80,4 +80,13 @@ class PlaybackDecodersTest {
         )
         assertEquals(listOf("sw-a", "sw-b", "hw-a", "hw-b"), ordered.map { it.name })
     }
+
+    @Test
+    fun `only incompatible originals select aligned hls`() {
+        assertEquals(PlaybackStreamKind.ALIGNED_HLS, playbackStreamKindForFrame(1080, 1920))
+        assertEquals(PlaybackStreamKind.ALIGNED_HLS, playbackStreamKindForFrame(404, 720))
+        assertEquals(PlaybackStreamKind.DIRECT, playbackStreamKindForFrame(1280, 720))
+        assertEquals(PlaybackStreamKind.DIRECT, playbackStreamKindForFrame(1920, 1080))
+        assertEquals(PlaybackStreamKind.DIRECT, playbackStreamKindForFrame(0, 0))
+    }
 }
