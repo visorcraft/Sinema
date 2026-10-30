@@ -96,4 +96,36 @@ class PlaybackDecodersTest {
         assertEquals(false, shouldFallbackToDirect(PlaybackStreamKind.ALIGNED_HLS, true))
         assertEquals(false, shouldFallbackToDirect(PlaybackStreamKind.DIRECT, false))
     }
+
+    @Test
+    fun `direct original can fall back to aligned hls once`() {
+        assertEquals(true, shouldFallbackToAlignedHls(PlaybackStreamKind.DIRECT, false, false))
+        assertEquals(false, shouldFallbackToAlignedHls(PlaybackStreamKind.DIRECT, true, false))
+        assertEquals(false, shouldFallbackToAlignedHls(PlaybackStreamKind.DIRECT, false, true))
+        assertEquals(false, shouldFallbackToAlignedHls(PlaybackStreamKind.ALIGNED_HLS, false, false))
+    }
+
+    @Test
+    fun `fallback state selects a stream without looping`() {
+        assertEquals(false, shouldUseAlignedHls(PlaybackStreamKind.DIRECT, false, false))
+        assertEquals(true, shouldUseAlignedHls(PlaybackStreamKind.DIRECT, true, false))
+        assertEquals(false, shouldUseAlignedHls(PlaybackStreamKind.DIRECT, true, true))
+        assertEquals(true, shouldUseAlignedHls(PlaybackStreamKind.ALIGNED_HLS, false, false))
+        assertEquals(false, shouldUseAlignedHls(PlaybackStreamKind.ALIGNED_HLS, false, true))
+    }
+
+    @Test
+    fun `requested playback without video retries before decoder becomes ready`() {
+        assertEquals(true, shouldRetryWithoutVideoOutput(playWhenReady = true, hasVideoOutput = false))
+        assertEquals(false, shouldRetryWithoutVideoOutput(playWhenReady = false, hasVideoOutput = false))
+        assertEquals(false, shouldRetryWithoutVideoOutput(playWhenReady = true, hasVideoOutput = true))
+    }
+
+    @Test
+    fun `only nonzero video dimensions count as output`() {
+        assertEquals(true, hasVideoOutputDimensions(1920, 1080))
+        assertEquals(false, hasVideoOutputDimensions(0, 0))
+        assertEquals(false, hasVideoOutputDimensions(1920, 0))
+        assertEquals(false, hasVideoOutputDimensions(0, 1080))
+    }
 }

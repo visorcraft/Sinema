@@ -47,3 +47,24 @@ internal fun shouldFallbackToDirect(
     kind: PlaybackStreamKind,
     alreadyAttempted: Boolean
 ): Boolean = kind == PlaybackStreamKind.ALIGNED_HLS && !alreadyAttempted
+
+internal fun shouldFallbackToAlignedHls(
+    originalKind: PlaybackStreamKind,
+    forceAlignedHls: Boolean,
+    hasFallenBackToDirect: Boolean
+): Boolean = originalKind == PlaybackStreamKind.DIRECT &&
+    !forceAlignedHls && !hasFallenBackToDirect
+
+internal fun shouldUseAlignedHls(
+    originalKind: PlaybackStreamKind,
+    forceAlignedHls: Boolean,
+    hasFallenBackToDirect: Boolean
+): Boolean = !hasFallenBackToDirect &&
+    (forceAlignedHls || originalKind == PlaybackStreamKind.ALIGNED_HLS)
+
+internal fun shouldRetryWithoutVideoOutput(
+    playWhenReady: Boolean,
+    hasVideoOutput: Boolean
+): Boolean = playWhenReady && !hasVideoOutput
+
+internal fun hasVideoOutputDimensions(width: Int, height: Int): Boolean = width > 0 && height > 0

@@ -28,6 +28,8 @@ import com.sinema.util.SceneIntents
 import com.sinema.util.TimeFormat
 import kotlinx.coroutines.launch
 
+private const val VIDEO_OUTPUT_TIMEOUT_MS = 5_000L
+
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackActivity : FragmentActivity() {
     private var player: ExoPlayer? = null
@@ -36,6 +38,8 @@ class PlaybackActivity : FragmentActivity() {
     private var videoWidth: Int = 0
     private var videoHeight: Int = 0
     private var hasFallenBackToDirect = false
+    private var forceAlignedHls = false
+    private var hasVideoOutput = false
     private var resumePositionMs: Long = 0L
     private var startTimeMs: Long = 0L
     private var playCountSent = false
@@ -50,6 +54,12 @@ class PlaybackActivity : FragmentActivity() {
     private var isPaused = false
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { playerView.hideController() }
+    private val videoOutputTimeout = Runnable {
+        val exo = player
+        if (exo != null && shouldRetryWithoutVideoOutput(exo.playWhenReady, hasVideoOutput)) {
+            fallbackToAlignedHls()
+        }
+    }
     private val hideDelayMs = 3000L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -162,16 +172,16 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun buildMediaItem(): MediaItem {
         val app = SinemaApp.instance
-        val streamKind = playbackStreamKindForFrame(videoWidth, videoHeight)
-        val useDirect = streamKind == PlaybackStreamKind.DIRECT || hasFallenBackToDirect
-        val streamUrl = if (useDirect) {
-            app.api.getStreamUrl(sceneId)
-        } else {
+        val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
+        val useAligned = shouldUseAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect)
+        val streamUrl = if (useAligned) {
             app.api.getAlignedHlsStreamUrl(sceneId)
+        } else {
+            app.api.getStreamUrl(sceneId)
         }
         android.util.Log.d(
             "Sinema",
-            "Starting ${if (useDirect) PlaybackStreamKind.DIRECT else PlaybackStreamKind.ALIGNED_HLS} " +
+            "Starting ${if (useAligned) PlaybackStreamKind.ALIGNED_HLS else PlaybackStreamKind.DIRECT} " +
                 "for ${videoWidth}x$videoHeight"
         )
         // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
@@ -229,8 +239,36 @@ class PlaybackActivity : FragmentActivity() {
         )
     }
 
+    private fun scheduleVideoOutputTimeout() {
+        handler.removeCallbacks(videoOutputTimeout)
+        if (hasVideoOutput) return
+        val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
+        if (!shouldFallbackToAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect)) return
+        handler.postDelayed(videoOutputTimeout, VIDEO_OUTPUT_TIMEOUT_MS)
+    }
+
+    private fun fallbackToAlignedHls() {
+        val exo = player ?: return
+        val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
+        if (!shouldFallbackToAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect)) return
+        handler.removeCallbacks(videoOutputTimeout)
+        forceAlignedHls = true
+        hasVideoOutput = false
+        val retryPositionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
+        android.util.Log.w("Sinema", "Direct playback produced no video; retrying aligned HLS")
+        resumePositionMs = retryPositionMs
+        exo.stop()
+        exo.clearMediaItems()
+        mountPlayerView(videoWidth, videoHeight)
+        exo.setMediaItem(buildMediaItem())
+        exo.prepare()
+        if (retryPositionMs > 0L) exo.seekTo(retryPositionMs)
+        exo.playWhenReady = true
+    }
+
     private fun initPlayer() {
         if (sceneId.isEmpty()) return
+        hasVideoOutput = false
         mountPlayerView()
         playerView.playbackAspectRatio = aspectRatio
         val app = SinemaApp.instance
@@ -251,8 +289,13 @@ class PlaybackActivity : FragmentActivity() {
                 }
                 exo.playWhenReady = true
                 exo.repeatMode = if (prefs.loopEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                scheduleVideoOutputTimeout()
                 exo.addListener(object : Player.Listener {
                     override fun onVideoSizeChanged(videoSize: VideoSize) {
+                        if (hasVideoOutputDimensions(videoSize.width, videoSize.height)) {
+                            handler.removeCallbacks(videoOutputTimeout)
+                            hasVideoOutput = true
+                        }
                         android.util.Log.d(
                             "Sinema",
                             "Video size ${videoSize.width}x${videoSize.height}, " +
@@ -272,6 +315,11 @@ class PlaybackActivity : FragmentActivity() {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         isPaused = !isPlaying
                         val exo = player
+                        if (isPlaying) {
+                            scheduleVideoOutputTimeout()
+                        } else if (exo?.playWhenReady != true) {
+                            handler.removeCallbacks(videoOutputTimeout)
+                        }
                         val isEnded = exo != null && exo.playbackState == Player.STATE_ENDED
                         if (isPaused && !isEnded) {
                             handler.removeCallbacks(hideRunnable)
@@ -282,27 +330,33 @@ class PlaybackActivity : FragmentActivity() {
                     }
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        handler.removeCallbacks(videoOutputTimeout)
                         val streamKind = playbackStreamKindForFrame(videoWidth, videoHeight)
-                        if (!shouldFallbackToDirect(streamKind, hasFallenBackToDirect)) {
-                            android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
+                        if (shouldFallbackToDirect(streamKind, hasFallenBackToDirect)) {
+                            hasFallenBackToDirect = true
+                            hasVideoOutput = false
+                            val retryPositionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
+                            android.util.Log.w("Sinema", "Aligned HLS failed; retrying direct", error)
+                            resumePositionMs = retryPositionMs
+                            exo.stop()
+                            exo.clearMediaItems()
+                            mountPlayerView(videoWidth, videoHeight)
+                            exo.setMediaItem(buildMediaItem())
+                            exo.prepare()
+                            if (retryPositionMs > 0L) exo.seekTo(retryPositionMs)
+                            exo.playWhenReady = true
                             return
                         }
-
-                        hasFallenBackToDirect = true
-                        val retryPositionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
-                        android.util.Log.w("Sinema", "Aligned HLS failed; retrying direct", error)
-                        resumePositionMs = retryPositionMs
-                        exo.stop()
-                        exo.clearMediaItems()
-                        mountPlayerView(videoWidth, videoHeight)
-                        exo.setMediaItem(buildMediaItem())
-                        exo.prepare()
-                        if (retryPositionMs > 0L) exo.seekTo(retryPositionMs)
-                        exo.playWhenReady = true
+                        if (shouldFallbackToAlignedHls(streamKind, forceAlignedHls, hasFallenBackToDirect)) {
+                            fallbackToAlignedHls()
+                            return
+                        }
+                        android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
                     }
 
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state != Player.STATE_ENDED) return
+                        handler.removeCallbacks(videoOutputTimeout)
                         handler.removeCallbacks(hideRunnable)
                         // Subsequent loop iterations re-fire STATE_ENDED; skip savePlayback
                         // because its finished-clear branch would overwrite the user's actual
@@ -338,6 +392,8 @@ class PlaybackActivity : FragmentActivity() {
                             videoWidth = nextWidth
                             videoHeight = nextHeight
                             hasFallenBackToDirect = false
+                            forceAlignedHls = false
+                            hasVideoOutput = false
                             resumePositionMs = 0L
                             playCountSent = false
                             startTimeMs = System.currentTimeMillis()
@@ -350,6 +406,7 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     private fun releasePlayer() {
+        handler.removeCallbacks(videoOutputTimeout)
         player?.release()
         player = null
     }

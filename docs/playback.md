@@ -112,6 +112,8 @@ For source dimensions that trigger the HY450 Max Allwinner AVC decoder bug, Sine
 
 Aligned HLS uses CPU transcoding on the Stash server. If the request fails, Sinema retries once with the original direct stream. If a stock Stash server returns unaligned HLS, Sinema retains software decoding and TextureView rather than showing a black screen.
 
+Dimension-compatible originals still start with direct playback. If direct playback has been requested but produces no video frame for five seconds, Sinema retries once with aligned HLS at the current position. This covers decoder failures that stall before ExoPlayer reports ready or playing, as well as failures that do not raise an ExoPlayer error. Each fallback direction happens at most once per scene, preventing retry loops.
+
 ## Android TV Watch Next sync
 
 When Android TV channels are enabled, saving playback can refresh Sinema's Watch Next entries with the latest Continue Playing list.
