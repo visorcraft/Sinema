@@ -35,6 +35,7 @@ class PlaybackActivity : FragmentActivity() {
     private var sceneId: String = ""
     private var videoWidth: Int = 0
     private var videoHeight: Int = 0
+    private var hasFallenBackToDirect = false
     private var resumePositionMs: Long = 0L
     private var startTimeMs: Long = 0L
     private var playCountSent = false
@@ -162,11 +163,17 @@ class PlaybackActivity : FragmentActivity() {
     private fun buildMediaItem(): MediaItem {
         val app = SinemaApp.instance
         val streamKind = playbackStreamKindForFrame(videoWidth, videoHeight)
-        val streamUrl = when (streamKind) {
-            PlaybackStreamKind.DIRECT -> app.api.getStreamUrl(sceneId)
-            PlaybackStreamKind.ALIGNED_HLS -> app.api.getAlignedHlsStreamUrl(sceneId)
+        val useDirect = streamKind == PlaybackStreamKind.DIRECT || hasFallenBackToDirect
+        val streamUrl = if (useDirect) {
+            app.api.getStreamUrl(sceneId)
+        } else {
+            app.api.getAlignedHlsStreamUrl(sceneId)
         }
-        android.util.Log.d("Sinema", "Starting $streamKind for ${videoWidth}x$videoHeight")
+        android.util.Log.d(
+            "Sinema",
+            "Starting ${if (useDirect) PlaybackStreamKind.DIRECT else PlaybackStreamKind.ALIGNED_HLS} " +
+                "for ${videoWidth}x$videoHeight"
+        )
         // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
         val subs = captions.map { c ->
             val mime = when (c.captionType.lowercase()) {
@@ -187,9 +194,9 @@ class PlaybackActivity : FragmentActivity() {
             .build()
     }
 
-    private fun mountPlayerView() {
+    private fun mountPlayerView(width: Int = videoWidth, height: Int = videoHeight) {
         val container = findViewById<FrameLayout>(R.id.player_container)
-        val wantTexture = videoFrameNeedsSoftwareOutput(videoWidth, videoHeight)
+        val wantTexture = videoFrameNeedsSoftwareOutput(width, height)
         val existing = container.findViewById<AspectRatioPlayerView>(R.id.player_view)
         if (existing != null && (existing.videoSurfaceView is TextureView) == wantTexture) {
             playerView = existing
@@ -209,15 +216,17 @@ class PlaybackActivity : FragmentActivity() {
             )
         )
         playerView.playbackAspectRatio = aspectRatio
+        playerView.player = player
+        playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+            isControllerVisible = visibility == View.VISIBLE
+        })
         playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
             showAspectRatioDialog()
         }
-        if (wantTexture) {
-            android.util.Log.d(
-                "Sinema",
-                "Texture output for ${videoWidth}x${videoHeight}; display tunnel drops this frame size"
-            )
-        }
+        android.util.Log.d(
+            "Sinema",
+            "${if (wantTexture) "TextureView" else "SurfaceView"} output for ${width}x$height"
+        )
     }
 
     private fun initPlayer() {
@@ -235,9 +244,6 @@ class PlaybackActivity : FragmentActivity() {
             .build()
             .also { exo ->
                 playerView.player = exo
-                playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-                    isControllerVisible = visibility == View.VISIBLE
-                })
                 exo.setMediaItem(buildMediaItem())
                 exo.prepare()
                 if (resumePositionMs > 0) {
@@ -254,6 +260,9 @@ class PlaybackActivity : FragmentActivity() {
                                 "rotation=${exo.videoFormat?.rotationDegrees}, " +
                                 "aspectRatio=$aspectRatio"
                         )
+                        exo.videoFormat?.let { format ->
+                            mountPlayerView(format.width, format.height)
+                        }
                     }
 
                     override fun onRepeatModeChanged(repeatMode: Int) {
@@ -273,7 +282,23 @@ class PlaybackActivity : FragmentActivity() {
                     }
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
+                        val streamKind = playbackStreamKindForFrame(videoWidth, videoHeight)
+                        if (!shouldFallbackToDirect(streamKind, hasFallenBackToDirect)) {
+                            android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
+                            return
+                        }
+
+                        hasFallenBackToDirect = true
+                        val retryPositionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
+                        android.util.Log.w("Sinema", "Aligned HLS failed; retrying direct", error)
+                        resumePositionMs = retryPositionMs
+                        exo.stop()
+                        exo.clearMediaItems()
+                        mountPlayerView(videoWidth, videoHeight)
+                        exo.setMediaItem(buildMediaItem())
+                        exo.prepare()
+                        if (retryPositionMs > 0L) exo.seekTo(retryPositionMs)
+                        exo.playWhenReady = true
                     }
 
                     override fun onPlaybackStateChanged(state: Int) {
@@ -312,6 +337,7 @@ class PlaybackActivity : FragmentActivity() {
                             sceneId = nextId
                             videoWidth = nextWidth
                             videoHeight = nextHeight
+                            hasFallenBackToDirect = false
                             resumePositionMs = 0L
                             playCountSent = false
                             startTimeMs = System.currentTimeMillis()

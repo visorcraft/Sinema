@@ -89,4 +89,11 @@ class PlaybackDecodersTest {
         assertEquals(PlaybackStreamKind.DIRECT, playbackStreamKindForFrame(1920, 1080))
         assertEquals(PlaybackStreamKind.DIRECT, playbackStreamKindForFrame(0, 0))
     }
+
+    @Test
+    fun `only the first aligned hls failure falls back to direct`() {
+        assertEquals(true, shouldFallbackToDirect(PlaybackStreamKind.ALIGNED_HLS, false))
+        assertEquals(false, shouldFallbackToDirect(PlaybackStreamKind.ALIGNED_HLS, true))
+        assertEquals(false, shouldFallbackToDirect(PlaybackStreamKind.DIRECT, false))
+    }
 }

@@ -110,13 +110,10 @@ private class FrameAlignedVideoRenderer(
     ): List<MediaCodecInfo> {
         val found = super.getDecoderInfos(mediaCodecSelector, format, requiresSecureDecoder)
         val ordered = orderDecodersForVideoFrame(found, format.width, format.height) { it.softwareOnly }
-        if (ordered.firstOrNull()?.name != found.firstOrNull()?.name) {
-            Log.d(
-                "Sinema",
-                "Frame ${format.width}x${format.height} needs the software decoder; " +
-                    "preferring ${ordered.firstOrNull()?.name}"
-            )
-        }
+        Log.d(
+            "Sinema",
+            "Video decoder for ${format.width}x${format.height}: ${ordered.firstOrNull()?.name}"
+        )
         return ordered
     }
 }

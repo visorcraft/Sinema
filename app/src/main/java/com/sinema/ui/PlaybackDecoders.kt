@@ -42,3 +42,8 @@ internal fun playbackStreamKindForFrame(width: Int, height: Int): PlaybackStream
     } else {
         PlaybackStreamKind.DIRECT
     }
+
+internal fun shouldFallbackToDirect(
+    kind: PlaybackStreamKind,
+    alreadyAttempted: Boolean
+): Boolean = kind == PlaybackStreamKind.ALIGNED_HLS && !alreadyAttempted
