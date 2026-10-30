@@ -134,6 +134,12 @@ Check:
 
 If you use session sign-in, launcher artwork may be missing because the Android TV launcher cannot attach Sinema's session cookie when loading poster URLs.
 
+## Affected videos stutter or fall back to software decoding
+
+Check logcat with the `Sinema` tag. `ALIGNED_HLS` with `c2.allwinner.avc.decoder` and `SurfaceView` is the intended compatibility path. `c2.android.avc.decoder` with `TextureView` means the returned stream was still unaligned or direct fallback was used.
+
+Verify the server is running the aligned-HLS Stash image, its cache path is writable, and its CPU transcode stays ahead of real time. `Aligned HLS failed; retrying direct` identifies a failed transcode request. Sinema retries direct only once per scene to avoid a retry loop.
+
 ## Update install fails
 
 Check:

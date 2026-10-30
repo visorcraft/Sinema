@@ -106,6 +106,12 @@ Behavior:
 
 The queue is intentionally temporary. It is not saved across process death or device reboot.
 
+## Allwinner compatibility streaming
+
+For source dimensions that trigger the HY450 Max Allwinner AVC decoder bug, Sinema automatically requests Stash HLS with `resolution=STANDARD&align=16x8`. A Stash build with aligned-HLS support transcodes to H.264 and pads width to a multiple of 16 and height to a multiple of 8, allowing hardware decoding. Other videos continue direct playback.
+
+Aligned HLS uses CPU transcoding on the Stash server. If the request fails, Sinema retries once with the original direct stream. If a stock Stash server returns unaligned HLS, Sinema retains software decoding and TextureView rather than showing a black screen.
+
 ## Android TV Watch Next sync
 
 When Android TV channels are enabled, saving playback can refresh Sinema's Watch Next entries with the latest Continue Playing list.
