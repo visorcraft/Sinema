@@ -46,6 +46,10 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("channels_enabled", false)
         set(value) = prefs.edit().putBoolean("channels_enabled", value).apply()
 
+    var setupAllowSelfSigned: Boolean
+        get() = prefs.getBoolean("setup_allow_self_signed", false)
+        set(value) = prefs.edit().putBoolean("setup_allow_self_signed", value).apply()
+
     /**
      * Opt-in participation in Android TV system search. The manifest ships
      * the search components disabled; Settings flips them (and this flag)
@@ -62,6 +66,10 @@ class Prefs(context: Context) {
     var playbackAspectRatio: String
         get() = prefs.getString("playback_aspect_ratio", "") ?: ""
         set(value) = prefs.edit().putString("playback_aspect_ratio", value).apply()
+
+    var playbackStreamQuality: String
+        get() = prefs.getString("playback_stream_quality", "") ?: ""
+        set(value) = prefs.edit().putString("playback_stream_quality", value).apply()
 
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
@@ -96,10 +104,14 @@ class Prefs(context: Context) {
             sessionCookie = sessionCookie,
             authMode = authMode,
             stashUsername = stashUsername,
-            stashPassword = stashPassword
+            stashPassword = stashPassword,
+            allowSelfSigned = setupAllowSelfSigned
         )
         profiles = listOf(p)
         activeProfileId = p.id
+        // Consume the one-shot setup opt-in so a later Web Setup (which has
+        // no such checkbox) cannot silently inherit trust-all TLS.
+        setupAllowSelfSigned = false
     }
 
     /** Persist the active profile's fields back into the legacy accessors. */

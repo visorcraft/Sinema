@@ -243,6 +243,13 @@ class SettingsPresenter : Presenter() {
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }
+            "Saved Filters" -> {
+                title.text = "⭐ Saved Filters"
+                content.text = "Filters saved in Stash"
+                image.setImageResource(android.R.drawable.ic_menu_sort_by_size)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
             else -> {
                 title.text = "⚙️ Settings"
                 content.text = "Server configuration"

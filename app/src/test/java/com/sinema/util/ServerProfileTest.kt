@@ -53,4 +53,15 @@ class ServerProfileTest {
         assertEquals("", decoded[0].serverUrl)
         assertEquals("apikey", decoded[0].authMode)
     }
+
+    @Test
+    fun `self-signed trust is off by default and round trips`() {
+        // Profiles stored before the field existed must decode strict.
+        val legacy = ProfileCodec.fromJson("""[{"name":"Old"}]""")
+        assertEquals(false, legacy[0].allowSelfSigned)
+
+        val trusted = ServerProfile(name = "T", serverUrl = "https://t", allowSelfSigned = true)
+        val roundTrip = ProfileCodec.fromJson(ProfileCodec.toJson(listOf(trusted)))
+        assertEquals(true, roundTrip[0].allowSelfSigned)
+    }
 }

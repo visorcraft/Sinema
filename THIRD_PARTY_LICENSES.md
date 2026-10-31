@@ -19,7 +19,9 @@ The resolved dependency graph can be inspected with:
 | AndroidX Media3 UI | 1.10.1 | Apache-2.0 |
 | AndroidX Media3 UI Leanback | 1.10.1 | Apache-2.0 |
 | AndroidX Media3 ExoPlayer HLS | 1.10.1 | Apache-2.0 |
+| AndroidX Media3 Datasource OkHttp | 1.10.1 | Apache-2.0 |
 | Glide | 5.0.7 | Simplified BSD License |
+| Glide OkHttp Integration | 5.0.7 | Simplified BSD License |
 | OkHttp | 5.4.0 | Apache-2.0 |
 | Gson | 2.14.0 | Apache-2.0 |
 | kotlinx-coroutines-android | 1.11.0 | Apache-2.0 |

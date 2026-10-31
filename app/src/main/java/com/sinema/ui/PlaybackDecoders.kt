@@ -1,5 +1,7 @@
 package com.sinema.ui
 
+import com.sinema.model.PlaybackStreamQuality
+
 /**
  * The hardware AVC decoder on this Android TV (`c2.allwinner.avc.decoder`)
  * advertises 2×2 alignment, then times out in `fetchGraphicBlock` unless the
@@ -61,6 +63,40 @@ internal fun shouldUseAlignedHls(
     hasFallenBackToDirect: Boolean
 ): Boolean = !hasFallenBackToDirect &&
     (forceAlignedHls || originalKind == PlaybackStreamKind.ALIGNED_HLS)
+
+/** What the player should do when the current stream errors out. */
+internal enum class FallbackAction {
+    /** Retry with the direct stream (used by forced-HLS and AUTO aligned starts). */
+    RETRY_DIRECT,
+    /** Retry with the aligned-HLS stream (AUTO direct starts only). */
+    RETRY_ALIGNED_HLS,
+    /** No fallback available — surface the error. */
+    TERMINAL
+}
+
+/**
+ * Error-fallback policy. Manual quality choices own the decision first:
+ * DIRECT never falls back, forced HLS falls back to direct exactly once;
+ * only AUTO uses the shape-based state machine.
+ */
+internal fun errorFallbackAction(
+    quality: PlaybackStreamQuality,
+    originalKind: PlaybackStreamKind,
+    forceAlignedHls: Boolean,
+    hasFallenBackToDirect: Boolean
+): FallbackAction = when {
+    quality == PlaybackStreamQuality.DIRECT -> FallbackAction.TERMINAL
+    quality.isForcedHls ->
+        if (hasFallenBackToDirect) FallbackAction.TERMINAL else FallbackAction.RETRY_DIRECT
+    shouldFallbackToDirect(originalKind, hasFallenBackToDirect) -> FallbackAction.RETRY_DIRECT
+    shouldFallbackToAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect) ->
+        FallbackAction.RETRY_ALIGNED_HLS
+    else -> FallbackAction.TERMINAL
+}
+
+/** AUTO mode is the only mode that auto-retries on missing video output. */
+internal fun allowsNoVideoRetry(quality: PlaybackStreamQuality): Boolean =
+    quality == PlaybackStreamQuality.AUTO
 
 internal fun shouldRetryWithoutVideoOutput(
     playWhenReady: Boolean,

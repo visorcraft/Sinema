@@ -8,6 +8,7 @@ import com.google.gson.JsonObject
 import com.sinema.model.CaptionRef
 import com.sinema.model.EntityHeader
 import com.sinema.model.EntityItem
+import com.sinema.model.SavedSceneFilter
 import com.sinema.model.ImageItem
 import com.sinema.model.MarkerRef
 import com.sinema.model.PerformerRef
@@ -31,7 +32,8 @@ class SinemaApi(
     private var serverUrl: String,
     private var apiKey: String,
     private var sessionCookie: String = "",
-    private var authMode: String = "apikey"
+    private var authMode: String = "apikey",
+    allowSelfSigned: Boolean = false
 ) {
 
     companion object {
@@ -72,7 +74,14 @@ class SinemaApi(
         )
     }
 
-    private val client = OkHttpClient.Builder()
+    /**
+     * Opt-in trust-all TLS for servers behind self-signed certificates
+     * (per profile, off by default). Disables certificate and hostname
+     * verification for this server's connections only.
+     */
+    private var trustAllCerts: Boolean = allowSelfSigned
+
+    private fun baseClientBuilder(): OkHttpClient.Builder = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         // Folder browsing fans out many small queries; the default
@@ -81,7 +90,20 @@ class SinemaApi(
             maxRequests = 24
             maxRequestsPerHost = 12
         })
-        .build()
+
+    private val strictClient: OkHttpClient by lazy { baseClientBuilder().build() }
+
+    private val trustAllClient: OkHttpClient by lazy {
+        with(com.sinema.util.TlsTrust) {
+            baseClientBuilder().trustAllCertificates().build()
+        }
+    }
+
+    /** Active HTTP client: strict TLS unless the profile opted into self-signed trust. */
+    val client: OkHttpClient get() = if (trustAllCerts) trustAllClient else strictClient
+
+    /** Client for ExoPlayer's OkHttp data source; shares the active TLS config. */
+    fun okHttpClient(): OkHttpClient = client
 
     /**
      * Client for system-search suggestions. Runs on a binder thread inside
@@ -89,9 +111,16 @@ class SinemaApi(
      * blocking execute(), so OkHttp's total callTimeout enforces the
      * deadline instead (6s covers connect + read for a healthy server).
      */
-    private val suggestionsClient: OkHttpClient by lazy {
-        client.newBuilder().callTimeout(6, TimeUnit.SECONDS).build()
+    private val strictSuggestionsClient: OkHttpClient by lazy {
+        strictClient.newBuilder().callTimeout(6, TimeUnit.SECONDS).build()
     }
+
+    private val trustAllSuggestionsClient: OkHttpClient by lazy {
+        trustAllClient.newBuilder().callTimeout(6, TimeUnit.SECONDS).build()
+    }
+
+    private val suggestionsClient: OkHttpClient
+        get() = if (trustAllCerts) trustAllSuggestionsClient else strictSuggestionsClient
     private val gson = Gson()
     private val gsonWithNulls = com.google.gson.GsonBuilder().serializeNulls().create()
 
@@ -99,17 +128,28 @@ class SinemaApi(
     var stashPassword: String = ""
     var onSessionRefreshed: ((String) -> Unit)? = null
 
-    fun updateConfig(url: String, key: String, cookie: String = "", mode: String = "apikey") {
+    fun updateConfig(
+        url: String,
+        key: String,
+        cookie: String = "",
+        mode: String = "apikey",
+        allowSelfSigned: Boolean = false
+    ) {
         serverUrl = url.trimEnd('/')
         apiKey = key
         sessionCookie = cookie
         authMode = mode
+        trustAllCerts = allowSelfSigned
     }
 
     fun getScreenshotUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/screenshot"
     fun getStreamUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/stream"
     fun getAlignedHlsStreamUrl(sceneId: String): String =
-        "$serverUrl/scene/$sceneId/stream.m3u8?resolution=STANDARD&align=16x8"
+        getHlsStreamUrl(sceneId, "STANDARD")
+
+    /** Aligned HLS transcode URL at a Stash ResolutionEnum tier. */
+    fun getHlsStreamUrl(sceneId: String, resolution: String): String =
+        "$serverUrl/scene/$sceneId/stream.m3u8?resolution=$resolution&align=16x8"
     fun getImageThumbnailUrl(imageId: String): String = "$serverUrl/image/$imageId/thumbnail"
     fun getImageUrl(imageId: String): String = "$serverUrl/image/$imageId/image"
 
@@ -221,7 +261,8 @@ class SinemaApi(
     private fun reLogin(): String? {
         if (stashUsername.isBlank() || stashPassword.isBlank()) return null
         return try {
-            val loginClient = OkHttpClient.Builder()
+            // Derive from the active client so self-signed trust applies.
+            val loginClient = client.newBuilder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.SECONDS)
                 .followRedirects(false)
@@ -835,6 +876,78 @@ class SinemaApi(
         imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
         tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList()
     )
+
+    /**
+     * Lists scene-mode saved filters stored in Stash (created via the Stash
+     * web UI). Available since Stash 0.16; safe for the 0.24+ baseline.
+     */
+    suspend fun findSavedSceneFilters(): List<SavedSceneFilter> {
+        val query = """
+            query {
+                findSavedFilters(mode: SCENES) {
+                    id name
+                    find_filter { sort direction }
+                    object_filter
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query)
+        val arr = result.getAsJsonObject("data")
+            ?.get("findSavedFilters")?.takeIf { !it.isJsonNull }?.asJsonArray
+            ?: return emptyList()
+        return arr.map { parseSavedSceneFilter(it.asJsonObject) }
+    }
+
+    /** Fetches one saved scene filter by id, or null if it does not exist. */
+    suspend fun findSavedSceneFilter(id: String): SavedSceneFilter? {
+        val query = """
+            query(${"$"}id: ID!) {
+                findSavedFilter(id: ${"$"}id) {
+                    id name
+                    find_filter { sort direction }
+                    object_filter
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("id" to id))
+        val obj = result.getAsJsonObject("data")
+            ?.get("findSavedFilter")?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?: return null
+        return parseSavedSceneFilter(obj)
+    }
+
+    /** Runs a saved filter's raw SceneFilterType through the normal scene query. */
+    suspend fun findScenesForSavedFilter(
+        filter: SavedSceneFilter,
+        page: Int = 1,
+        perPage: Int = 100,
+        sort: String = filter.sort ?: "path",
+        direction: String = filter.direction ?: "ASC"
+    ): Pair<Int, List<Scene>> = findScenesInternal(
+        page = page,
+        perPage = perPage,
+        sort = sort,
+        direction = direction,
+        sceneFilter = filter.sceneFilter
+    )
+
+    @VisibleForTesting
+    internal fun parseSavedSceneFilter(obj: JsonObject): SavedSceneFilter {
+        val findFilter = obj.get("find_filter")?.takeIf { !it.isJsonNull }?.asJsonObject
+        val rawObjectFilter = obj.get("object_filter")?.takeIf { !it.isJsonNull }?.asJsonObject
+        return SavedSceneFilter(
+            id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            sceneFilter = rawObjectFilter?.let { gson.fromJson(it, MapType.savingFilterMap) },
+            sort = findFilter?.get("sort")?.takeIf { !it.isJsonNull }?.asString,
+            direction = findFilter?.get("direction")?.takeIf { !it.isJsonNull }?.asString
+        )
+    }
+
+    private object MapType {
+        val savingFilterMap: java.lang.reflect.Type =
+            object : com.google.gson.reflect.TypeToken<Map<String, Any?>>() {}.type
+    }
 
     /**
      * Fetch scenes filtered by a tag, performer, or studio entity.

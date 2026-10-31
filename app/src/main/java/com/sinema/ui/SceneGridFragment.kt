@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.leanback.app.VerticalGridSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.FocusHighlight
+import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.VerticalGridPresenter
 import androidx.leanback.widget.VerticalGridView
 import androidx.lifecycle.lifecycleScope
@@ -43,6 +44,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open val sortScreenKey: String? = null
     protected open val filterScreenKey: String? get() = sortScreenKey
     protected open val defaultSort: SortOption = SortOption.PATH_ASC
+    /** Cards shown in this grid; grids of non-Scene items override this. */
+    protected open fun createCardPresenter(): Presenter = CardPresenter(app.api)
     protected var sort: SortOption = SortOption.PATH_ASC
     protected var sceneFilter = SceneFilterOptions()
     protected var randomSeed: Int = 0
@@ -135,7 +138,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
         gridPresenter.numberOfColumns = columns
         setGridPresenter(gridPresenter)
-        gridAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+        gridAdapter = ArrayObjectAdapter(createCardPresenter())
         adapter = gridAdapter
         setOnItemViewClickedListener { _, item, _, _ -> item?.let { onItemClicked(it) } }
         reload()

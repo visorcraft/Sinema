@@ -125,6 +125,19 @@ Artwork behavior:
 
 Channel sync happens when the main screen loads and when playback state is saved.
 
+## Self-signed certificates
+
+If your Stash server uses HTTPS with a self-signed certificate, Sinema can optionally trust it:
+
+- During setup: check `Trust self-signed certificates` on the sign-in or manual setup screen. A confirmation warning is shown before continuing.
+- Or later: Settings → Servers → `...` on a profile → `Trust self-signed certificates` (also confirmed with a warning).
+- Web Setup does not offer the checkbox; if your server needs it, enable the toggle in Settings after setup completes.
+- The setting is per server profile and off by default. Profiles created later never inherit an earlier setup's choice.
+
+What it affects while enabled: all traffic to that server only (API calls, images, streams, subtitles) skips TLS certificate and hostname verification. Other profiles stay strict.
+
+Security note: disabling certificate verification means a man-in-the-middle on your network could impersonate the server. Only enable this on private networks you control.
+
 ## Global search
 
 On Android TV devices, Settings shows a Global Search toggle (off by default).

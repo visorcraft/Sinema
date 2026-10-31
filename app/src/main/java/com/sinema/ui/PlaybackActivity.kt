@@ -13,7 +13,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
@@ -23,6 +23,7 @@ import androidx.media3.ui.PlayerView
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.PlaybackAspectRatio
+import com.sinema.model.PlaybackStreamQuality
 import com.sinema.model.CaptionRef
 import com.sinema.model.StarRating
 import com.sinema.util.PlaybackQueue
@@ -51,7 +52,9 @@ class PlaybackActivity : FragmentActivity() {
     private var aspectRatioDialog: android.app.AlertDialog? = null
     private var playerMenuDialog: android.app.AlertDialog? = null
     private var rateDialog: android.app.AlertDialog? = null
+    private var streamQualityDialog: android.app.AlertDialog? = null
     private var aspectRatio = PlaybackAspectRatio.AUTO
+    private var streamQuality = PlaybackStreamQuality.AUTO
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
     private val renderersFactory by lazy { PlaybackRenderersFactory(this) }
@@ -70,6 +73,7 @@ class PlaybackActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_playback)
         aspectRatio = PlaybackAspectRatio.fromName(prefs.playbackAspectRatio)
+        streamQuality = PlaybackStreamQuality.fromName(prefs.playbackStreamQuality)
         sceneId = SceneIntents.sceneIdFrom(intent)
         videoWidth = SceneIntents.videoWidthFrom(intent)
         videoHeight = SceneIntents.videoHeightFrom(intent)
@@ -111,6 +115,8 @@ class PlaybackActivity : FragmentActivity() {
         rateFetchJob = null
         rateDialog?.dismiss()
         rateDialog = null
+        streamQualityDialog?.dismiss()
+        streamQualityDialog = null
     }
 
     override fun onStop() {
@@ -126,6 +132,8 @@ class PlaybackActivity : FragmentActivity() {
         rateFetchJob = null
         rateDialog?.dismiss()
         rateDialog = null
+        streamQualityDialog?.dismiss()
+        streamQualityDialog = null
         releasePlayer()
         if (isFinishing) PlaybackQueue.clear()
     }
@@ -188,17 +196,23 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun buildMediaItem(): MediaItem {
         val app = SinemaApp.instance
-        val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
-        val useAligned = shouldUseAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect)
-        val streamUrl = if (useAligned) {
-            app.api.getAlignedHlsStreamUrl(sceneId)
-        } else {
-            app.api.getStreamUrl(sceneId)
+        val streamUrl = when {
+            // Manual direct-only: never transcode.
+            streamQuality == PlaybackStreamQuality.DIRECT -> app.api.getStreamUrl(sceneId)
+            // Manual HLS tier: transcode at that resolution; if the player
+            // already fell back to direct after an error, stay on direct.
+            streamQuality.isForcedHls && !hasFallenBackToDirect ->
+                app.api.getHlsStreamUrl(sceneId, streamQuality.resolutionParam!!)
+            else -> {
+                val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
+                val useAligned = shouldUseAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect)
+                if (useAligned) app.api.getAlignedHlsStreamUrl(sceneId)
+                else app.api.getStreamUrl(sceneId)
+            }
         }
         android.util.Log.d(
             "Sinema",
-            "Starting ${if (useAligned) PlaybackStreamKind.ALIGNED_HLS else PlaybackStreamKind.DIRECT} " +
-                "for ${videoWidth}x$videoHeight"
+            "Stream selection ${streamQuality.name} -> $streamUrl for ${videoWidth}x$videoHeight"
         )
         // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
         val subs = captions.map { c ->
@@ -258,6 +272,9 @@ class PlaybackActivity : FragmentActivity() {
     private fun scheduleVideoOutputTimeout() {
         handler.removeCallbacks(videoOutputTimeout)
         if (hasVideoOutput) return
+        // Only AUTO retries a silent direct stream; manual modes surface
+        // errors via onPlayerError instead of looping retries.
+        if (!allowsNoVideoRetry(streamQuality)) return
         val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
         if (!shouldFallbackToAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect)) return
         handler.postDelayed(videoOutputTimeout, VIDEO_OUTPUT_TIMEOUT_MS)
@@ -265,21 +282,29 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun fallbackToAlignedHls() {
         val exo = player ?: return
+        if (!allowsNoVideoRetry(streamQuality)) return
         val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
         if (!shouldFallbackToAlignedHls(originalKind, forceAlignedHls, hasFallenBackToDirect)) return
         handler.removeCallbacks(videoOutputTimeout)
         forceAlignedHls = true
         hasVideoOutput = false
-        val retryPositionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
         android.util.Log.w("Sinema", "Direct playback produced no video; retrying aligned HLS")
-        resumePositionMs = retryPositionMs
+        rebuildCurrentStream()
+    }
+
+    /** Stops, rebuilds the media item at the current/resume position, and plays. */
+    private fun rebuildCurrentStream() {
+        val exo = player ?: return
+        val positionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
+        resumePositionMs = positionMs
         exo.stop()
         exo.clearMediaItems()
         mountPlayerView(videoWidth, videoHeight)
         exo.setMediaItem(buildMediaItem())
         exo.prepare()
-        if (retryPositionMs > 0L) exo.seekTo(retryPositionMs)
+        if (positionMs > 0L) exo.seekTo(positionMs)
         exo.playWhenReady = true
+        scheduleVideoOutputTimeout()
     }
 
     private fun initPlayer() {
@@ -289,7 +314,9 @@ class PlaybackActivity : FragmentActivity() {
         playerView.playbackAspectRatio = aspectRatio
         val app = SinemaApp.instance
 
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
+        // OkHttp data source shares the API client's TLS config (self-signed
+        // opt-in) and auth headers for stream + subtitle requests.
+        val dataSourceFactory = OkHttpDataSource.Factory(app.api.okHttpClient())
             .setDefaultRequestProperties(app.api.mediaAuthHeaders())
 
         player = ExoPlayer.Builder(this)
@@ -347,27 +374,25 @@ class PlaybackActivity : FragmentActivity() {
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                         handler.removeCallbacks(videoOutputTimeout)
-                        val streamKind = playbackStreamKindForFrame(videoWidth, videoHeight)
-                        if (shouldFallbackToDirect(streamKind, hasFallenBackToDirect)) {
-                            hasFallenBackToDirect = true
-                            hasVideoOutput = false
-                            val retryPositionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
-                            android.util.Log.w("Sinema", "Aligned HLS failed; retrying direct", error)
-                            resumePositionMs = retryPositionMs
-                            exo.stop()
-                            exo.clearMediaItems()
-                            mountPlayerView(videoWidth, videoHeight)
-                            exo.setMediaItem(buildMediaItem())
-                            exo.prepare()
-                            if (retryPositionMs > 0L) exo.seekTo(retryPositionMs)
-                            exo.playWhenReady = true
-                            return
+                        val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
+                        when (errorFallbackAction(
+                            streamQuality, originalKind, forceAlignedHls, hasFallenBackToDirect
+                        )) {
+                            FallbackAction.RETRY_DIRECT -> {
+                                hasFallenBackToDirect = true
+                                hasVideoOutput = false
+                                android.util.Log.w("Sinema", "Stream failed; retrying direct", error)
+                                rebuildCurrentStream()
+                            }
+                            FallbackAction.RETRY_ALIGNED_HLS -> {
+                                forceAlignedHls = true
+                                hasVideoOutput = false
+                                android.util.Log.w("Sinema", "Stream failed; retrying aligned HLS", error)
+                                rebuildCurrentStream()
+                            }
+                            FallbackAction.TERMINAL ->
+                                android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
                         }
-                        if (shouldFallbackToAlignedHls(streamKind, forceAlignedHls, hasFallenBackToDirect)) {
-                            fallbackToAlignedHls()
-                            return
-                        }
-                        android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
                     }
 
                     override fun onPlaybackStateChanged(state: Int) {
@@ -441,6 +466,31 @@ class PlaybackActivity : FragmentActivity() {
         }
     }
 
+    private fun showStreamQualityDialog() {
+        if (streamQualityDialog?.isShowing == true) return
+        val dialog = StreamQualityDialog.show(this, streamQuality) { chosen ->
+            if (chosen != streamQuality) applyStreamQuality(chosen)
+        }
+        streamQualityDialog = dialog
+        dialog.setOnDismissListener {
+            if (streamQualityDialog === dialog) streamQualityDialog = null
+            playerView.requestFocus()
+        }
+    }
+
+    /** Switch stream quality mid-playback, preserving the current position. */
+    private fun applyStreamQuality(chosen: PlaybackStreamQuality) {
+        streamQuality = chosen
+        prefs.playbackStreamQuality = chosen.name
+        if (player == null) return
+        // Reset fallback state so the new selection takes effect cleanly.
+        forceAlignedHls = false
+        hasFallenBackToDirect = false
+        hasVideoOutput = false
+        rebuildCurrentStream()
+        android.util.Log.i("Sinema", "Stream quality changed to ${chosen.name}")
+    }
+
     private fun showChapters() {
         if (markers.isEmpty()) return
         if (chaptersDialog?.isShowing == true) return
@@ -461,6 +511,7 @@ class PlaybackActivity : FragmentActivity() {
             if (markers.isNotEmpty()) add("Chapters")
             add("★ Rate scene")
             add("Aspect ratio")
+            add("Stream quality")
         }
         playerMenuDialog = android.app.AlertDialog.Builder(this)
             .setTitle("Playback menu")
@@ -470,6 +521,7 @@ class PlaybackActivity : FragmentActivity() {
                     "Chapters" -> showChapters()
                     "★ Rate scene" -> showRateDialog()
                     "Aspect ratio" -> showAspectRatioDialog()
+                    "Stream quality" -> showStreamQualityDialog()
                 }
             }
             .setOnDismissListener {

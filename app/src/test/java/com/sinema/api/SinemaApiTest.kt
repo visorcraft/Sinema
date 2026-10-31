@@ -188,6 +188,77 @@ class SinemaApiTest {
     }
 
     @Test
+    fun `parseSavedSceneFilter reads object_filter and find_filter`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"3","name":"Rated HD",
+                "find_filter":{"sort":"rating","direction":"DESC"},
+                "object_filter":{"rating100":{"value":40,"modifier":"GREATER_THAN"},
+                                 "resolution":{"value":"STANDARD_HD","modifier":"GREATER_THAN"}}}"""
+        ).asJsonObject
+        val f = api.parseSavedSceneFilter(obj)
+        assertEquals("3", f.id)
+        assertEquals("Rated HD", f.name)
+        assertEquals("rating", f.sort)
+        assertEquals("DESC", f.direction)
+        @Suppress("UNCHECKED_CAST")
+        val rating = f.sceneFilter?.get("rating100") as Map<String, Any>
+        assertEquals(40.0, rating["value"])
+        assertEquals("GREATER_THAN", rating["modifier"])
+        assertEquals("STANDARD_HD", (f.sceneFilter?.get("resolution") as Map<*, *>)["value"])
+    }
+
+    @Test
+    fun `parseSavedSceneFilter tolerates nulls and missing sections`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"1","name":"F","find_filter":null,"object_filter":null}"""
+        ).asJsonObject
+        val f = api.parseSavedSceneFilter(obj)
+        assertEquals(null, f.sceneFilter)
+        assertEquals(null, f.sort)
+        assertEquals(null, f.direction)
+    }
+
+    @Test
+    fun `findSavedSceneFilters requests scene mode and parses list`() {
+        val requestBody = java.util.concurrent.atomic.AtomicReference("")
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBody.set(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"findSavedFilters":[
+                {"id":"3","name":"Rated HD",
+                 "find_filter":{"sort":"rating","direction":"DESC"},
+                 "object_filter":{"rating100":{"value":40,"modifier":"GREATER_THAN"}}},
+                {"id":"4","name":"Tagged"}
+            ]}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            val filters = kotlinx.coroutines.runBlocking { api.findSavedSceneFilters() }
+            assertEquals(2, filters.size)
+            assertEquals("Rated HD", filters[0].name)
+            assertEquals("rating", filters[0].sort)
+            assertEquals(40.0, (filters[0].sceneFilter?.get("rating100") as Map<*, *>)["value"])
+            assertEquals(null, filters[1].sceneFilter)
+            org.junit.Assert.assertTrue(
+                "Expected SCENES mode in query: ${requestBody.get()}",
+                requestBody.get().contains("findSavedFilters(mode: SCENES)")
+            )
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `parseScene reads details and o_counter`() {
         val api = SinemaApi("http://server", "k", "", "apikey")
         val full = com.google.gson.JsonParser.parseString(

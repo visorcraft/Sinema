@@ -4,6 +4,8 @@ This guide explains the browsing and library features in Sinema.
 
 ## Main screen
 
+When a scene is partially watched, a hero banner sits at the very top: a large backdrop for the newest Continue Playing scene with its title, details, and a one-click `RESUME` (or `PLAY`) action.
+
 The top shortcut row contains:
 
 - Search
@@ -13,6 +15,7 @@ The top shortcut row contains:
 - Tags
 - Performers
 - Studios
+- Saved Filters
 - Log Out, only when a PIN is set
 
 The content rows are loaded from Stash:
@@ -49,6 +52,14 @@ Open `Search` from the main screen.
 - Use Filter to show all, watched, or unwatched scenes and optionally limit scene results to favorites. Filters do not change entity results.
 
 The selected search sort and filters are saved and reused later. Filters also apply to folder and entity scene views.
+
+## Saved Filters
+
+Open `Saved Filters` from the main screen to browse scene filters you saved in the Stash web UI.
+
+- Selecting a saved filter opens a scene grid driven by the filter's own criteria, sort, and direction — exactly as Stash would run it.
+- Sort and Play All work inside the filtered grid like any other grid.
+- Filters are stored server-side; create or edit them in Stash and they appear here on the next visit.
 
 ## Favorites
 

@@ -173,6 +173,17 @@ class SetupActivity : FragmentActivity() {
         layout.addView(passwordEdit, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = 24 })
+
+        val selfSignedCheck = android.widget.CheckBox(this).apply {
+            text = "Trust self-signed certificates"
+            textSize = 15f
+            setTextColor(0xFFCCCCCC.toInt())
+            isChecked = app.prefs.setupAllowSelfSigned
+        }
+        layout.addView(selfSignedCheck, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = 32 })
         
         val errorText = TextView(this).apply {
@@ -190,23 +201,49 @@ class SetupActivity : FragmentActivity() {
             val serverUrl = normalizeServerUrl(urlEdit.text.toString())
             val username = usernameEdit.text.toString().trim()
             val password = passwordEdit.text.toString()
-            
+
             if (serverUrl.isEmpty() || username.isEmpty() || password.isEmpty()) {
                 errorText.text = "Please fill in all fields"
                 errorText.visibility = android.view.View.VISIBLE
                 return@setOnClickListener
             }
-            
+
+            if (selfSignedCheck.isChecked) {
+                confirmSelfSignedTrust(serverUrl) {
+                    errorText.visibility = android.view.View.GONE
+                    signInBtn.isEnabled = false
+                    signInBtn.text = "Signing in..."
+
+                    lifecycleScope.launch {
+                        try {
+                            val sessionCookie = performStashLogin(serverUrl, username, password, true)
+
+                            withContext(Dispatchers.Main) {
+                                showAuthModeChoice(serverUrl, username, password, sessionCookie, true)
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                errorText.text = "Login failed: ${e.message}"
+                                errorText.visibility = android.view.View.VISIBLE
+                                signInBtn.isEnabled = true
+                                signInBtn.text = "Sign In"
+                            }
+                        }
+                    }
+                }
+                return@setOnClickListener
+            }
+
             errorText.visibility = android.view.View.GONE
             signInBtn.isEnabled = false
             signInBtn.text = "Signing in..."
-            
+
             lifecycleScope.launch {
                 try {
-                    val sessionCookie = performStashLogin(serverUrl, username, password)
-                    
+                    val sessionCookie = performStashLogin(serverUrl, username, password, false)
+
                     withContext(Dispatchers.Main) {
-                        showAuthModeChoice(serverUrl, username, password, sessionCookie)
+                        showAuthModeChoice(serverUrl, username, password, sessionCookie, false)
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -241,13 +278,21 @@ class SetupActivity : FragmentActivity() {
         urlEdit.requestFocus()
     }
     
-    private suspend fun performStashLogin(serverUrl: String, username: String, password: String): String {
+    private suspend fun performStashLogin(
+        serverUrl: String,
+        username: String,
+        password: String,
+        trustSelfSigned: Boolean = false
+    ): String {
         return withContext(Dispatchers.IO) {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .followRedirects(false)
-                .build()
+            val client = with(com.sinema.util.TlsTrust) {
+                OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .followRedirects(false)
+                    .let { if (trustSelfSigned) it.trustAllCertificates() else it }
+                    .build()
+            }
             
             // Login to get session cookie
             val loginBody = FormBody.Builder()
@@ -283,12 +328,19 @@ class SetupActivity : FragmentActivity() {
         }
     }
     
-    private suspend fun generateApiKey(serverUrl: String, sessionCookie: String): String {
+    private suspend fun generateApiKey(
+        serverUrl: String,
+        sessionCookie: String,
+        trustSelfSigned: Boolean = false
+    ): String {
         return withContext(Dispatchers.IO) {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build()
+            val client = with(com.sinema.util.TlsTrust) {
+                OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .let { if (trustSelfSigned) it.trustAllCertificates() else it }
+                    .build()
+            }
             
             val graphqlQuery = """{"query":"mutation { generateAPIKey(input: {}) }"}"""
             val graphqlBody = graphqlQuery.toRequestBody("application/json".toMediaType())
@@ -320,7 +372,7 @@ class SetupActivity : FragmentActivity() {
         }
     }
     
-    private fun showAuthModeChoice(serverUrl: String, username: String, password: String, sessionCookie: String) {
+    private fun showAuthModeChoice(serverUrl: String, username: String, password: String, sessionCookie: String, trustSelfSigned: Boolean) {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(80, 60, 80, 60)
@@ -375,7 +427,7 @@ class SetupActivity : FragmentActivity() {
             
             lifecycleScope.launch {
                 try {
-                    val apiKey = generateApiKey(serverUrl, sessionCookie)
+                    val apiKey = generateApiKey(serverUrl, sessionCookie, trustSelfSigned)
                     
                     withContext(Dispatchers.Main) {
                         app.prefs.serverUrl = serverUrl
@@ -384,6 +436,8 @@ class SetupActivity : FragmentActivity() {
                         app.prefs.sessionCookie = ""
                         app.prefs.stashUsername = ""
                         app.prefs.stashPassword = ""
+                        app.prefs.setupAllowSelfSigned = trustSelfSigned
+                        app.prefs.migrateToProfilesIfNeeded()
                         app.refreshApi()
 
                         Toast.makeText(this@SetupActivity, "API key generated! You're all set.", Toast.LENGTH_SHORT).show()
@@ -438,6 +492,8 @@ class SetupActivity : FragmentActivity() {
             app.prefs.apiKey = ""
             app.prefs.stashUsername = username
             app.prefs.stashPassword = password
+            app.prefs.setupAllowSelfSigned = trustSelfSigned
+            app.prefs.migrateToProfilesIfNeeded()
             app.refreshApi()
 
             Toast.makeText(this, "Connected! You're all set.", Toast.LENGTH_SHORT).show()
@@ -743,6 +799,23 @@ class SetupActivity : FragmentActivity() {
         return if (ok) cleaned else ""
     }
 
+    /**
+     * MITM warning shown before any setup action proceeds with the
+     * self-signed trust checkbox ticked. Mirrors the Settings toggle.
+     */
+    private fun confirmSelfSignedTrust(serverUrl: String, onEnable: () -> Unit) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Trust self-signed certificates")
+            .setMessage(
+                "This disables TLS certificate verification for $serverUrl. " +
+                    "Only continue on private networks you control — a " +
+                    "man-in-the-middle could otherwise impersonate your server."
+            )
+            .setPositiveButton("Enable & Continue") { _, _ -> onEnable() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun generateShortSetupToken(): String {
         val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         return (1..6).map { alphabet.random() }.joinToString("")
@@ -799,27 +872,53 @@ class SetupActivity : FragmentActivity() {
         layout.addView(keyEdit, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = 24 })
+
+        val selfSignedCheck = android.widget.CheckBox(this).apply {
+            text = "Trust self-signed certificates"
+            textSize = 15f
+            setTextColor(0xFFCCCCCC.toInt())
+            isChecked = app.prefs.setupAllowSelfSigned
+        }
+        layout.addView(selfSignedCheck, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = 32 })
-        
-        val saveBtn = createButton("Save & Continue") {
+
+        fun performManualSave() {
             val serverUrl = normalizeServerUrl(urlEdit.text.toString())
             val apiKey = keyEdit.text.toString().trim()
-            
+
             if (serverUrl.isEmpty() || apiKey.isEmpty()) {
-                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-                return@createButton
+                Toast.makeText(this@SetupActivity, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                return
             }
-            
+
             app.prefs.serverUrl = serverUrl
             app.prefs.apiKey = apiKey
             app.prefs.authMode = "apikey"
             app.prefs.sessionCookie = ""
             app.prefs.stashUsername = ""
             app.prefs.stashPassword = ""
+            app.prefs.setupAllowSelfSigned = selfSignedCheck.isChecked
+            app.prefs.migrateToProfilesIfNeeded()
             app.refreshApi()
-            
-            Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
+
+            Toast.makeText(this@SetupActivity, "Settings saved!", Toast.LENGTH_SHORT).show()
             finishWithSuccess()
+        }
+
+        val saveBtn = createButton("Save & Continue") {
+            if (selfSignedCheck.isChecked) {
+                val serverUrl = normalizeServerUrl(urlEdit.text.toString())
+                if (serverUrl.isEmpty()) {
+                    Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                    return@createButton
+                }
+                confirmSelfSignedTrust(serverUrl) { performManualSave() }
+                return@createButton
+            }
+            performManualSave()
         }
         layout.addView(saveBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,

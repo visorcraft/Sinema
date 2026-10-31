@@ -74,6 +74,16 @@ Use the aspect-ratio button next to the Settings gear to choose:
 
 Every option fits the selected shape on screen without cropping, with black bars filling unused space. The choice applies immediately and is reused for later videos until you change it.
 
+## Stream quality
+
+Press Menu during playback and choose `Stream quality` to override how Sinema streams from Stash:
+
+- Auto (direct with fallback): the default — play the original file directly, and if the TV cannot decode it, retry via a compatible 480p transcode.
+- Direct stream only: never transcode. Useful when you want the untouched file and accept that some codecs may not display.
+- Transcoded 480p / 720p / 1080p: always start on Stash's aligned HLS transcode at that resolution. Useful for slow servers or weak Wi-Fi.
+
+The choice applies immediately (playback resumes at the same position) and is remembered for later videos. With Auto, the player also falls back from a failed transcode to the direct stream.
+
 ## Scene markers as chapters
 
 Sinema reads Stash scene markers and exposes them during playback.

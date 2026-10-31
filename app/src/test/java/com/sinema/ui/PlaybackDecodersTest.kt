@@ -1,5 +1,6 @@
 package com.sinema.ui
 
+import com.sinema.model.PlaybackStreamQuality
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -127,5 +128,64 @@ class PlaybackDecodersTest {
         assertEquals(false, hasVideoOutputDimensions(0, 0))
         assertEquals(false, hasVideoOutputDimensions(1920, 0))
         assertEquals(false, hasVideoOutputDimensions(0, 1080))
+    }
+
+    @Test
+    fun `direct-only never falls back on error`() {
+        // Any shape, any state: DIRECT is terminal.
+        PlaybackStreamKind.entries.forEach { kind ->
+            assertEquals(
+                FallbackAction.TERMINAL,
+                errorFallbackAction(PlaybackStreamQuality.DIRECT, kind, forceAlignedHls = false, hasFallenBackToDirect = false)
+            )
+            assertEquals(
+                FallbackAction.TERMINAL,
+                errorFallbackAction(PlaybackStreamQuality.DIRECT, kind, forceAlignedHls = true, hasFallenBackToDirect = true)
+            )
+        }
+    }
+
+    @Test
+    fun `forced hls retries direct exactly once regardless of source shape`() {
+        // Direct-compatible shape (kind=DIRECT): the shape heuristic alone
+        // would suggest an HLS retry; the manual quality overrides it.
+        assertEquals(
+            FallbackAction.RETRY_DIRECT,
+            errorFallbackAction(PlaybackStreamQuality.HLS_720P, PlaybackStreamKind.DIRECT, forceAlignedHls = false, hasFallenBackToDirect = false)
+        )
+        // Software-output shape (kind=ALIGNED_HLS): also retries direct once.
+        assertEquals(
+            FallbackAction.RETRY_DIRECT,
+            errorFallbackAction(PlaybackStreamQuality.HLS_1080P, PlaybackStreamKind.ALIGNED_HLS, forceAlignedHls = false, hasFallenBackToDirect = false)
+        )
+        // Second failure is terminal.
+        assertEquals(
+            FallbackAction.TERMINAL,
+            errorFallbackAction(PlaybackStreamQuality.HLS_720P, PlaybackStreamKind.ALIGNED_HLS, forceAlignedHls = false, hasFallenBackToDirect = true)
+        )
+    }
+
+    @Test
+    fun `auto keeps the shape-based state machine`() {
+        assertEquals(
+            FallbackAction.RETRY_DIRECT,
+            errorFallbackAction(PlaybackStreamQuality.AUTO, PlaybackStreamKind.ALIGNED_HLS, forceAlignedHls = false, hasFallenBackToDirect = false)
+        )
+        assertEquals(
+            FallbackAction.RETRY_ALIGNED_HLS,
+            errorFallbackAction(PlaybackStreamQuality.AUTO, PlaybackStreamKind.DIRECT, forceAlignedHls = false, hasFallenBackToDirect = false)
+        )
+        assertEquals(
+            FallbackAction.TERMINAL,
+            errorFallbackAction(PlaybackStreamQuality.AUTO, PlaybackStreamKind.ALIGNED_HLS, forceAlignedHls = false, hasFallenBackToDirect = true)
+        )
+    }
+
+    @Test
+    fun `only auto retries on missing video output`() {
+        assertEquals(true, allowsNoVideoRetry(PlaybackStreamQuality.AUTO))
+        assertEquals(false, allowsNoVideoRetry(PlaybackStreamQuality.DIRECT))
+        assertEquals(false, allowsNoVideoRetry(PlaybackStreamQuality.HLS_480P))
+        assertEquals(false, allowsNoVideoRetry(PlaybackStreamQuality.HLS_1080P))
     }
 }

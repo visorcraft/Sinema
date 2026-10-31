@@ -63,7 +63,8 @@ class SettingsFragment : Fragment() {
         val app = SinemaApp.instance
         val prefs = app.prefs
 
-        // SetupActivity wrote credentials into legacy prefs; wrap them into a new profile
+        // SetupActivity wrote credentials into legacy prefs; wrap them into a new profile.
+        // The setup screens persist the self-signed opt-in alongside the credentials.
         val name = try { java.net.URI(prefs.serverUrl).host ?: prefs.serverUrl } catch (_: Exception) { prefs.serverUrl }
         val p = com.sinema.model.ServerProfile(
             name = name,
@@ -72,10 +73,12 @@ class SettingsFragment : Fragment() {
             sessionCookie = prefs.sessionCookie,
             authMode = prefs.authMode,
             stashUsername = prefs.stashUsername,
-            stashPassword = prefs.stashPassword
+            stashPassword = prefs.stashPassword,
+            allowSelfSigned = prefs.setupAllowSelfSigned
         )
         prefs.profiles = prefs.profiles + p
         prefs.applyProfile(p)
+        prefs.setupAllowSelfSigned = false
         app.refreshApi()
 
         Toast.makeText(requireContext(), "Server added: ${p.name}", Toast.LENGTH_SHORT).show()

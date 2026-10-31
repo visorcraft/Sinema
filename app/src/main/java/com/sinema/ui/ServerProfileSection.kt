@@ -120,16 +120,55 @@ object ServerProfileSection {
     }
 
     private fun showProfileOptions(ctx: Context, profile: ServerProfile, isLast: Boolean) {
-        val items = arrayOf("Rename", "Remove")
+        val selfSignedLabel = if (profile.allowSelfSigned)
+            "Trust self-signed certificates: ON" else "Trust self-signed certificates: OFF"
+        val items = arrayOf("Rename", selfSignedLabel, "Remove")
         AlertDialog.Builder(ctx)
             .setTitle(profile.name)
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> renameProfile(ctx, profile)
-                    1 -> removeProfile(ctx, profile, isLast)
+                    1 -> confirmSelfSignedToggle(ctx, profile)
+                    2 -> removeProfile(ctx, profile, isLast)
                 }
             }
             .show()
+    }
+
+    private fun confirmSelfSignedToggle(ctx: Context, profile: ServerProfile) {
+        val app = SinemaApp.instance
+        val enabling = !profile.allowSelfSigned
+        if (!enabling) {
+            applySelfSigned(ctx, profile, false)
+            return
+        }
+        AlertDialog.Builder(ctx)
+            .setTitle("Trust self-signed certificates")
+            .setMessage(
+                "Disables TLS certificate verification for ${profile.name}. " +
+                    "Only enable this on private networks you control — a " +
+                    "man-in-the-middle could otherwise impersonate your server."
+            )
+            .setPositiveButton("Enable") { _, _ -> applySelfSigned(ctx, profile, true) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun applySelfSigned(ctx: Context, profile: ServerProfile, enabled: Boolean) {
+        val app = SinemaApp.instance
+        val updated = profile.copy(allowSelfSigned = enabled)
+        app.prefs.profiles = app.prefs.profiles.map { if (it.id == profile.id) updated else it }
+        if (app.prefs.activeProfileId == profile.id) {
+            app.prefs.applyProfile(updated)
+            app.refreshApi()
+        }
+        Toast.makeText(
+            ctx,
+            if (enabled) "Self-signed certificates trusted for ${profile.name}"
+            else "Certificate verification restored for ${profile.name}",
+            Toast.LENGTH_SHORT
+        ).show()
+        (ctx as? android.app.Activity)?.recreate()
     }
 
     private fun renameProfile(ctx: Context, profile: ServerProfile) {

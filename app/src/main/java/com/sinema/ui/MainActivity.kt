@@ -118,6 +118,16 @@ class MainFragment : RowsSupportFragment() {
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
                 is Scene -> startActivity(SceneIntents.detail(requireContext(), item))
+                is HeroItem -> {
+                    // One click on the hero resumes (or plays) directly —
+                    // the scene detail screen stays available via rows/cards.
+                    startActivity(
+                        SceneIntents.playback(
+                            requireContext(), item.scene.id, item.resumeMs,
+                            item.scene.width, item.scene.height
+                        )
+                    )
+                }
                 is String -> {
                     when (item) {
                         "Settings" -> startActivity(Intent(requireContext(), SettingsActivity::class.java))
@@ -128,6 +138,7 @@ class MainFragment : RowsSupportFragment() {
                         "Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))
                         "Performers" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.PERFORMER))
                         "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))
+                        "Saved Filters" -> startActivity(Intent(requireContext(), SavedFiltersActivity::class.java))
                         "Log Out" -> {
                             app.pinVerifiedThisSession = false
                             requireActivity().finishAffinity()
@@ -251,20 +262,6 @@ class MainFragment : RowsSupportFragment() {
                 Log.d("Sinema", "loadContent starting")
                 rowsAdapter.clear()
 
-                // 1. Top row: Search | Surprise Me | Favorites | Browse Folders | Tags | Performers | Studios (+ Log Out)
-                val topAdapter = ArrayObjectAdapter(SettingsPresenter())
-                topAdapter.add("Search")
-                topAdapter.add("Surprise Me")
-                topAdapter.add("Favorites")
-                topAdapter.add("Browse Folders")
-                topAdapter.add("Tags")
-                topAdapter.add("Performers")
-                topAdapter.add("Studios")
-                if (app.prefs.hasPinSet()) {
-                    topAdapter.add("Log Out")
-                }
-                rowsAdapter.add(ListRow(HeaderItem(""), topAdapter))
-
                 // Each content row is loaded independently so one failed Stash
                 // query cannot blank the rest of the dashboard (seen when a
                 // single bad CriterionModifier made findRecentlyPlayed throw
@@ -292,6 +289,29 @@ class MainFragment : RowsSupportFragment() {
 
                 val continuePairs = rows.continuePlaying.value ?: emptyList<Pair<Scene, Double>>()
                 rows.continuePlaying.error?.let { noteError("Continue Playing", it) }
+
+                // 0. Hero: the freshest continue-playing scene, one click to resume.
+                continuePairs.firstOrNull()?.let { (heroScene, resumeSeconds) ->
+                    val heroAdapter = ArrayObjectAdapter(HeroPresenter(app.api))
+                    heroAdapter.add(HeroItem(heroScene, (resumeSeconds * 1000).toLong()))
+                    rowsAdapter.add(ListRow(HeaderItem(""), heroAdapter))
+                }
+
+                // 1. Top row: Search | Surprise Me | Favorites | Browse Folders | Tags | Performers | Studios | Saved Filters (+ Log Out)
+                val topAdapter = ArrayObjectAdapter(SettingsPresenter())
+                topAdapter.add("Search")
+                topAdapter.add("Surprise Me")
+                topAdapter.add("Favorites")
+                topAdapter.add("Browse Folders")
+                topAdapter.add("Tags")
+                topAdapter.add("Performers")
+                topAdapter.add("Studios")
+                topAdapter.add("Saved Filters")
+                if (app.prefs.hasPinSet()) {
+                    topAdapter.add("Log Out")
+                }
+                rowsAdapter.add(ListRow(HeaderItem(""), topAdapter))
+
                 if (continuePairs.isNotEmpty()) {
                     val continueAdapter = ArrayObjectAdapter(CardPresenter(app.api))
                     continuePairs.forEach { (scene, _) -> continueAdapter.add(scene) }

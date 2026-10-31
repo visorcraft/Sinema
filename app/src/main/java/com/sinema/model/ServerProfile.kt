@@ -10,5 +10,11 @@ data class ServerProfile(
     val sessionCookie: String = "",
     val authMode: String = "apikey",
     val stashUsername: String = "",
-    val stashPassword: String = ""
+    val stashPassword: String = "",
+    /**
+     * Opt-in: disable TLS certificate verification for this server only
+     * (self-hosted Stash behind a self-signed certificate). Defaults to
+     * false; stored profiles deserializing without the field stay strict.
+     */
+    val allowSelfSigned: Boolean = false
 )

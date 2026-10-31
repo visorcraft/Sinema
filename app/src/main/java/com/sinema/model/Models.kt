@@ -50,6 +50,19 @@ data class EntityHeader(
     val tags: List<TagRef> = emptyList()
 )
 
+/**
+ * A scene saved filter stored server-side in Stash (built in the Stash web
+ * UI). [sceneFilter] is the raw SceneFilterType map forwarded as-is — the
+ * server validates it against its own schema version.
+ */
+data class SavedSceneFilter(
+    val id: String,
+    val name: String,
+    val sceneFilter: Map<String, Any?>? = null,
+    val sort: String? = null,
+    val direction: String? = null
+)
+
 /** Full single-scene payload for the detail screen and player. */
 data class SceneDetails(
     val scene: Scene,

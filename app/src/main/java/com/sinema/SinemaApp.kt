@@ -22,13 +22,38 @@ class SinemaApp : Application() {
         instance = this
         prefs = Prefs(this)
         prefs.migrateToProfilesIfNeeded()
-        api = SinemaApi(prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode)
+        api = SinemaApi(
+            prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode,
+            allowSelfSigned = prefs.activeProfile?.allowSelfSigned == true
+        )
         configureApi()
+        configureGlideTransport()
     }
 
     fun refreshApi() {
-        api.updateConfig(prefs.serverUrl, prefs.apiKey, prefs.sessionCookie, prefs.authMode)
+        api.updateConfig(
+            prefs.serverUrl, prefs.apiKey, prefs.sessionCookie, prefs.authMode,
+            allowSelfSigned = prefs.activeProfile?.allowSelfSigned == true
+        )
         configureApi()
+        configureGlideTransport()
+    }
+
+    /**
+     * Route Glide image loads through the API's OkHttp client so images
+     * from a self-signed server load once the profile opts in. Replaced on
+     * every refresh because OkHttpClient instances are immutable.
+     */
+    private fun configureGlideTransport() {
+        try {
+            com.bumptech.glide.Glide.get(this).registry.replace(
+                com.bumptech.glide.load.model.GlideUrl::class.java,
+                java.io.InputStream::class.java,
+                com.bumptech.glide.integration.okhttp3.OkHttpUrlLoader.Factory(api.okHttpClient())
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("Sinema", "Could not install Glide OkHttp transport", e)
+        }
     }
 
     private fun configureApi() {

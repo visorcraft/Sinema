@@ -108,7 +108,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 ## Features
 
-- **🏠 Home Screen** — Continue Playing, Recently Played, Recently Added, Favorites.
+- **🏠 Home Screen** — Hero banner for the newest continue-playing scene, plus Continue Playing, Recently Played, Recently Added, Favorites.
 - **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with scene counts and images.
 - **📁 Folder Browser** — Navigate your library by directory structure.
 - **🔍 Unified Search** — Find scenes, tags, performers, and studios together; voice search via the remote microphone where available.
@@ -124,6 +124,9 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **❤️ Favorites** — One-tap favorite/unfavorite via star rating, synced with Stash ratings. Folders with favorited content show a heart overlay.
 - **📺 Android TV Channels** — Optional "Watch Next" (Continue Watching) and "Recently Added" rows on the launcher home screen (opt-in, privacy-first).
 - **🔎 Global Search** — Optional participation in the Android TV system search dialog (Settings toggle, off by default). Scene suggestions deep-link straight to scene details.
+- **⭐ Saved Filters** — Use scene filters saved in the Stash web UI directly from the home screen.
+- **🎛️ Stream Quality** — Force direct playback or pick a transcode tier (480p/720p/1080p) from the player menu for slow servers and weak networks.
+- **🔐 Self-Signed HTTPS** — Per-server opt-in to trust self-signed certificates for self-hosted TLS setups.
 - **🖥️ Multi-Server Profiles** — Switch between multiple Stash servers from Settings.
 - **🔒 PIN Lock** — Optional 4-digit PIN to keep things private. Log Out locks the app until PIN is re-entered.
 - **🎮 D-pad Native** — Built for TV remotes, no touchscreen needed.
@@ -160,7 +163,9 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 | AndroidX Core KTX | **1.18.0** |
 | AndroidX Leanback | **1.2.0** |
 | Media3 (ExoPlayer) | **1.10.1** |
+| Media3 OkHttp Datasource | **1.10.1** |
 | Glide | **5.0.7** |
+| Glide OkHttp Integration | **5.0.7** |
 | OkHttp | **5.4.0** |
 | Gson | **2.14.0** |
 | Coroutines | **1.11.0** |

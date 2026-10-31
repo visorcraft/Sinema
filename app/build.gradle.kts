@@ -52,9 +52,13 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.10.1")
     implementation("androidx.media3:media3-ui-leanback:1.10.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.10.1")
+    // HTTP-backed playback data source sharing the API client's TLS config
+    implementation("androidx.media3:media3-datasource-okhttp:1.10.1")
     
     // Image loading
     implementation("com.github.bumptech.glide:glide:5.0.7")
+    // Route Glide image loads through OkHttp (shared TLS/auth with SinemaApi)
+    implementation("com.github.bumptech.glide:okhttp3-integration:5.0.7")
     
     // HTTP/JSON
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
