@@ -306,6 +306,23 @@ class SettingsFragment : Fragment() {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = 16 })
 
+        val homeSettingsBtn = Button(ctx).apply {
+            text = "Home Settings"
+            isFocusable = true
+            setBackgroundColor(0xFF333333.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            setOnFocusChangeListener { _, hasFocus ->
+                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
+            }
+            setOnClickListener {
+                startActivity(Intent(ctx, HomeSettingsActivity::class.java))
+            }
+        }
+        layout.addView(homeSettingsBtn, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 16 })
+
         val saveBtn = Button(ctx).apply {
             text = "Save Settings"
             isFocusable = true

@@ -6,6 +6,7 @@ enum class SortOption(val label: String, val field: String, val direction: Strin
     PATH_DESC("Name (Z–A)", "path", "DESC"),
     ADDED_DESC("Recently added", "created_at", "DESC"),
     UPDATED_DESC("Recently updated", "updated_at", "DESC"),
+    LAST_PLAYED_DESC("Recently played", "last_played_at", "DESC"),
     DATE_DESC("Release date", "date", "DESC"),
     DURATION_DESC("Longest first", "duration", "DESC"),
     RATING_DESC("Highest rated", "rating", "DESC"),

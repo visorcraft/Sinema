@@ -14,6 +14,9 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.EntityItem
+import com.sinema.model.HomeContentRow
+import com.sinema.model.HomeLayoutSettings
+import com.sinema.model.SavedSceneFilter
 import com.sinema.model.Scene
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.Job
@@ -72,6 +75,11 @@ class MainFragment : RowsSupportFragment() {
     private var recentlyPlayedState = HomeRowState<Scene>(PLAYED_ROW_ID, "Recently Played")
     private var recentlyAddedState = HomeRowState<Scene>(RECENT_ROW_ID, "Recently Added")
     private var favoritesState = HomeRowState<Scene>(FAVORITES_ROW_ID, "Favorites")
+    private var unwatchedFavoritesState = HomeRowState<Scene>(UNWATCHED_ROW_ID, "Unwatched Favorites")
+    private var recentlyReleasedState = HomeRowState<Scene>(RELEASED_ROW_ID, "Recently Released")
+    private var savedFilterState = HomeRowState<Scene>(SAVED_FILTER_ROW_ID, "Saved Filter")
+    private var pinnedFilter: SavedSceneFilter? = null
+    private lateinit var layoutSnapshot: HomeLayoutSettings
     private val contentRows = mutableMapOf<Long, ListRow>()
     private var heroRow: ListRow? = null
     private lateinit var shortcutsRow: ListRow
@@ -81,6 +89,7 @@ class MainFragment : RowsSupportFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        layoutSnapshot = app.prefs.homeLayout
         view.setBackgroundColor(0xFF1B1B1B.toInt())
         // Overscan-safe padding so content isn't clipped at screen edges
         val density = resources.displayMetrics.density
@@ -137,12 +146,14 @@ class MainFragment : RowsSupportFragment() {
                         )
                     )
                 }
+                is HomeViewAll -> openViewAll(item)
                 is String -> {
                     when (item) {
                         "Settings" -> startActivity(Intent(requireContext(), SettingsActivity::class.java))
                         "Search" -> startActivity(Intent(requireContext(), SearchActivity::class.java))
                         "Surprise Me" -> playRandomScene()
                         "Favorites" -> startActivity(Intent(requireContext(), FavoritesActivity::class.java))
+                        "Library" -> startActivity(Intent(requireContext(), LibraryActivity::class.java))
                         "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
                         "Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))
                         "Performers" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.PERFORMER))
@@ -184,16 +195,7 @@ class MainFragment : RowsSupportFragment() {
 
     private fun createStaticRows() {
         val shortcutsAdapter = ArrayObjectAdapter(SettingsPresenter())
-        shortcutsAdapter.add("Search")
-        shortcutsAdapter.add("Surprise Me")
-        shortcutsAdapter.add("Favorites")
-        shortcutsAdapter.add("Browse Folders")
-        shortcutsAdapter.add("Tags")
-        shortcutsAdapter.add("Performers")
-        shortcutsAdapter.add("Studios")
-        shortcutsAdapter.add("Markers")
-        shortcutsAdapter.add("Stats")
-        shortcutsAdapter.add("Saved Filters")
+        layoutSnapshot.visibleShortcuts().map { it.label }.forEach(shortcutsAdapter::add)
         if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
         shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, ""), shortcutsAdapter)
 
@@ -209,6 +211,10 @@ class MainFragment : RowsSupportFragment() {
 
     override fun onResume() {
         super.onResume()
+        if (layoutSnapshot != app.prefs.homeLayout) {
+            requireActivity().recreate()
+            return
+        }
         loadContent()
     }
 
@@ -299,28 +305,54 @@ class MainFragment : RowsSupportFragment() {
     private fun indexOfRow(row: ListRow): Int =
         (0 until rowsAdapter.size()).indexOfFirst { rowsAdapter.get(it) === row }
 
-    private fun reconcileContentRow(state: HomeRowState<out Any>, items: List<Any>?) {
+    private fun rowId(row: HomeContentRow): Long = when (row) {
+        HomeContentRow.CONTINUE_PLAYING -> CONTINUE_ROW_ID
+        HomeContentRow.RECENTLY_PLAYED -> PLAYED_ROW_ID
+        HomeContentRow.RECENTLY_ADDED -> RECENT_ROW_ID
+        HomeContentRow.FAVORITES -> FAVORITES_ROW_ID
+        HomeContentRow.UNWATCHED_FAVORITES -> UNWATCHED_ROW_ID
+        HomeContentRow.RECENTLY_RELEASED -> RELEASED_ROW_ID
+        HomeContentRow.SAVED_FILTER -> SAVED_FILTER_ROW_ID
+    }
+
+    private fun openViewAll(item: HomeViewAll) {
+        if (item.row == HomeContentRow.SAVED_FILTER) {
+            pinnedFilter?.let {
+                startActivity(SavedFilterScenesActivity.intent(requireContext(), it))
+            } ?: Toast.makeText(requireContext(), "Saved filter unavailable", Toast.LENGTH_LONG).show()
+        } else {
+            startActivity(HomeRowScenesActivity.intent(requireContext(), item.row))
+        }
+    }
+
+    private fun reconcileContentRow(
+        rowType: HomeContentRow,
+        state: HomeRowState<out Any>,
+        items: List<Any>?
+    ) {
         val existing = contentRows[state.id]
-        if (!state.visible) {
+        if (!state.visible || !layoutSnapshot.isRowVisible(rowType)) {
             existing?.let(rowsAdapter::remove)
             contentRows.remove(state.id)
             return
         }
         val row = existing ?: ListRow(
             HeaderItem(state.id, state.displayTitle),
-            ArrayObjectAdapter(CardPresenter(app.api))
+            ArrayObjectAdapter(CardPresenter(app.api, layoutSnapshot.cardSize))
         ).also { contentRows[state.id] = it }
         if (row.headerItem?.name != state.displayTitle) {
             row.headerItem = HeaderItem(state.id, state.displayTitle)
             val index = indexOfRow(row)
             if (index >= 0) rowsAdapter.notifyItemRangeChanged(index, 1)
         }
-        if (items != null) updateItems(row, items)
+        if (items != null) updateItems(row, items + HomeViewAll(rowType, state.title))
     }
 
     private fun reconcileHomeRows() {
         val heroItem = continueState.items.orEmpty().firstOrNull()?.let { (scene, resumeSeconds) ->
             HeroItem(scene, (resumeSeconds * 1000).toLong())
+        }.takeIf {
+            layoutSnapshot.showHero && layoutSnapshot.isRowVisible(HomeContentRow.CONTINUE_PLAYING)
         }
         if (heroItem == null) {
             heroRow?.let(rowsAdapter::remove)
@@ -333,16 +365,19 @@ class MainFragment : RowsSupportFragment() {
             updateItems(row, listOf(heroItem))
         }
 
-        reconcileContentRow(continueState, continueState.items?.map { it.first })
-        reconcileContentRow(recentlyPlayedState, recentlyPlayedState.items)
-        reconcileContentRow(recentlyAddedState, recentlyAddedState.items)
-        reconcileContentRow(favoritesState, favoritesState.items?.take(20))
+        reconcileContentRow(HomeContentRow.CONTINUE_PLAYING, continueState, continueState.items?.map { it.first })
+        reconcileContentRow(HomeContentRow.RECENTLY_PLAYED, recentlyPlayedState, recentlyPlayedState.items)
+        reconcileContentRow(HomeContentRow.RECENTLY_ADDED, recentlyAddedState, recentlyAddedState.items)
+        reconcileContentRow(HomeContentRow.FAVORITES, favoritesState, favoritesState.items?.take(20))
+        reconcileContentRow(HomeContentRow.UNWATCHED_FAVORITES, unwatchedFavoritesState, unwatchedFavoritesState.items)
+        reconcileContentRow(HomeContentRow.RECENTLY_RELEASED, recentlyReleasedState, recentlyReleasedState.items)
+        reconcileContentRow(HomeContentRow.SAVED_FILTER, savedFilterState, savedFilterState.items)
 
         val orderedRows = buildList {
             heroRow?.let(::add)
             add(shortcutsRow)
-            listOf(continueState, recentlyPlayedState, recentlyAddedState, favoritesState).forEach { state ->
-                if (state.visible) contentRows[state.id]?.let(::add)
+            layoutSnapshot.orderedRows().forEach { rowType ->
+                contentRows[rowId(rowType)]?.let(::add)
             }
             add(settingsRow)
         }
@@ -365,10 +400,19 @@ class MainFragment : RowsSupportFragment() {
         isLoading = true
         val live = captureFocus()
         val focus = if (live.rowIndex >= 0) live else pausedFocus
-        continueState = continueState.refreshing()
-        recentlyPlayedState = recentlyPlayedState.refreshing()
-        recentlyAddedState = recentlyAddedState.refreshing()
-        favoritesState = favoritesState.refreshing()
+        fun enabled(row: HomeContentRow) = layoutSnapshot.isRowVisible(row)
+        if (enabled(HomeContentRow.CONTINUE_PLAYING)) continueState = continueState.refreshing()
+        if (enabled(HomeContentRow.RECENTLY_PLAYED)) recentlyPlayedState = recentlyPlayedState.refreshing()
+        if (enabled(HomeContentRow.RECENTLY_ADDED)) recentlyAddedState = recentlyAddedState.refreshing()
+        if (enabled(HomeContentRow.FAVORITES)) favoritesState = favoritesState.refreshing()
+        if (enabled(HomeContentRow.UNWATCHED_FAVORITES)) unwatchedFavoritesState = unwatchedFavoritesState.refreshing()
+        if (enabled(HomeContentRow.RECENTLY_RELEASED)) recentlyReleasedState = recentlyReleasedState.refreshing()
+        if (enabled(HomeContentRow.SAVED_FILTER)) {
+            savedFilterState = savedFilterState.copy(
+                title = layoutSnapshot.savedFilterName.ifBlank { "Saved Filter" }
+            ).refreshing()
+            pinnedFilter = null
+        }
         reconcileHomeRows()
         lifecycleScope.launch {
             try {
@@ -382,21 +426,71 @@ class MainFragment : RowsSupportFragment() {
                 }
 
                 val rows = coroutineScope {
-                    val continueJob = async { loadRow { app.api.findContinuePlaying() } }
-                    val playedJob = async { loadRow { app.api.findRecentlyPlayed(25) } }
-                    val recentJob = async { loadRow { app.api.findRecentScenes(25) } }
-                    val favJob = async { loadRow { app.api.findFavoriteScenes() } }
-                    DashboardLoad(continueJob.await(), playedJob.await(), recentJob.await(), favJob.await())
+                    val continueJob = async {
+                        if (shouldLoadHomeRow(
+                                enabled(HomeContentRow.CONTINUE_PLAYING), app.prefs.channelsEnabled, feedsLauncher = true
+                            )
+                        ) loadRow { app.api.findContinuePlaying() }
+                        else RowResult<List<Pair<Scene, Double>>>(emptyList())
+                    }
+                    val playedJob = async {
+                        if (enabled(HomeContentRow.RECENTLY_PLAYED)) loadRow { app.api.findRecentlyPlayed(25) }
+                        else RowResult<List<Scene>>(emptyList())
+                    }
+                    val recentJob = async {
+                        if (shouldLoadHomeRow(
+                                enabled(HomeContentRow.RECENTLY_ADDED), app.prefs.channelsEnabled, feedsLauncher = true
+                            )
+                        ) loadRow { app.api.findRecentScenes(25) }
+                        else RowResult<List<Scene>>(emptyList())
+                    }
+                    val favJob = async {
+                        if (enabled(HomeContentRow.FAVORITES)) loadRow { app.api.findFavoriteScenes() }
+                        else RowResult<List<Scene>>(emptyList())
+                    }
+                    val unwatchedJob = async {
+                        if (enabled(HomeContentRow.UNWATCHED_FAVORITES)) loadRow {
+                            app.api.findFavoriteScenesPaged(
+                                page = 1, perPage = 25, sort = "updated_at", direction = "DESC", unwatchedOnly = true
+                            ).second
+                        } else RowResult<List<Scene>>(emptyList())
+                    }
+                    val releasedJob = async {
+                        if (enabled(HomeContentRow.RECENTLY_RELEASED)) loadRow {
+                            app.api.findRecentlyReleasedPaged(page = 1, perPage = 25).second
+                        } else RowResult<List<Scene>>(emptyList())
+                    }
+                    val savedJob = async {
+                        if (enabled(HomeContentRow.SAVED_FILTER)) loadRow {
+                            val id = layoutSnapshot.savedFilterId
+                            if (id.isBlank()) throw java.io.IOException("Choose a saved filter in Home Settings")
+                            val filter = app.api.findSavedSceneFilter(id)
+                                ?: throw java.io.IOException("Saved filter no longer exists")
+                            pinnedFilter = filter
+                            savedFilterState = savedFilterState.copy(title = filter.name)
+                            app.api.findScenesForSavedFilter(filter, page = 1, perPage = 25).second
+                        } else RowResult<List<Scene>>(emptyList())
+                    }
+                    DashboardLoad(
+                        continueJob.await(), playedJob.await(), recentJob.await(), favJob.await(),
+                        unwatchedJob.await(), releasedJob.await(), savedJob.await()
+                    )
                 }
 
                 continueState = applyResult(continueState, rows.continuePlaying)
                 recentlyPlayedState = applyResult(recentlyPlayedState, rows.recentlyPlayed)
                 recentlyAddedState = applyResult(recentlyAddedState, rows.recentlyAdded)
                 favoritesState = applyResult(favoritesState, rows.favorites)
+                unwatchedFavoritesState = applyResult(unwatchedFavoritesState, rows.unwatchedFavorites)
+                recentlyReleasedState = applyResult(recentlyReleasedState, rows.recentlyReleased)
+                savedFilterState = applyResult(savedFilterState, rows.savedFilter)
                 rows.continuePlaying.error?.let { noteError("Continue Playing", it) }
                 rows.recentlyPlayed.error?.let { noteError("Recently Played", it) }
                 rows.recentlyAdded.error?.let { noteError("Recently Added", it) }
                 rows.favorites.error?.let { noteError("Favorites", it) }
+                rows.unwatchedFavorites.error?.let { noteError("Unwatched Favorites", it) }
+                rows.recentlyReleased.error?.let { noteError("Recently Released", it) }
+                rows.savedFilter.error?.let { noteError("Saved Filter", it) }
                 reconcileHomeRows()
 
                 val continuePairs = rows.continuePlaying.value.orEmpty()
@@ -436,6 +530,9 @@ class MainFragment : RowsSupportFragment() {
                 if (recentlyPlayedState.loading) recentlyPlayedState = recentlyPlayedState.failed(e)
                 if (recentlyAddedState.loading) recentlyAddedState = recentlyAddedState.failed(e)
                 if (favoritesState.loading) favoritesState = favoritesState.failed(e)
+                if (unwatchedFavoritesState.loading) unwatchedFavoritesState = unwatchedFavoritesState.failed(e)
+                if (recentlyReleasedState.loading) recentlyReleasedState = recentlyReleasedState.failed(e)
+                if (savedFilterState.loading) savedFilterState = savedFilterState.failed(e)
                 reconcileHomeRows()
                 if (!isAdded) return@launch
                 val message = e.message ?: "Unknown error"
@@ -502,8 +599,14 @@ class MainFragment : RowsSupportFragment() {
         private const val FAVORITES_ROW_ID = 5L
         private const val SHORTCUTS_ROW_ID = 6L
         private const val SETTINGS_ROW_ID = 7L
+        private const val UNWATCHED_ROW_ID = 8L
+        private const val RELEASED_ROW_ID = 9L
+        private const val SAVED_FILTER_ROW_ID = 10L
     }
 }
+
+internal fun shouldLoadHomeRow(rowVisible: Boolean, channelsEnabled: Boolean, feedsLauncher: Boolean): Boolean =
+    rowVisible || (channelsEnabled && feedsLauncher)
 
 /** Result of one independently-failing dashboard row load. */
 internal class RowResult<out T>(val value: T? = null, val error: Exception? = null)
@@ -522,10 +625,13 @@ internal suspend fun <T> loadRow(block: suspend () -> T): RowResult<T> = try {
     RowResult(error = e)
 }
 
-/** The four home-screen row queries, fetched concurrently. */
+/** The enabled home-screen row queries, fetched concurrently. */
 private class DashboardLoad(
     val continuePlaying: RowResult<List<Pair<Scene, Double>>>,
     val recentlyPlayed: RowResult<List<Scene>>,
     val recentlyAdded: RowResult<List<Scene>>,
-    val favorites: RowResult<List<Scene>>
+    val favorites: RowResult<List<Scene>>,
+    val unwatchedFavorites: RowResult<List<Scene>>,
+    val recentlyReleased: RowResult<List<Scene>>,
+    val savedFilter: RowResult<List<Scene>>
 )

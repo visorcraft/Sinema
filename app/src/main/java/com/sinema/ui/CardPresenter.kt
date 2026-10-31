@@ -12,14 +12,23 @@ import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
 import com.sinema.model.EntityItem
 import com.sinema.model.FolderItem
+import com.sinema.model.HomeCardSize
 import com.sinema.model.Scene
 import com.sinema.model.StarRating
 import com.sinema.util.GlideAuth
 
-class CardPresenter(private val api: SinemaApi) : Presenter() {
+class CardPresenter(
+    private val api: SinemaApi,
+    private val cardSize: HomeCardSize = HomeCardSize.COMPACT
+) : Presenter() {
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_card, parent, false)
+        val density = parent.resources.displayMetrics.density
+        view.layoutParams.width = (cardSize.widthDp * density).toInt()
+        view.layoutParams.height = (cardSize.heightDp * density).toInt()
+        (view.findViewById<ImageView>(R.id.card_image).parent as View).layoutParams.height =
+            (cardSize.imageHeightDp * density).toInt()
         return ViewHolder(view)
     }
 
@@ -55,6 +64,17 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
                     .load(GlideAuth.url(api, url))
                     .centerCrop()
                     .into(image)
+            }
+            is HomeViewAll -> {
+                title.text = item.actionLabel
+                content.text = item.title
+                heart?.visibility = View.GONE
+                checkmark?.visibility = View.GONE
+                progress?.visibility = View.GONE
+                Glide.with(view.context).clear(image)
+                image.setImageResource(android.R.drawable.ic_menu_more)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
             }
             is EntityItem -> {
                 title.text = item.name
@@ -211,6 +231,13 @@ class SettingsPresenter : Presenter() {
             "Browse Folders" -> {
                 title.text = "📁 Browse Folders"
                 content.text = "All folders"
+                image.setImageResource(android.R.drawable.ic_menu_agenda)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Library" -> {
+                title.text = "🎬 Library"
+                content.text = "Browse your collection"
                 image.setImageResource(android.R.drawable.ic_menu_agenda)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())

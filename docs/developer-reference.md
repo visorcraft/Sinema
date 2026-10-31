@@ -67,6 +67,8 @@ Session mode can automatically re-login when Stash GraphQL returns 401, if the p
 
 Each Stash-backed row has a `HomeRowState` that retains its last successful items through loading and failures. `MainFragment` keeps persistent `ListRow` instances and reconciles only changed adapters, headers, and row positions instead of clearing the dashboard. Stable header IDs preserve focus across refresh-status changes and row insertion or removal. Empty successful results hide their rows; failures retain content or show an unavailable header when no content has loaded.
 
+`HomeLayoutSettings` persists normalized shortcut/row order, visibility, card size, hero visibility, Library grouping, and the pinned saved filter in `Prefs`. `HomeSettingsActivity` and `HomeOrderActivity` edit that value; `LibraryActivity` presents grouped secondary shortcuts. `HomeRowScenesActivity` provides paged View All grids, while optional dashboard rows use the same independent `RowResult` error isolation as the original four rows. Recently Played's default recency sort fetches the complete filtered result before applying nulls-last ordering and slicing pages because Stash orders null timestamps unpredictably; other sorts remain server-paged.
+
 ### Scene detail
 
 `SceneDetailActivity` receives lightweight scene extras through `SceneIntents`, then fetches full metadata with `findSceneFull`.
@@ -112,6 +114,10 @@ Full details include:
 Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sort fields. Entity sort options live in `EntityGridActivity.kt`.
 
 `SceneFilterOptions.kt` maps watched state to `play_count` and favorites to `rating100`, with per-screen persistence in `Prefs`. The Menu key remains available through `SortableScreen.handleSortMenuKey`.
+
+## Playback UI
+
+`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for native scrubbing plus marker ticks. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals; `previewBucketMs` throttles authenticated timestamp screenshot requests to five-second buckets. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
 
 ## Playback state
 `PlaybackActivity.savePlayback` writes Stash activity through `sceneSaveActivity`.

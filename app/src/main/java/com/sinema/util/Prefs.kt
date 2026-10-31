@@ -71,6 +71,10 @@ class Prefs(context: Context) {
         get() = prefs.getString("playback_stream_quality", "") ?: ""
         set(value) = prefs.edit().putString("playback_stream_quality", value).apply()
 
+    var playbackSeekPreset: String
+        get() = prefs.getString("playback_seek_preset", "") ?: ""
+        set(value) = prefs.edit().putString("playback_seek_preset", value).apply()
+
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
         get() = ProfileCodec.fromJson(getSecureString("server_profiles"))
@@ -181,6 +185,18 @@ class Prefs(context: Context) {
 
     fun setSceneFilterFor(screen: String, filter: com.sinema.model.SceneFilterOptions) =
         prefs.edit().putString("scene_filter_$screen", filter.toPreferenceValue()).apply()
+
+    var homeLayout: com.sinema.model.HomeLayoutSettings
+        get() = try {
+            gson.fromJson(
+                prefs.getString("home_layout", null),
+                com.sinema.model.HomeLayoutSettings::class.java
+            ) ?: com.sinema.model.HomeLayoutSettings()
+        } catch (e: Exception) {
+            Log.w("Sinema", "Invalid home layout preferences; using defaults", e)
+            com.sinema.model.HomeLayoutSettings()
+        }.normalized()
+        set(value) = prefs.edit().putString("home_layout", gson.toJson(value.normalized())).apply()
 
     fun getAllResumePositions(): Map<String, Long> {
         return prefs.all.filter { it.key.startsWith("resume_") && it.value is Long && (it.value as Long) > 0 }

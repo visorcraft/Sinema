@@ -57,6 +57,22 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".ui.HomeSettingsActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.HomeOrderActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.LibraryActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.HomeRowScenesActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ui.FavoritesActivity"
             android:screenOrientation="landscape" />
 

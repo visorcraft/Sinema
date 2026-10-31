@@ -746,4 +746,48 @@ class SinemaApiTest {
             server.stop(0)
         }
     }
+
+    @Test
+    fun `home view all queries preserve paging and row criteria`() {
+        val requestBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBodies.add(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            kotlinx.coroutines.runBlocking {
+                api.findFavoriteScenesPaged(
+                    page = 2, perPage = 50, sort = "updated_at", direction = "DESC", unwatchedOnly = true
+                )
+                api.findContinuePlayingPaged(page = 3, perPage = 75)
+                api.findRecentlyPlayedPaged(page = 2, perPage = 25)
+            }
+            assertEquals(3, requestBodies.size)
+            val favorites = requestBodies[0]
+            org.junit.Assert.assertTrue(favorites, favorites.contains("\"page\":2"))
+            org.junit.Assert.assertTrue(favorites, favorites.contains("\"per_page\":50"))
+            org.junit.Assert.assertTrue(favorites, favorites.contains("\"rating100\""))
+            org.junit.Assert.assertTrue(favorites, favorites.contains("\"play_count\""))
+            val resume = requestBodies[1]
+            org.junit.Assert.assertTrue(resume, resume.contains("\"page\":3"))
+            org.junit.Assert.assertTrue(resume, resume.contains("\"per_page\":75"))
+            org.junit.Assert.assertTrue(resume, resume.contains("\"resume_time\""))
+            org.junit.Assert.assertTrue(resume, resume.contains("GREATER_THAN"))
+            val recentlyPlayed = requestBodies[2]
+            org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"page\":1"))
+            org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"per_page\":0"))
+        } finally {
+            server.stop(0)
+        }
+    }
 }

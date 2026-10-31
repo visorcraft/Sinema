@@ -108,7 +108,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 ## Features
 
-- **🏠 Home Screen** — Hero banner for the newest continue-playing scene, plus Continue Playing, Recently Played, Recently Added, Favorites.
+- **🏠 Personalized Home** — Reorder/hide shortcuts and rows, group secondary destinations under Library, choose card sizes, pin optional rows and a saved filter, and open full grids with View All.
 - **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with scene counts and images.
 - **📁 Folder Browser** — Navigate your library by directory structure.
 - **🔍 Unified Search** — Find scenes, tags, performers, and studios together; voice search via the remote microphone where available.
@@ -119,6 +119,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **▶️ Resume Playback** — Pause anywhere, pick up where you left off (persisted to Stash). Scene cards show a thin progress bar for partially watched scenes.
 - **🎬 Scene Detail** — Friendly titles, synopsis, metadata chips, and collapsible technical details for filenames, paths, and file information.
 - **📝 Subtitles, Tracks & Aspect Ratio** — Select subtitles and audio tracks, adjust playback speed, and choose Auto, 16:9, 4:3, or 9:16 display ratios.
+- **🎮 Remote-First Player** — Marker-aware timeline, configurable quick seek, remaining time, timestamped scrub previews, and D-pad playback actions.
 - **📑 Scene Markers as Chapters** — Jump between markers via chapters dialog or media keys.
 - **▶️ Play All & Autoplay** — Queue all scenes in a folder or entity grid; auto-advances when one ends.
 - **❤️ Favorites** — One-tap favorite/unfavorite via star rating, synced with Stash ratings. Folders with favorited content show a heart overlay.

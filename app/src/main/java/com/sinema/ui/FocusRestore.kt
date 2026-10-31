@@ -10,6 +10,7 @@ object FocusRestore {
         is Scene -> "scene:${item.id}"
         is EntityItem -> "entity:${item.kind}:${item.id}"
         is String -> "string:$item"
+        is HomeViewAll -> item.key
         else -> "obj:$item"
     }
 

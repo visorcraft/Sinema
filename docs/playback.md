@@ -31,14 +31,18 @@ These Stash fields drive the home screen:
 
 ## Player controls
 
-Standard Android TV media controls come from ExoPlayer's `PlayerView`.
+Sinema's remote-first controller is built around Media3 playback and a D-pad-accessible timeline.
 
 Common controls:
 
 - Select or OK: show controls or activate the focused control.
 - Play/Pause: pause or resume.
 - Back: leave playback and save progress.
-- Seek controls: use the default player controls exposed by your Android TV device.
+- Rewind/forward buttons: quick-seek using the selected preset. Choose `Seek` in the action row or `Seek buttons` in the playback menu to cycle through −10s/+30s, −30s/+60s, and −60s/+60s. The choice is remembered.
+- Timeline: focus the seek bar and use D-pad Left/Right to scrub. Marker positions appear as ticks.
+- Scrub preview: while actively scrubbing, Sinema shows a timestamp and an authenticated Stash frame near that position. Requests are throttled to five-second buckets; the image is hidden if the server cannot provide it.
+- Remaining time: shown at the right side of the time row.
+- Action row: subtitles/audio/speed through Media3 settings, aspect ratio, stream quality, rating, next marker, and seek preset. All actions are D-pad reachable.
 
 ## Subtitles
 
@@ -56,7 +60,7 @@ Subtitle requests use the same media auth headers as streams, so they work with 
 
 ## Audio tracks and playback speed
 
-The default ExoPlayer controller provides the settings menu for:
+The Settings button in Sinema's controller opens the Media3 settings menu for:
 
 - Audio track selection, when the stream exposes multiple audio tracks.
 - Playback speed.

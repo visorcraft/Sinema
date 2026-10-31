@@ -503,6 +503,47 @@ class SinemaApi(
     suspend fun findRecentScenes(perPage: Int = 25): List<Scene> =
         findScenesInternal(perPage = perPage, sort = "created_at", direction = "DESC").second
 
+    suspend fun findFavoriteScenesPaged(
+        page: Int,
+        perPage: Int,
+        sort: String,
+        direction: String,
+        unwatchedOnly: Boolean = false,
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> = findScenesInternal(
+        page = page,
+        perPage = perPage,
+        sort = sort,
+        direction = direction,
+        sceneFilter = buildMap {
+            put("rating100", mapOf("value" to 1, "modifier" to "GREATER_THAN"))
+            if (unwatchedOnly) put("play_count", mapOf("value" to 0, "modifier" to "EQUALS"))
+        },
+        filters = filters
+    )
+
+    suspend fun findRecentScenesPaged(
+        page: Int,
+        perPage: Int,
+        sort: String = "created_at",
+        direction: String = "DESC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> = findScenesInternal(
+        page = page,
+        perPage = perPage,
+        sort = sort,
+        direction = direction,
+        filters = filters
+    )
+
+    suspend fun findRecentlyReleasedPaged(
+        page: Int,
+        perPage: Int,
+        sort: String = "date",
+        direction: String = "DESC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> = findRecentScenesPaged(page, perPage, sort, direction, filters)
+
     /**
      * One random scene from the whole library, for the "Surprise Me" card.
      * @return a scene, or null when the library is empty.
@@ -674,6 +715,43 @@ class SinemaApi(
             val resumeTime = obj.asJsonObject.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
             Pair(scene, resumeTime)
         }
+    }
+
+    suspend fun findContinuePlayingPaged(
+        page: Int,
+        perPage: Int,
+        sort: String = "last_played_at",
+        direction: String = "DESC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> = findScenesInternal(
+        page = page,
+        perPage = perPage,
+        sort = sort,
+        direction = direction,
+        sceneFilter = mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
+        filters = filters
+    )
+
+    suspend fun findRecentlyPlayedPaged(
+        page: Int,
+        perPage: Int,
+        sort: String = "last_played_at",
+        direction: String = "DESC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> {
+        val result = findScenesInternal(
+            page = if (sort == "last_played_at") 1 else page,
+            perPage = if (sort == "last_played_at") 0 else perPage,
+            sort = sort,
+            direction = direction,
+            sceneFilter = RECENTLY_PLAYED_SCENE_FILTER,
+            filters = filters,
+            fields = SCENE_FIELDS + " last_played_at"
+        )
+        if (sort != "last_played_at") return result
+        // Stash orders null timestamps unpredictably, so recency paging must
+        // sort the complete result before slicing rather than sorting each page.
+        return result.first to recentlyPlayedPage(result.second, page, perPage, direction)
     }
 
     suspend fun hasFavoritesInPath(pathPrefix: String): Boolean {

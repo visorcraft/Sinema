@@ -26,6 +26,8 @@ import com.sinema.model.PlaybackAspectRatio
 import com.sinema.model.PlaybackStreamQuality
 import com.sinema.model.CaptionRef
 import com.sinema.model.StarRating
+import com.bumptech.glide.Glide
+import com.sinema.util.GlideAuth
 import com.sinema.util.PlaybackQueue
 import com.sinema.util.SceneIntents
 import com.sinema.util.TimeFormat
@@ -55,12 +57,22 @@ class PlaybackActivity : FragmentActivity() {
     private var streamQualityDialog: android.app.AlertDialog? = null
     private var aspectRatio = PlaybackAspectRatio.AUTO
     private var streamQuality = PlaybackStreamQuality.AUTO
+    private var seekPreset = SeekPreset.TEN_THIRTY
+    private var sceneTitle = ""
+    private var previewBucket = -1L
+    private var previewSceneId = ""
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
     private val renderersFactory by lazy { PlaybackRenderersFactory(this) }
     private var isPaused = false
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { playerView.hideController() }
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            updatePlaybackText()
+            handler.postDelayed(this, 500L)
+        }
+    }
     private val videoOutputTimeout = Runnable {
         val exo = player
         if (exo != null && shouldRetryWithoutVideoOutput(exo.playWhenReady, hasVideoOutput)) {
@@ -74,12 +86,14 @@ class PlaybackActivity : FragmentActivity() {
         setContentView(R.layout.activity_playback)
         aspectRatio = PlaybackAspectRatio.fromName(prefs.playbackAspectRatio)
         streamQuality = PlaybackStreamQuality.fromName(prefs.playbackStreamQuality)
+        seekPreset = SeekPreset.fromName(prefs.playbackSeekPreset)
         sceneId = SceneIntents.sceneIdFrom(intent)
         videoWidth = SceneIntents.videoWidthFrom(intent)
         videoHeight = SceneIntents.videoHeightFrom(intent)
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
+        loadSceneTitle()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -99,12 +113,14 @@ class PlaybackActivity : FragmentActivity() {
     override fun onStart() {
         super.onStart()
         initPlayer()
+        handler.post(progressRunnable)
         startTimeMs = System.currentTimeMillis()
     }
 
     override fun onPause() {
         super.onPause()
         savePlayback()
+        hideSeekPreview()
         aspectRatioDialog?.dismiss()
         aspectRatioDialog = null
         chaptersDialog?.dismiss()
@@ -121,6 +137,7 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onStop() {
         handler.removeCallbacks(hideRunnable)
+        handler.removeCallbacks(progressRunnable)
         super.onStop()
         aspectRatioDialog?.dismiss()
         aspectRatioDialog = null
@@ -140,6 +157,7 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(hideRunnable)
+        handler.removeCallbacks(progressRunnable)
         super.onDestroy()
     }
 
@@ -240,6 +258,7 @@ class PlaybackActivity : FragmentActivity() {
         val existing = container.findViewById<AspectRatioPlayerView>(R.id.player_view)
         if (existing != null && (existing.videoSurfaceView is TextureView) == wantTexture) {
             playerView = existing
+            bindPlaybackControls()
             return
         }
         existing?.let {
@@ -259,14 +278,163 @@ class PlaybackActivity : FragmentActivity() {
         playerView.player = player
         playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
             isControllerVisible = visibility == View.VISIBLE
+            if (!isControllerVisible) hideSeekPreview()
         })
-        playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
-            showAspectRatioDialog()
-        }
+        bindPlaybackControls()
         android.util.Log.d(
             "Sinema",
             "${if (wantTexture) "TextureView" else "SurfaceView"} output for ${width}x$height"
         )
+    }
+
+    private fun loadSceneTitle() {
+        val requestedScene = sceneId
+        lifecycleScope.launch {
+            try {
+                val details = SinemaApp.instance.api.findSceneFull(requestedScene)
+                if (sceneId == requestedScene) {
+                    sceneTitle = details?.scene?.displayTitle ?: ""
+                    updatePlaybackText()
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("Sinema", "Could not load playback title for $requestedScene", e)
+            }
+        }
+    }
+
+    private fun bindPlaybackControls() {
+        if (!::playerView.isInitialized) return
+        playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
+        playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).apply {
+            setSceneMarkers(markers)
+            setKeyTimeIncrement(seekPreset.forwardMs)
+            scrubPreviewListener = object : MarkerTimeBar.ScrubPreviewListener {
+                override fun onPreviewStart(positionMs: Long) = showSeekPreview(positionMs)
+                override fun onPreviewMove(positionMs: Long) = showSeekPreview(positionMs)
+                override fun onPreviewStop() = hideSeekPreview()
+            }
+        }
+        playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
+            showAspectRatioDialog()
+        }
+        playerView.findViewById<View>(R.id.playback_quality_button).setOnClickListener {
+            showStreamQualityDialog()
+        }
+        playerView.findViewById<View>(R.id.playback_rate_button).setOnClickListener {
+            showRateDialog()
+        }
+        playerView.findViewById<View>(R.id.playback_marker_button).setOnClickListener {
+            seekToAdjacentMarker(true)
+        }
+        playerView.findViewById<android.widget.Button>(R.id.playback_seek_preset_button).apply {
+            text = "Seek: ${seekPreset.label}"
+            setOnClickListener { cycleSeekPreset() }
+        }
+        playerView.findViewById<View>(androidx.media3.ui.R.id.exo_prev).setOnClickListener {
+            seekToAdjacentMarker(false)
+        }
+        playerView.findViewById<View>(androidx.media3.ui.R.id.exo_next).setOnClickListener {
+            seekToAdjacentMarker(true)
+        }
+        playerView.findViewById<View>(androidx.media3.ui.R.id.exo_rew_with_amount).apply {
+            contentDescription = "Rewind ${seekPreset.backwardMs / 1000} seconds"
+            setOnClickListener { seekRelative(-seekPreset.backwardMs) }
+        }
+        playerView.findViewById<View>(androidx.media3.ui.R.id.exo_ffwd_with_amount).apply {
+            contentDescription = "Forward ${seekPreset.forwardMs / 1000} seconds"
+            setOnClickListener { seekRelative(seekPreset.forwardMs) }
+        }
+        updatePlaybackText()
+    }
+
+    private fun updatePlaybackText() {
+        if (!::playerView.isInitialized) return
+        playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
+        val exo = player
+        playerView.findViewById<android.widget.TextView>(R.id.playback_remaining).text =
+            if (exo == null) "" else formatRemainingMs(exo.currentPosition, exo.duration)
+        playerView.findViewById<View>(R.id.playback_marker_button).apply {
+            isEnabled = markers.isNotEmpty()
+            alpha = if (markers.isEmpty()) 0.5f else 1.0f
+        }
+    }
+
+    private fun seekRelative(deltaMs: Long) {
+        val exo = player ?: return
+        val duration = exo.duration
+        val target = (exo.currentPosition + deltaMs).coerceIn(
+            0L,
+            if (duration > 0L) duration else Long.MAX_VALUE
+        )
+        exo.seekTo(target)
+        playerView.showController()
+        updatePlaybackText()
+    }
+
+    private fun cycleSeekPreset() {
+        seekPreset = seekPreset.next()
+        prefs.playbackSeekPreset = seekPreset.name
+        applySeekPreset()
+        bindPlaybackControls()
+        Toast.makeText(this, "Seek buttons ${seekPreset.label}", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun applySeekPreset(target: ExoPlayer? = player) {
+        target?.setSeekBackIncrementMs(seekPreset.backwardMs)
+        target?.setSeekForwardIncrementMs(seekPreset.forwardMs)
+    }
+
+    private fun showSeekPreview(positionMs: Long) {
+        if (!::playerView.isInitialized) return
+        val exo = player ?: return
+        val bucket = previewBucketMs(positionMs, exo.duration)
+        val container = playerView.findViewById<View>(R.id.playback_preview_container)
+        container.visibility = View.VISIBLE
+        playerView.findViewById<android.widget.TextView>(R.id.playback_preview_time).text =
+            TimeFormat.formatMs(bucket)
+        if (bucket == previewBucket && previewSceneId == sceneId) return
+        previewBucket = bucket
+        previewSceneId = sceneId
+        val image = playerView.findViewById<android.widget.ImageView>(R.id.playback_preview_image)
+        Glide.with(image).clear(image)
+        Glide.with(image)
+            .load(GlideAuth.url(SinemaApp.instance.api,
+                SinemaApp.instance.api.getMarkerScreenshotUrl(sceneId, bucket / 1000.0)))
+            .centerCrop()
+            .listener(object : com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable> {
+                override fun onLoadFailed(
+                    e: com.bumptech.glide.load.engine.GlideException?,
+                    model: Any?,
+                    target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>,
+                    isFirstResource: Boolean
+                ): Boolean {
+                    if (previewSceneId == sceneId && previewBucket == bucket) image.visibility = View.INVISIBLE
+                    return false
+                }
+
+                override fun onResourceReady(
+                    resource: android.graphics.drawable.Drawable,
+                    model: Any,
+                    target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>,
+                    dataSource: com.bumptech.glide.load.DataSource,
+                    isFirstResource: Boolean
+                ): Boolean {
+                    if (previewSceneId == sceneId && previewBucket == bucket) image.visibility = View.VISIBLE
+                    return false
+                }
+            })
+            .into(image)
+    }
+
+    private fun hideSeekPreview() {
+        previewBucket = -1L
+        previewSceneId = ""
+        if (!::playerView.isInitialized) return
+        playerView.findViewById<View>(R.id.playback_preview_container).visibility = View.GONE
+        val image = playerView.findViewById<android.widget.ImageView>(R.id.playback_preview_image)
+        Glide.with(image).clear(image)
     }
 
     private fun scheduleVideoOutputTimeout() {
@@ -324,6 +492,7 @@ class PlaybackActivity : FragmentActivity() {
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
             .also { exo ->
+                applySeekPreset(exo)
                 playerView.player = exo
                 exo.setMediaItem(buildMediaItem())
                 exo.prepare()
@@ -417,18 +586,22 @@ class PlaybackActivity : FragmentActivity() {
                         lifecycleScope.launch {
                             var nextWidth = 0
                             var nextHeight = 0
+                            var nextTitle = ""
                             try {
                                 val details = app.api.findSceneFull(nextId)
                                 captions = details?.scene?.captions ?: emptyList()
                                 markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
                                 nextWidth = details?.scene?.width ?: 0
                                 nextHeight = details?.scene?.height ?: 0
+                                nextTitle = details?.scene?.displayTitle ?: ""
                             } catch (e: Exception) {
                                 android.util.Log.w("Sinema", "Failed to fetch next scene metadata, playing without captions/markers", e)
                                 captions = emptyList()
                                 markers = emptyList()
                             }
                             if (isFinishing) return@launch
+                            hideSeekPreview()
+                            sceneTitle = nextTitle
                             sceneId = nextId
                             videoWidth = nextWidth
                             videoHeight = nextHeight
@@ -504,7 +677,6 @@ class PlaybackActivity : FragmentActivity() {
             .show()
     }
 
-    /** Player menu on the MENU key: chapters (when present), rating, aspect ratio. */
     private fun showPlayerMenu() {
         if (playerMenuDialog?.isShowing == true) return
         val items = buildList {
@@ -512,6 +684,7 @@ class PlaybackActivity : FragmentActivity() {
             add("★ Rate scene")
             add("Aspect ratio")
             add("Stream quality")
+            add("Seek buttons")
         }
         playerMenuDialog = android.app.AlertDialog.Builder(this)
             .setTitle("Playback menu")
@@ -522,6 +695,7 @@ class PlaybackActivity : FragmentActivity() {
                     "★ Rate scene" -> showRateDialog()
                     "Aspect ratio" -> showAspectRatioDialog()
                     "Stream quality" -> showStreamQualityDialog()
+                    "Seek buttons" -> cycleSeekPreset()
                 }
             }
             .setOnDismissListener {

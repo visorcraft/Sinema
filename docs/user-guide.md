@@ -6,7 +6,7 @@ This guide explains the browsing and library features in Sinema.
 
 When a scene is partially watched, a hero banner sits at the very top: a large backdrop for the newest Continue Playing scene with its title, details, and a one-click `RESUME` (or `PLAY`) action.
 
-The top shortcut row contains:
+By default, the top shortcut row contains:
 
 - Search
 - Surprise Me: plays a random scene from your library right away.
@@ -40,6 +40,18 @@ The bottom row contains:
 - About: shows the installed Sinema version and can manually check for updates.
 
 Sinema refreshes the home screen when you return to it, so changes made in playback or scene detail screens are reflected quickly. Existing cards stay visible while rows refresh, and row headers show loading or refresh status. If a refresh fails, Sinema keeps the last loaded cards and marks that row as `Refresh failed`; if the first load fails, the row is marked `Unavailable`.
+
+### Personalize home
+
+Open `Settings` → `Home Settings` to:
+
+- Reorder, show, or hide shortcuts and content rows.
+- Choose compact or large scene artwork and show or hide the hero banner.
+- Group secondary shortcuts under `Library`, keeping Search, Surprise Me, and Favorites on home.
+- Enable Unwatched Favorites and Recently Released rows.
+- Choose one Stash saved filter to pin as a home row.
+
+Every non-empty scene row ends with `View All`, which opens a full paged grid with sorting and filtering. Changes apply when you return home.
 
 ## Search
 
@@ -195,6 +207,7 @@ Sort choices:
 - Name Z-A.
 - Recently added.
 - Recently updated.
+- Recently played.
 - Release date.
 - Longest first.
 - Highest rated.
