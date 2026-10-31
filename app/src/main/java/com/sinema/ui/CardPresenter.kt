@@ -250,6 +250,20 @@ class SettingsPresenter : Presenter() {
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }
+            "Markers" -> {
+                title.text = "📑 Markers"
+                content.text = "Browse all chapters"
+                image.setImageResource(android.R.drawable.ic_menu_compass)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Stats" -> {
+                title.text = "📊 Stats"
+                content.text = "Library and watch stats"
+                image.setImageResource(android.R.drawable.ic_menu_sort_by_size)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
             else -> {
                 title.text = "⚙️ Settings"
                 content.text = "Server configuration"

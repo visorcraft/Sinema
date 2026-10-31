@@ -387,6 +387,171 @@ class SinemaApiTest {
     }
 
     @Test
+    fun `parseSceneMarker reads marker with scene metadata`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"m1","title":"Intro", "seconds":42.5,
+                "primary_tag":{"id":"9","name":"favorite"},
+                "scene":{"id":"7","title":"Scene Title",
+                         "files":[{"path":"/data/s.mp4","size":5,"duration":90.0,"width":1920,"height":1080}]}}"""
+        ).asJsonObject
+        val m = api.parseSceneMarker(obj)
+        assertEquals("m1", m.id)
+        assertEquals("Intro", m.title)
+        assertEquals(42.5, m.seconds, 0.0)
+        assertEquals("7", m.sceneId)
+        assertEquals("Scene Title", m.sceneTitle)
+        assertEquals(1920, m.sceneWidth)
+        assertEquals(1080, m.sceneHeight)
+        assertEquals("9", m.primaryTagId)
+        assertEquals("favorite", m.primaryTagName)
+        assertEquals("Intro", m.displayTitle)
+    }
+
+    @Test
+    fun `parseSceneMarker falls back to primary tag and tolerates nulls`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val obj = com.google.gson.JsonParser.parseString(
+            """{"id":"m2","title":null,"seconds":null,
+                "primary_tag":{"id":"3","name":"Tag Name"},
+                "scene":{"id":"8","title":null,"files":[]}}"""
+        ).asJsonObject
+        val m = api.parseSceneMarker(obj)
+        assertEquals("", m.title)
+        assertEquals(0.0, m.seconds, 0.0)
+        assertEquals("Tag Name", m.displayTitle)
+        assertEquals("", m.sceneTitle)
+        assertEquals(0, m.sceneWidth)
+    }
+
+    @Test
+    fun `findSceneMarkers sends tag filter and parses list`() {
+        val requestBody = java.util.concurrent.atomic.AtomicReference("")
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBody.set(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"findSceneMarkers":{"count":2,"scene_markers":[
+                {"id":"m1","title":"Intro","seconds":10.0,
+                 "primary_tag":{"id":"9","name":"t1"},
+                 "scene":{"id":"7","title":"S","files":[{"path":"/a.mp4","size":1,"duration":60.0,"width":1,"height":2}]}},
+                {"id":"m2","title":"","seconds":20.0,
+                 "primary_tag":{"id":"9","name":"t1"},
+                 "scene":{"id":"8","title":"S2","files":[]}}
+            ]}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            val (count, markers) = kotlinx.coroutines.runBlocking {
+                api.findSceneMarkers(page = 1, perPage = 50, sort = "created_at", direction = "DESC", tagId = "9")
+            }
+            assertEquals(2, count)
+            assertEquals(2, markers.size)
+            assertEquals("Intro", markers[0].displayTitle)
+            assertEquals("t1", markers[1].displayTitle) // blank title → primary tag
+            // Exact wire contract: hierarchical tags criterion under the
+            // marker_filter variable (maps to $marker_filter in the query),
+            // page/sort in the find filter.
+            val body = com.google.gson.JsonParser.parseString(requestBody.get()).asJsonObject
+            val variables = body.getAsJsonObject("variables")
+            assertEquals(1, variables.get("filter").asJsonObject.get("page").asInt)
+            assertEquals("created_at", variables.get("filter").asJsonObject.get("sort").asString)
+            val markerFilter = variables.getAsJsonObject("marker_filter")
+            val tags = markerFilter.getAsJsonObject("tags")
+            assertEquals("INCLUDES", tags.get("modifier").asString)
+            assertEquals(0, tags.get("depth").asInt)
+            assertEquals(1, tags.getAsJsonArray("value").size())
+            assertEquals("9", tags.getAsJsonArray("value")[0].asString)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `findTopPlayedScenes requests play count sort and full fields`() {
+        val requestBody = java.util.concurrent.atomic.AtomicReference("")
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBody.set(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"findScenes":{"count":1,"scenes":[
+                {"id":"5","title":"top","play_count":9,"rating100":null,"resume_time":0.0,
+                 "date":"2020-01-01","details":null,"o_counter":0,
+                 "studio":{"id":"2","name":"St"},"tags":[],"performers":[],"captions":[],
+                 "files":[{"path":"/data/t.mp4","size":9,"duration":10.0,"width":1920,"height":1080}]}
+            ]}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            val scenes = kotlinx.coroutines.runBlocking { api.findTopPlayedScenes() }
+            assertEquals(1, scenes.size)
+            assertEquals("top", scenes[0].title)
+            assertEquals("St", scenes[0].studio?.name)
+            val variables = com.google.gson.JsonParser.parseString(requestBody.get())
+                .asJsonObject.getAsJsonObject("variables")
+            assertEquals("play_count", variables.get("filter").asJsonObject.get("sort").asString)
+            assertEquals("DESC", variables.get("filter").asJsonObject.get("direction").asString)
+            assertEquals(200, variables.get("filter").asJsonObject.get("per_page").asInt)
+            val playCount = variables.getAsJsonObject("scene_filter").getAsJsonObject("play_count")
+            assertEquals("GREATER_THAN", playCount.get("modifier").asString)
+            assertEquals(0, playCount.get("value").asInt)
+            org.junit.Assert.assertTrue(
+                "Expected full metadata fields in query: ${requestBody.get()}",
+                requestBody.get().contains("performers") && requestBody.get().contains("o_counter")
+            )
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `getStats parses the server stats payload`() {
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            val response = """{"data":{"stats":{
+                "scene_count":120,"scenes_size":300.5,"scenes_duration":432000.0,
+                "image_count":10,"performer_count":7,"studio_count":3,"tag_count":40,
+                "total_o_count":11,"total_play_duration":5400.0,
+                "total_play_count":77,"scenes_played":55}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            val stats = kotlinx.coroutines.runBlocking { api.getStats() }
+            assertEquals(120, stats.sceneCount)
+            assertEquals(7, stats.performerCount)
+            assertEquals(40, stats.tagCount)
+            assertEquals(3, stats.studioCount)
+            assertEquals(5400.0, stats.totalPlayDurationSeconds, 0.0)
+            assertEquals(77, stats.totalPlayCount)
+            assertEquals(55, stats.scenesPlayed)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `recently-played filter omits last_played_at for Stash 0_24 compat`() {
         // Regression guard for 1.17.0:
         // 1) Used invalid CriterionModifier IS_NOT_NULL → HTTP 422

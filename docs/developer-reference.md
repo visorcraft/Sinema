@@ -114,7 +114,6 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 `SceneFilterOptions.kt` maps watched state to `play_count` and favorites to `rating100`, with per-screen persistence in `Prefs`. The Menu key remains available through `SortableScreen.handleSortMenuKey`.
 
 ## Playback state
-
 `PlaybackActivity.savePlayback` writes Stash activity through `sceneSaveActivity`.
 
 Important thresholds:
@@ -183,3 +182,30 @@ Build release APK:
 - Play All queues up to 500 scenes.
 - Play All still requires a remote Menu key; Sort, Filter, and entity Search also have visible controls.
 - Android TV launcher artwork is only attached in API-key mode.
+
+## Baseline profiles
+
+Release builds ship a compiled baseline profile (`assets/dexopt/baseline.prof`) that lets ART pre-compile hot code paths on install, improving cold start and reducing early jank.
+
+How it is wired:
+
+- `:baselineprofile` is a `com.android.test` module holding a UIAutomator-driven `BaselineProfileRule` generator (`baselineprofile/src/main/kotlin/.../BaselineProfileGenerator.kt`).
+- The app module applies the `androidx.baselineprofile` plugin, depends on `androidx.profileinstaller` (installs profiles on sideloaded updates), and commits the generated human-readable rules under `app/src/release/generated/baselineProfiles/baseline-prof.txt` (`baselineProfile { saveInSrc = true }`).
+- Because the rules are committed, release CI needs no emulator; R8 rewrites them for the shipped (obfuscated-safe, here non-minified) release dex at build time.
+
+Regenerating (requires an emulator with KVM; a fresh emulator exercises the setup flow, a configured one the home rows):
+
+```bash
+# One-time: create an Android TV AVD (image already in the local SDK)
+echo no | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
+  -n sinema_bp -k "system-images;android-36;android-tv;x86_64" -d tv_1080p
+
+$ANDROID_HOME/emulator/emulator -avd sinema_bp -no-window -no-audio \
+  -gpu swiftshader_indirect -no-snapshot &
+
+# Wait for boot, then regenerate (writes to app/src/release/generated)
+adb wait-for-device && adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+./gradlew :app:generateReleaseBaselineProfile
+```
+
+Commit the regenerated `baseline-prof.txt` with the change that shifts startup-critical code.

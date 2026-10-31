@@ -63,6 +63,103 @@ data class SavedSceneFilter(
     val direction: String? = null
 )
 
+/** A Stash scene marker, with just enough scene metadata to jump into playback. */
+data class SceneMarkerItem(
+    val id: String,
+    val title: String,
+    val seconds: Double,
+    val sceneId: String,
+    val sceneTitle: String,
+    val sceneWidth: Int,
+    val sceneHeight: Int,
+    val primaryTagId: String,
+    val primaryTagName: String
+) {
+    val displayTitle: String get() = title.ifBlank { primaryTagName }
+}
+
+/** Sort choices for the marker browser, mapped to Stash marker sort fields. */
+enum class MarkerSortOption(val label: String, val field: String, val direction: String) {
+    CREATED_DESC("Recently added", "created_at", "DESC"),
+    TITLE_ASC("Title A–Z", "title", "ASC"),
+    RANDOM("Random", "random", "ASC");
+
+    /** Stash paginates random sorts stably when the seed is in the field name. */
+    fun apiSort(seed: Int): String = if (this == RANDOM) "random_${seed.coerceAtLeast(0)}" else field
+
+    companion object {
+        fun fromName(name: String?, default: MarkerSortOption = CREATED_DESC): MarkerSortOption =
+            entries.firstOrNull { it.name == name } ?: default
+    }
+}
+
+/** Server-wide library stats from Stash's stats query (all Stash 0.24+ fields). */
+data class StatsSummary(
+    val sceneCount: Int = 0,
+    val scenesSizeBytes: Double = 0.0,
+    val scenesDurationSeconds: Double = 0.0,
+    val imageCount: Int = 0,
+    val performerCount: Int = 0,
+    val studioCount: Int = 0,
+    val tagCount: Int = 0,
+    val totalOCount: Int = 0,
+    val totalPlayDurationSeconds: Double = 0.0,
+    val totalPlayCount: Int = 0,
+    val scenesPlayed: Int = 0
+)
+
+/** An entity (performer/tag/studio) with its aggregated play count. */
+data class EntityPlayCount(val item: EntityItem, val plays: Int)
+
+/**
+ * Client-side aggregation of the most-watched entities across the top-played
+ * scenes. Pure Kotlin so the weighting (a scene with 5 plays counts 5×) is
+ * unit-testable.
+ */
+object ScenePlayStats {
+    fun topPerformers(scenes: List<Scene>, limit: Int = 10): List<EntityPlayCount> =
+        aggregate(scenes, limit, kind = EntityItem.Kind.PERFORMER) { s ->
+            s.performers.map { it.id to it.name }
+        }
+
+    fun topStudios(scenes: List<Scene>, limit: Int = 10): List<EntityPlayCount> =
+        aggregate(scenes, limit, kind = EntityItem.Kind.STUDIO) { s ->
+            s.studio?.let { listOf(it.id to it.name) } ?: emptyList()
+        }
+
+    fun topTags(scenes: List<Scene>, limit: Int = 10): List<EntityPlayCount> =
+        aggregate(scenes, limit, kind = EntityItem.Kind.TAG) { s ->
+            s.tags.map { it.id to it.name }
+        }
+
+    private inline fun aggregate(
+        scenes: List<Scene>,
+        limit: Int,
+        kind: EntityItem.Kind,
+        refsOf: (Scene) -> List<Pair<String, String>>
+    ): List<EntityPlayCount> {
+        val totals = LinkedHashMap<String, MutableEntry>()
+        scenes.forEach { scene ->
+            val weight = scene.playCount.coerceAtLeast(0)
+            if (weight == 0) return@forEach
+            refsOf(scene).forEach { (id, name) ->
+                if (id.isBlank() || name.isBlank()) return@forEach
+                val entry = totals.getOrPut(id) { MutableEntry(name) }
+                entry.plays += weight
+                entry.count += 1
+            }
+        }
+        return totals.map { (id, e) ->
+            EntityPlayCount(EntityItem(id, e.name, e.count, null, kind), e.plays)
+        }.sortedByDescending { it.plays }.take(limit)
+    }
+
+    private class MutableEntry(val name: String) {
+        var plays = 0
+        var count = 0
+    }
+}
+
 /** Full single-scene payload for the detail screen and player. */
 data class SceneDetails(
     val scene: Scene,

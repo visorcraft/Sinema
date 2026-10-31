@@ -15,6 +15,8 @@ The top shortcut row contains:
 - Tags
 - Performers
 - Studios
+- Markers
+- Stats
 - Saved Filters
 - Log Out, only when a PIN is set
 
@@ -60,6 +62,24 @@ Open `Saved Filters` from the main screen to browse scene filters you saved in t
 - Selecting a saved filter opens a scene grid driven by the filter's own criteria, sort, and direction — exactly as Stash would run it.
 - Sort and Play All work inside the filtered grid like any other grid.
 - Filters are stored server-side; create or edit them in Stash and they appear here on the next visit.
+
+## Markers
+
+Open `Markers` from the main screen to browse every scene marker ("chapter") on the server in one grid.
+
+- Cards show the marker's title (or its primary tag when untitled), the scene, the timestamp, and the scene screenshot at that moment.
+- Selecting a marker jumps straight into playback at the marker's timestamp.
+- Press Menu (or the Filter button) to filter markers by tag, and choose a sort order: Recently added, Title A–Z, or Random. The sort choice is remembered.
+
+## Stats
+
+Open `Stats` from the main screen for a library overview:
+
+- Server totals: total watch time, total plays, scenes, scenes played, performers, tags, and studios.
+- Most played scenes.
+- Most watched performers, tags, and studios, aggregated from the 200 most-played scenes (a scene played three times contributes three plays to its performers, tags, and studio). Rows are labeled accordingly; they are estimates of library-wide rankings, not exact totals.
+
+Select any scene or entity card to jump to its details or its scene grid.
 
 ## Favorites
 

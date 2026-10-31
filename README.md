@@ -125,6 +125,8 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **📺 Android TV Channels** — Optional "Watch Next" (Continue Watching) and "Recently Added" rows on the launcher home screen (opt-in, privacy-first).
 - **🔎 Global Search** — Optional participation in the Android TV system search dialog (Settings toggle, off by default). Scene suggestions deep-link straight to scene details.
 - **⭐ Saved Filters** — Use scene filters saved in the Stash web UI directly from the home screen.
+- **📑 Marker Browser** — Every scene marker in one grid with tag filtering; select one to jump straight into playback at that timestamp.
+- **📊 Stats** — Total watch time, plays, and most-watched scenes, performers, tags, and studios.
 - **🎛️ Stream Quality** — Force direct playback or pick a transcode tier (480p/720p/1080p) from the player menu for slow servers and weak networks.
 - **🔐 Self-Signed HTTPS** — Per-server opt-in to trust self-signed certificates for self-hosted TLS setups.
 - **🖥️ Multi-Server Profiles** — Switch between multiple Stash servers from Settings.
@@ -166,6 +168,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 | Media3 OkHttp Datasource | **1.10.1** |
 | Glide | **5.0.7** |
 | Glide OkHttp Integration | **5.0.7** |
+| Profile Installer | **1.4.1** |
 | OkHttp | **5.4.0** |
 | Gson | **2.14.0** |
 | Coroutines | **1.11.0** |

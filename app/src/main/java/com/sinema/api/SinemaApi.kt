@@ -9,6 +9,8 @@ import com.sinema.model.CaptionRef
 import com.sinema.model.EntityHeader
 import com.sinema.model.EntityItem
 import com.sinema.model.SavedSceneFilter
+import com.sinema.model.SceneMarkerItem
+import com.sinema.model.StatsSummary
 import com.sinema.model.ImageItem
 import com.sinema.model.MarkerRef
 import com.sinema.model.PerformerRef
@@ -143,6 +145,11 @@ class SinemaApi(
     }
 
     fun getScreenshotUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/screenshot"
+
+    /** Scene frame at a timestamp — used as the marker card thumbnail. */
+    fun getMarkerScreenshotUrl(sceneId: String, seconds: Double): String =
+        "$serverUrl/scene/$sceneId/screenshot?t=${seconds.toInt()}"
+
     fun getStreamUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/stream"
     fun getAlignedHlsStreamUrl(sceneId: String): String =
         getHlsStreamUrl(sceneId, "STANDARD")
@@ -930,6 +937,111 @@ class SinemaApi(
         direction = direction,
         sceneFilter = filter.sceneFilter
     )
+
+    /**
+     * Library-wide scene markers, optionally filtered to one tag (matches
+     * markers whose primary or extra tags include it, via the same
+     * hierarchical criterion Stash's web UI uses).
+     */
+    suspend fun findSceneMarkers(
+        page: Int = 1,
+        perPage: Int = 100,
+        sort: String = "created_at",
+        direction: String = "DESC",
+        tagId: String? = null
+    ): Pair<Int, List<SceneMarkerItem>> {
+        val query = """
+            query(${"$"}filter: FindFilterType, ${"$"}marker_filter: SceneMarkerFilterType) {
+                findSceneMarkers(filter: ${"$"}filter, scene_marker_filter: ${"$"}marker_filter) {
+                    count
+                    scene_markers {
+                        id title seconds
+                        primary_tag { id name }
+                        scene { id title files { path width height } }
+                    }
+                }
+            }
+        """.trimIndent()
+        val markerFilter = tagId?.takeIf { it.isNotBlank() }?.let {
+            mapOf("tags" to mapOf("value" to listOf(it), "modifier" to "INCLUDES", "depth" to 0))
+        }
+        val variables = mapOf(
+            "filter" to mapOf(
+                "page" to page, "per_page" to perPage,
+                "sort" to sort, "direction" to direction
+            ),
+            "marker_filter" to markerFilter
+        )
+        val result = graphql(query, variables)
+        val data = result.getAsJsonObject("data")?.getAsJsonObject("findSceneMarkers")
+            ?: return Pair(0, emptyList())
+        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val markers = (data.get("scene_markers") as? JsonArray)
+            ?.map { parseSceneMarker(it.asJsonObject) } ?: emptyList()
+        return Pair(count, markers)
+    }
+
+    @VisibleForTesting
+    internal fun parseSceneMarker(obj: JsonObject): SceneMarkerItem {
+        val scene = obj.get("scene")?.takeIf { !it.isJsonNull }?.asJsonObject
+        val files = scene?.get("files") as? JsonArray
+        val file = files?.firstOrNull()?.asJsonObject
+        val tag = obj.get("primary_tag")?.takeIf { !it.isJsonNull }?.asJsonObject
+        return SceneMarkerItem(
+            id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            seconds = obj.get("seconds")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            sceneId = scene?.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            sceneTitle = scene?.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            sceneWidth = file?.get("width")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            sceneHeight = file?.get("height")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            primaryTagId = tag?.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            primaryTagName = tag?.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+        )
+    }
+
+    /** Server-wide library stats (Stash 0.24+ stats query). */
+    suspend fun getStats(): StatsSummary {
+        val query = """
+            query {
+                stats {
+                    scene_count scenes_size scenes_duration image_count
+                    performer_count studio_count tag_count total_o_count
+                    total_play_duration total_play_count scenes_played
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query)
+        val obj = result.getAsJsonObject("data")?.get("stats")?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?: return StatsSummary()
+        return StatsSummary(
+            sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            scenesSizeBytes = obj.get("scenes_size")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            scenesDurationSeconds = obj.get("scenes_duration")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            imageCount = obj.get("image_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            performerCount = obj.get("performer_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            studioCount = obj.get("studio_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            tagCount = obj.get("tag_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            totalOCount = obj.get("total_o_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            totalPlayDurationSeconds = obj.get("total_play_duration")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            totalPlayCount = obj.get("total_play_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            scenesPlayed = obj.get("scenes_played")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        )
+    }
+
+    /**
+     * The most-played scenes with full metadata, for the stats screen's
+     * top-entity aggregation. Client-side aggregation keeps this a single
+     * 0.24-safe query instead of per-entity play-time filters.
+     */
+    suspend fun findTopPlayedScenes(perPage: Int = 200): List<Scene> =
+        findScenesInternal(
+            perPage = perPage,
+            sort = "play_count",
+            direction = "DESC",
+            sceneFilter = mapOf("play_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
+            fields = SCENE_FIELDS_FULL
+        ).second
 
     @VisibleForTesting
     internal fun parseSavedSceneFilter(obj: JsonObject): SavedSceneFilter {

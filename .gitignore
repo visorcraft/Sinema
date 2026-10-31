@@ -5,6 +5,7 @@
 /docs/
 /build/
 /app/build/
+/baselineprofile/build/
 /dist/
 *.apk
 *.aab

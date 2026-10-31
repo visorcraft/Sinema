@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("androidx.baselineprofile")
 }
 
 android {
@@ -42,6 +43,12 @@ android {
     }
 }
 
+baselineProfile {
+    // Generated profiles are written into src/release/generated and
+    // committed, so release CI builds never need an emulator.
+    saveInSrc = true
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.leanback:leanback:1.2.0")
@@ -69,6 +76,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("androidx.tvprovider:tvprovider:1.1.0")
+
+    // Compiles committed baseline profiles into release builds and installs
+    // them on app updates (see :baselineprofile and developer-reference.md).
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    baselineProfile(project(":baselineprofile"))
 
     testImplementation("junit:junit:4.13.2")
 }

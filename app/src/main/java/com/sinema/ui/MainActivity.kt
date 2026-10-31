@@ -148,6 +148,8 @@ class MainFragment : RowsSupportFragment() {
                         "Performers" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.PERFORMER))
                         "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))
                         "Saved Filters" -> startActivity(Intent(requireContext(), SavedFiltersActivity::class.java))
+                        "Markers" -> startActivity(Intent(requireContext(), MarkerBrowserActivity::class.java))
+                        "Stats" -> startActivity(Intent(requireContext(), StatsActivity::class.java))
                         "Log Out" -> {
                             app.pinVerifiedThisSession = false
                             requireActivity().finishAffinity()
@@ -189,6 +191,8 @@ class MainFragment : RowsSupportFragment() {
         shortcutsAdapter.add("Tags")
         shortcutsAdapter.add("Performers")
         shortcutsAdapter.add("Studios")
+        shortcutsAdapter.add("Markers")
+        shortcutsAdapter.add("Stats")
         shortcutsAdapter.add("Saved Filters")
         if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
         shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, ""), shortcutsAdapter)

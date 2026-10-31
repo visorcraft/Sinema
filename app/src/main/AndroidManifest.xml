@@ -100,6 +100,14 @@
             android:name=".ui.SavedFilterScenesActivity"
             android:screenOrientation="landscape" />
 
+        <activity
+            android:name=".ui.MarkerBrowserActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.StatsActivity"
+            android:screenOrientation="landscape" />
+
         <receiver
             android:name=".util.TvChannelInitReceiver"
             android:exported="true"

@@ -24,6 +24,7 @@ Sinema is maintained by VisorCraft LLC and depends on the work of several open-s
 - AndroidX Media3 1.10.1
 - Glide 5.0.7
 - Glide OkHttp Integration 5.0.7
+- Profile Installer 1.4.1 (baseline profile installation)
 - OkHttp 5.4.0
 - Gson 2.14.0
 - kotlinx-coroutines-android 1.11.0
