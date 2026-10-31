@@ -28,4 +28,10 @@ internal class SceneDetailState(initialScene: Scene) {
         scene = scene.copy(rating100 = rating100)
         refreshGeneration++
     }
+
+    /** Count one O so the next refresh doesn't clobber it. */
+    fun applyOIncrement() {
+        scene = scene.copy(oCounter = scene.oCounter + 1)
+        refreshGeneration++
+    }
 }

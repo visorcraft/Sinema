@@ -34,6 +34,7 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var btnResume: Button
     private lateinit var btnPlay: Button
     private lateinit var btnMarkWatched: Button
+    private lateinit var btnOCount: Button
     private var btnFolder: Button? = null
     private lateinit var metaView: TextView
     private lateinit var detailsView: TextView
@@ -68,6 +69,7 @@ class SceneDetailActivity : FragmentActivity() {
         btnResume = findViewById(R.id.btn_resume)
         btnPlay = findViewById(R.id.btn_play)
         btnMarkWatched = findViewById(R.id.btn_mark_watched)
+        btnOCount = findViewById(R.id.btn_o_count)
         btnFolder = findViewById(R.id.btn_folder)
         metaView = findViewById(R.id.detail_meta)
         detailsView = findViewById(R.id.detail_details)
@@ -133,6 +135,29 @@ class SceneDetailActivity : FragmentActivity() {
                     Log.e("Sinema", "Mark Watched/Unwatched FAILED for scene ${scene.id}", e)
                     runOnUiThread {
                         Toast.makeText(this@SceneDetailActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+
+        // O counter: one tap = one O, mirrors Stash's sceneIncrementO
+        btnOCount.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    app.api.sceneIncrementO(scene.id)
+                    detailState.applyOIncrement()
+                    runOnUiThread {
+                        bindMeta(scene)
+                        Toast.makeText(this@SceneDetailActivity,
+                            "O × ${scene.oCounter}", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("Sinema", "O count failed for ${scene.id}", e)
+                    runOnUiThread {
+                        Toast.makeText(this@SceneDetailActivity,
+                            "Failed: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
             }

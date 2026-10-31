@@ -719,6 +719,7 @@ class PlaybackActivity : FragmentActivity() {
         val items = buildList {
             if (markers.isNotEmpty()) add("Chapters")
             add("★ Rate scene")
+            add("🔥 O +1")
             add("Aspect ratio")
             add("Stream quality")
             add("Seek buttons")
@@ -730,6 +731,7 @@ class PlaybackActivity : FragmentActivity() {
                 when (items[which]) {
                     "Chapters" -> showChapters()
                     "★ Rate scene" -> showRateDialog()
+                    "🔥 O +1" -> incrementOCount()
                     "Aspect ratio" -> showAspectRatioDialog()
                     "Stream quality" -> showStreamQualityDialog()
                     "Seek buttons" -> cycleSeekPreset()
@@ -743,6 +745,31 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     private var rateFetchJob: kotlinx.coroutines.Job? = null
+
+    /** Count one O for the scene currently loaded in the player. */
+    private fun incrementOCount() {
+        val current = sceneId
+        if (current.isEmpty()) return
+        // appScope: the mutation must survive an immediate back-press exit.
+        // appScope runs on Dispatchers.IO — Toast needs the main thread.
+        val app = SinemaApp.instance
+        val appCtx = applicationContext
+        app.appScope.launch {
+            try {
+                app.api.sceneIncrementO(current)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    Toast.makeText(appCtx, "O counted", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("Sinema", "O count failed for $current", e)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    Toast.makeText(appCtx, "Failed to count O: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     private fun showRateDialog() {
         val current = sceneId
@@ -898,20 +925,49 @@ class PlaybackActivity : FragmentActivity() {
             Toast.makeText(this, "Queue empty", Toast.LENGTH_SHORT).show()
             return
         }
-        val labels = remaining.map { item ->
-            "${com.sinema.util.TimeFormat.formatSeconds(item.durationSec)}  ${item.title}"
+        val current = PlaybackQueue.current()
+        // Dimmed "now playing" row above the selectable remainder; disabled
+        // so D-pad skips straight to the first playable item.
+        val display = listOfNotNull(current) + remaining
+        val hasCurrentRow = current != null
+        val labels = display.map { item ->
+            val prefix = if (hasCurrentRow && item.id == current!!.id) "▶ " else ""
+            prefix + "${com.sinema.util.TimeFormat.formatSeconds(item.durationSec)}  ${item.title}"
+        }
+        val adapter = object : android.widget.ArrayAdapter<String>(
+            this, android.R.layout.simple_list_item_1, labels
+        ) {
+            override fun areAllItemsEnabled() = false
+            override fun isEnabled(position: Int) = !(hasCurrentRow && position == 0)
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val row = super.getView(position, convertView, parent)
+                row.alpha = if (hasCurrentRow && position == 0) 0.5f else 1f
+                return row
+            }
         }
         upNextDialog = android.app.AlertDialog.Builder(this)
             .setTitle("Up Next (${remaining.size})")
-            .setItems(labels.toTypedArray()) { dialog, which ->
+            .setAdapter(adapter) { dialog, which ->
                 dialog.dismiss()
+                if (hasCurrentRow && which == 0) return@setAdapter
+                val offset = if (hasCurrentRow) which - 1 else which
                 // Resolve by stable id: the queue may have advanced since
                 // this snapshot was built.
-                val targetId = remaining[which].id
-                if (PlaybackQueue.current()?.id == targetId) return@setItems
+                val targetId = remaining.getOrNull(offset)?.id ?: return@setAdapter
+                if (PlaybackQueue.current()?.id == targetId) return@setAdapter
                 PlaybackQueue.jumpToItem(targetId)?.let {
                     playSceneNow(it.id, it.title, saveCurrent = true)
                 } ?: Toast.makeText(this, "No longer in queue", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Unwatched only") { _, _ ->
+                PlaybackQueue.filterRemainingUnwatched()
+                val after = PlaybackQueue.remainingCount()
+                if (after == 0) {
+                    Toast.makeText(this, "No unwatched scenes ahead — queue emptied", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "$after unwatched ahead", Toast.LENGTH_SHORT).show()
+                }
+                updatePlaybackText()
             }
             .setNeutralButton("Shuffle") { _, _ ->
                 if (PlaybackQueue.shuffleRemaining()) {

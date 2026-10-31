@@ -106,36 +106,59 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         val scene = item as? Scene ?: return
         val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === scene } ?: return
         val playLabel = if (scene.resumeTime > 0.0) "▶ Resume" else "▶ Play"
-        val labels = listOf(
-            playLabel,
-            "▶ Play from here",
-            WatchedToggle.buttonLabel(scene.isWatched),
-            if (scene.isFavorite) "💔 Unfavorite" else "❤️ Favorite",
-            "ℹ️ Details"
-        )
+        val actions = buildList {
+            add(playLabel to Runnable {
+                startActivity(
+                    SceneIntents.playback(
+                        requireContext(), scene.id,
+                        resumeMs = (scene.resumeTime * 1000).toLong(),
+                        width = scene.width, height = scene.height
+                    )
+                )
+            })
+            add("▶ Play from here" to Runnable {
+                val rest = (index until gridAdapter.size())
+                    .mapNotNull { gridAdapter.get(it) as? Scene }
+                SceneIntents.playAll(requireContext(), rest, startAt = 0)
+            })
+            if (scene.resumeTime > 0.0) {
+                add("✖ Remove from Continue Playing" to Runnable { clearResume(scene, index) })
+            }
+            add(WatchedToggle.buttonLabel(scene.isWatched) to Runnable { toggleWatched(scene, index) })
+            add(
+                (if (scene.isFavorite) "💔 Unfavorite" else "❤️ Favorite") to
+                    Runnable { toggleFavorite(scene, index) }
+            )
+            add("ℹ️ Details" to Runnable {
+                startActivity(SceneIntents.detail(requireContext(), scene))
+            })
+        }
         android.app.AlertDialog.Builder(requireContext())
             .setTitle(scene.displayTitle)
-            .setItems(labels.toTypedArray()) { dialog, which ->
+            .setItems(actions.map { it.first }.toTypedArray()) { dialog, which ->
                 dialog.dismiss()
-                when (which) {
-                    0 -> startActivity(
-                        SceneIntents.playback(
-                            requireContext(), scene.id,
-                            resumeMs = (scene.resumeTime * 1000).toLong(),
-                            width = scene.width, height = scene.height
-                        )
-                    )
-                    1 -> {
-                        val rest = (index until gridAdapter.size())
-                            .mapNotNull { gridAdapter.get(it) as? Scene }
-                        SceneIntents.playAll(requireContext(), rest, startAt = 0)
-                    }
-                    2 -> toggleWatched(scene, index)
-                    3 -> toggleFavorite(scene, index)
-                    4 -> startActivity(SceneIntents.detail(requireContext(), scene))
-                }
+                actions[which].second.run()
             }
             .show()
+    }
+
+    /** Clears the server resume point so the scene drops off Continue Playing. */
+    private fun clearResume(scene: Scene, index: Int) {
+        lifecycleScope.launch {
+            try {
+                app.api.clearResumeTime(scene.id)
+                val updated = scene.copy(resumeTime = 0.0)
+                if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
+                    gridAdapter.replace(index, updated)
+                }
+                Toast.makeText(requireContext(), "Removed from Continue Playing", Toast.LENGTH_SHORT).show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Remove from Continue Playing failed for ${scene.id}", e)
+                Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun toggleWatched(scene: Scene, index: Int) {

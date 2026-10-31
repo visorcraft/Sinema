@@ -21,4 +21,12 @@ class HomeQueryTest {
         assertTrue(shouldLoadHomeRow(rowVisible = false, channelsEnabled = true, feedsLauncher = true))
         assertFalse(shouldLoadHomeRow(rowVisible = false, channelsEnabled = false, feedsLauncher = true))
     }
+
+    @Test
+    fun `channel sync only runs for successfully loaded rows`() {
+        assertTrue(shouldSyncTvChannelRow(RowResult(value = emptyList<Any>())))
+        assertFalse(shouldSyncTvChannelRow(RowResult<Any>(error = java.io.IOException("server unreachable"))))
+        // Defensive: a result with neither value nor error must not wipe channels.
+        assertFalse(shouldSyncTvChannelRow(RowResult<Any>()))
+    }
 }

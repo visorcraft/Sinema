@@ -527,11 +527,18 @@ class MainFragment : RowsSupportFragment() {
                 // appScope outlives this fragment, so calling requireContext()
                 // inside the coroutine would throw if the user navigated away
                 // before it ran. context may already be null after a long load.
+                // A failed row must never sync: both syncs delete existing
+                // entries first, so an error-derived empty list would wipe
+                // Watch Next / Recently Added on a single network blip.
                 val appCtx = context?.applicationContext
                 if (appCtx != null) {
                     app.appScope.launch {
-                        com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
-                        com.sinema.util.TvChannels.syncRecentlyAdded(appCtx, recentScenes)
+                        if (shouldSyncTvChannelRow(rows.continuePlaying)) {
+                            com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
+                        }
+                        if (shouldSyncTvChannelRow(rows.recentlyAdded)) {
+                            com.sinema.util.TvChannels.syncRecentlyAdded(appCtx, recentScenes)
+                        }
                     }
                 }
 
@@ -632,6 +639,14 @@ class MainFragment : RowsSupportFragment() {
 
 internal fun shouldLoadHomeRow(rowVisible: Boolean, channelsEnabled: Boolean, feedsLauncher: Boolean): Boolean =
     rowVisible || (channelsEnabled && feedsLauncher)
+
+/**
+ * TV channel sync must only run on a successfully loaded row: both syncs
+ * delete their launcher entries before republishing, so an error-derived
+ * empty list would wipe channels on a transient failure.
+ */
+internal fun shouldSyncTvChannelRow(result: RowResult<*>): Boolean =
+    result.error == null && result.value != null
 
 /** Result of one independently-failing dashboard row load. */
 internal class RowResult<out T>(val value: T? = null, val error: Exception? = null)

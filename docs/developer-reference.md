@@ -121,7 +121,7 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 ### Playback queue
 
-`PlaybackQueue` (util) keeps queued items with id/title/duration and exposes `next`, `jumpTo`, `remaining`, and seeded `shuffleRemaining`; the controller's `Up Next · N` chip opens a jump/shuffle/exit dialog, and the resume prompt (`shouldPromptResume`, 10 s threshold) asks before seeking into saved progress. `QueuePlanning` is the pure planning step (start-at, shuffle, 500 cap) behind `SceneIntents.playAll`; grid long-press actions live in `SceneGridFragment.showCardActions`.
+`PlaybackQueue` (util) keeps queued items with id/title/duration/play_count and exposes `next`, `jumpToItem`, `remaining`, seeded `shuffleRemaining`, and `filterRemainingUnwatched` (the dialog's Unwatched-only button); the controller's `Up Next · N` chip opens a jump/shuffle/filter/exit dialog, and the resume prompt (`shouldPromptResume`, 10 s threshold) asks before seeking into saved progress. `QueuePlanning` is the pure planning step (start-at, shuffle, 500 cap) behind `SceneIntents.playAll`; grid long-press actions live in `SceneGridFragment.showCardActions`. O-counter increments (`SinemaApi.sceneIncrementO`) run on the app scope from the playback menu so they survive an immediate exit.
 
 ## Playback state
 `PlaybackActivity.savePlayback` writes Stash activity through `sceneSaveActivity`.

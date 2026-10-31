@@ -51,9 +51,17 @@ class CardPresenter(
         when (item) {
             is Scene -> {
                 title.text = item.displayTitle
-                content.text = if (item.starCount > 0)
-                    "${StarRating.glyphs(item.starCount)}  ${item.formatDuration()}"
-                else item.formatDuration()
+                content.text = buildString {
+                    if (item.starCount > 0) {
+                        append(StarRating.glyphs(item.starCount))
+                        append("  ")
+                    }
+                    append(item.formatDuration())
+                    if (item.oCounter > 0) {
+                        append("  O×")
+                        append(item.oCounter)
+                    }
+                }
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE
                 val percent = item.watchProgressPercent

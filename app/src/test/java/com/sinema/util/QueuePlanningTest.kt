@@ -65,11 +65,13 @@ class QueuePlanningTest {
     @Test
     fun `queue items carry display metadata for the up next list`() {
         val blank = scene("a").copy(title = "", path = "/folder/nice file.mp4")
+        val watched = scene("b").copy(playCount = 3)
 
-        val items = QueuePlanning.toQueueItems(listOf(blank, scene("b")))
+        val items = QueuePlanning.toQueueItems(listOf(blank, watched))
 
         assertEquals("nice file.mp4", items[0].title)
         assertEquals(60.0, items[0].durationSec, 0.0)
         assertEquals("b", items[1].id)
+        assertEquals(3, items[1].playCount)
     }
 }

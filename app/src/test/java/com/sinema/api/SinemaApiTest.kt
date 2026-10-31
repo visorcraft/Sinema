@@ -162,6 +162,11 @@ class SinemaApiTest {
             "SCENE_FIELDS must select resume_time: ${SinemaApi.SCENE_FIELDS}",
             Regex("\\bresume_time\\b").containsMatchIn(SinemaApi.SCENE_FIELDS)
         )
+        // The card "O×n" badge reads o_counter from list queries too.
+        org.junit.Assert.assertTrue(
+            "SCENE_FIELDS must select o_counter: ${SinemaApi.SCENE_FIELDS}",
+            Regex("\\bo_counter\\b").containsMatchIn(SinemaApi.SCENE_FIELDS)
+        )
     }
 
     @Test

@@ -33,5 +33,7 @@ object QueuePlanning {
     }
 
     fun toQueueItems(ordered: List<Scene>): List<PlaybackQueue.Item> =
-        ordered.map { PlaybackQueue.Item(it.id, it.displayTitle, it.duration) }
+        ordered.map {
+            PlaybackQueue.Item(it.id, it.displayTitle, it.duration, it.playCount)
+        }
 }

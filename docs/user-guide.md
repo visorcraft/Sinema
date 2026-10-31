@@ -256,9 +256,18 @@ Long-press OK on a focused scene card in any grid to open per-card actions:
 
 - `Resume` / `Play`: starts the scene, resuming saved progress when present (a prompt offers resume or start over for scenes ≥ 10 seconds in).
 - `Play from here`: queues the current grid from the selected card onward.
+- `Remove from Continue Playing`: clears the saved resume point (shown only for partially watched scenes).
 - `Mark Watched` / `Mark Unwatched`: same semantics as the detail-screen toggle.
 - `Favorite` / `Unfavorite`: sets or clears the 5-star rating that marks a favorite.
 - `Details`: opens the scene detail screen.
+
+## O counter
+
+Count Os recorded in Stash (`o_counter`):
+
+- Scene detail: `🔥 O +1` next to Mark Watched.
+- During playback: Menu → `🔥 O +1`.
+- Scene cards show an `O×n` badge next to the duration when the count is above zero.
 
 ## Deep links
 

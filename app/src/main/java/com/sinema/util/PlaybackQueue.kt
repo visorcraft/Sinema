@@ -7,7 +7,14 @@ package com.sinema.util
  * every queued scene. `index` is the currently playing item.
  */
 object PlaybackQueue {
-    data class Item(val id: String, val title: String, val durationSec: Double)
+    data class Item(
+        val id: String,
+        val title: String,
+        val durationSec: Double,
+        // Snapshot of play_count when the queue was built; powers the
+        // "Unwatched only" filter. May go stale during playback — fine.
+        val playCount: Int = 0
+    )
 
     private var items: List<Item> = emptyList()
     private var index: Int = -1
@@ -67,6 +74,21 @@ object PlaybackQueue {
         val tail = items.drop(index + 1).shuffled(random)
         items = head + tail
         return true
+    }
+
+    /**
+     * Drop already-watched items (snapshot play_count > 0) from the
+     * remainder; the current item always stays. Returns true when any were
+     * removed.
+     */
+    @Synchronized
+    fun filterRemainingUnwatched(): Boolean {
+        if (index < 0) return false
+        val head = items.take(index + 1)
+        val tail = items.drop(index + 1)
+        val kept = tail.filter { it.playCount == 0 }
+        items = head + kept
+        return kept.size < tail.size
     }
 
     @Synchronized

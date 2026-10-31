@@ -185,6 +185,18 @@
                         android:textSize="14sp" />
 
                     <Button
+                        android:id="@+id/btn_o_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true"
+                        android:minWidth="120dp"
+                        android:text="🔥 O +1"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp" />
+
+                    <Button
                         android:id="@+id/btn_folder"
                         android:layout_width="wrap_content"
                         android:layout_height="48dp"

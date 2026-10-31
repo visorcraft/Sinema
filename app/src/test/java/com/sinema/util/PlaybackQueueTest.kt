@@ -81,6 +81,36 @@ class PlaybackQueueTest {
     }
 
     @Test
+    fun `filterRemainingUnwatched keeps current and drops watched remainder`() {
+        val items = listOf(
+            PlaybackQueue.Item("cur", "Now", 60.0, playCount = 0),
+            PlaybackQueue.Item("w1", "Watched 1", 60.0, playCount = 2),
+            PlaybackQueue.Item("u1", "Unwatched 1", 60.0, playCount = 0),
+            PlaybackQueue.Item("w2", "Watched 2", 60.0, playCount = 1),
+            PlaybackQueue.Item("u2", "Unwatched 2", 60.0)
+        )
+        PlaybackQueue.start(items, startAt = 0)
+
+        assertTrue(PlaybackQueue.filterRemainingUnwatched())
+
+        assertEquals("cur", PlaybackQueue.current()?.id)
+        assertEquals(listOf("u1", "u2"), PlaybackQueue.remaining().map { it.id })
+        // Nothing left to drop on a second pass.
+        assertFalse(PlaybackQueue.filterRemainingUnwatched())
+    }
+
+    @Test
+    fun `filterRemainingUnwatched on all-unwatched queue is a no-op`() {
+        PlaybackQueue.start(
+            listOf(item("a"), item("b")),
+            startAt = 0
+        )
+
+        assertFalse(PlaybackQueue.filterRemainingUnwatched())
+        assertEquals(listOf("b"), PlaybackQueue.remaining().map { it.id })
+    }
+
+    @Test
     fun `empty queue is inert`() {
         PlaybackQueue.start(emptyList(), startAt = 0)
 

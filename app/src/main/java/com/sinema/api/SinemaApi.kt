@@ -45,14 +45,15 @@ class SinemaApi(
         // Single source of truth for scene list payloads.
         // resume_time ships on Scene since Stash 0.24 and powers the
         // watch-progress bar on cards (see Scene.watchProgressPercent).
+        // o_counter powers the card "O×n" badge (same availability).
         internal const val SCENE_FIELDS =
-            "id title play_count rating100 resume_time files { path size duration width height }"
+            "id title play_count rating100 resume_time o_counter files { path size duration width height }"
 
         // Full scene payload — used by findSceneFull for detail/player screens.
+        // (o_counter already ships in SCENE_FIELDS for the card badge.)
         internal const val SCENE_FIELDS_FULL = SCENE_FIELDS +
             " date" +
             " details" +
-            " o_counter" +
             " studio { id name }" +
             " tags { id name }" +
             " performers { id name }" +
@@ -674,6 +675,16 @@ class SinemaApi(
         val query = """
             mutation(${"$"}id: ID!) {
                 sceneIncrementPlayCount(id: ${"$"}id)
+            }
+        """.trimIndent()
+        graphql(query, mapOf("id" to sceneId))
+    }
+
+    /** Increment the Stash O counter for a scene (playback menu / detail). */
+    suspend fun sceneIncrementO(sceneId: String) {
+        val query = """
+            mutation(${"$"}id: ID!) {
+                sceneIncrementO(id: ${"$"}id)
             }
         """.trimIndent()
         graphql(query, mapOf("id" to sceneId))
