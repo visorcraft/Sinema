@@ -32,7 +32,7 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
         val progress = view.findViewById<android.widget.ProgressBar>(R.id.card_progress)
         when (item) {
             is Scene -> {
-                title.text = item.filename
+                title.text = item.displayTitle
                 content.text = item.formatDuration()
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE

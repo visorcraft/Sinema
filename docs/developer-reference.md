@@ -98,15 +98,18 @@ Full details include:
 - Vertical grid setup.
 - Card presenter.
 - Scene click behavior.
-- Sort handling.
-- Play All.
+- Sort and watched/favorite filter handling.
+- Incremental paging for entity and entity-scene grids.
+- Play All for currently loaded scenes.
 - Error toasts.
 
-### Sorting
+`activity_grid.xml` adds visible D-pad controls through `SortableScreen`. Entity grids additionally expose name search and entity-specific sorting.
 
-Sort options live in `SortOption.kt` and map to Stash `FindFilterType` sort fields.
+### Sorting and filtering
 
-The Menu key is routed through `SortableScreen.handleSortMenuKey`.
+Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sort fields. Entity sort options live in `EntityGridActivity.kt`.
+
+`SceneFilterOptions.kt` maps watched state to `play_count` and favorites to `rating100`, with per-screen persistence in `Prefs`. The Menu key remains available through `SortableScreen.handleSortMenuKey`.
 
 ## Playback state
 
@@ -173,9 +176,8 @@ Build release APK:
 ## Current limits worth knowing
 
 - Folder browsing assumes Stash paths are rooted at `/data`.
-- Entity grids load up to 200 entities.
-- Entity scene grids load up to 200 scenes.
+- Entity and entity-scene grids append 100 items per page as the user scrolls; Play All includes only scenes loaded so far.
 - Folder views cap displayed videos/pictures at 10,000 items.
 - Play All queues up to 500 scenes.
-- Sort/play-all menu access currently depends on a remote Menu key.
+- Play All still requires a remote Menu key; Sort, Filter, and entity Search also have visible controls.
 - Android TV launcher artwork is only attached in API-key mode.

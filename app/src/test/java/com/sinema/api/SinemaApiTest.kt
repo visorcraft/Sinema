@@ -275,4 +275,136 @@ class SinemaApiTest {
             server.stop(0)
         }
     }
+
+    @Test
+    fun `entity search sends query sort direction and page for every kind`() {
+        val requestBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBodies.add(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            val cases = listOf(
+                Triple(com.sinema.model.EntityItem.Kind.TAG, "findTags", "tags"),
+                Triple(com.sinema.model.EntityItem.Kind.PERFORMER, "findPerformers", "performers"),
+                Triple(com.sinema.model.EntityItem.Kind.STUDIO, "findStudios", "studios")
+            )
+            kotlinx.coroutines.runBlocking {
+                cases.forEach { (kind, _, _) ->
+                    api.findEntities(
+                        kind,
+                        page = 3,
+                        perPage = 50,
+                        searchTerm = "space",
+                        sort = "name",
+                        direction = "ASC"
+                    )
+                }
+            }
+            assertEquals(3, requestBodies.size)
+            cases.forEachIndexed { index, (_, queryName, listKey) ->
+                val body = requestBodies[index]
+                org.junit.Assert.assertTrue(body, body.contains(queryName))
+                org.junit.Assert.assertTrue(body, body.contains("$listKey { id name"))
+                org.junit.Assert.assertTrue(body, body.contains("\"page\":3"))
+                org.junit.Assert.assertTrue(body, body.contains("\"per_page\":50"))
+                org.junit.Assert.assertTrue(body, body.contains("\"q\":\"space\""))
+                org.junit.Assert.assertTrue(body, body.contains("\"sort\":\"name\""))
+                org.junit.Assert.assertTrue(body, body.contains("\"direction\":\"ASC\""))
+            }
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `scene search combines watched and favorite filters`() {
+        val requestBody = java.util.concurrent.atomic.AtomicReference("")
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBody.set(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            kotlinx.coroutines.runBlocking {
+                api.searchScenes(
+                    "space",
+                    filters = com.sinema.model.SceneFilterOptions(
+                        com.sinema.model.WatchFilter.UNWATCHED,
+                        favoritesOnly = true
+                    )
+                )
+            }
+            val body = requestBody.get()
+            org.junit.Assert.assertTrue(body, body.contains("\"q\":\"space\""))
+            org.junit.Assert.assertTrue(body, body.contains("\"play_count\":{\"value\":0,\"modifier\":\"EQUALS\"}"))
+            org.junit.Assert.assertTrue(body, body.contains("\"rating100\":{\"value\":0,\"modifier\":\"GREATER_THAN\"}"))
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `entity and folder constraints survive user filters`() {
+        val requestBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBodies.add(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            val filters = com.sinema.model.SceneFilterOptions(
+                com.sinema.model.WatchFilter.WATCHED,
+                favoritesOnly = true
+            )
+            kotlinx.coroutines.runBlocking {
+                api.findScenesForEntity(
+                    com.sinema.model.EntityItem.Kind.TAG,
+                    "tag-1",
+                    filters = filters
+                )
+                api.findScenesByPath("/data/Foo - Bar", filters = filters)
+            }
+            assertEquals(2, requestBodies.size)
+            val entityBody = requestBodies[0]
+            org.junit.Assert.assertTrue(entityBody, entityBody.contains("\"tags\""))
+            org.junit.Assert.assertTrue(entityBody, entityBody.contains("\"play_count\""))
+            org.junit.Assert.assertTrue(entityBody, entityBody.contains("\"rating100\""))
+            val folderBody = requestBodies[1]
+            org.junit.Assert.assertTrue(folderBody, folderBody.contains("\"path\""))
+            org.junit.Assert.assertTrue(folderBody, folderBody.contains("Foo - Bar"))
+            org.junit.Assert.assertTrue(folderBody, folderBody.contains("\"play_count\""))
+            org.junit.Assert.assertTrue(folderBody, folderBody.contains("\"rating100\""))
+        } finally {
+            server.stop(0)
+        }
+    }
 }

@@ -27,7 +27,8 @@ import kotlinx.coroutines.launch
 
 class SceneDetailActivity : FragmentActivity() {
     private val app get() = SinemaApp.instance
-    private lateinit var scene: Scene
+    private lateinit var detailState: SceneDetailState
+    private val scene: Scene get() = detailState.scene
 
     private lateinit var btnResume: Button
     private lateinit var btnPlay: Button
@@ -52,13 +53,9 @@ class SceneDetailActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scene_detail)
 
-        scene = SceneIntents.sceneFrom(intent)
+        detailState = SceneDetailState(SceneIntents.sceneFrom(intent))
 
-        // Bind views
         val screenshot = findViewById<ImageView>(R.id.detail_screenshot)
-        val titleView = findViewById<TextView>(R.id.detail_title)
-        val subtitleView = findViewById<TextView>(R.id.detail_subtitle)
-        val pathView = findViewById<TextView>(R.id.detail_path)
         btnResume = findViewById(R.id.btn_resume)
         btnPlay = findViewById(R.id.btn_play)
         btnFavorite = findViewById(R.id.btn_favorite)
@@ -71,10 +68,14 @@ class SceneDetailActivity : FragmentActivity() {
         performersScroll = findViewById(R.id.detail_performers_scroll)
         performersRow = findViewById(R.id.detail_performers_row)
 
-        // Set static info
-        titleView.text = scene.filename
-        subtitleView.text = "${scene.formatDuration()} • ${scene.formatSize()} • ${scene.width}x${scene.height}"
-        pathView.text = scene.path
+        bindSceneText(scene)
+        val technicalContainer = findViewById<View>(R.id.technical_container)
+        val btnTechnical = findViewById<Button>(R.id.btn_technical)
+        btnTechnical.setOnClickListener {
+            val show = technicalContainer.visibility != View.VISIBLE
+            technicalContainer.visibility = if (show) View.VISIBLE else View.GONE
+            btnTechnical.text = if (show) "Hide technical details" else "Technical details"
+        }
 
         // Load screenshot
         val url = app.api.getScreenshotUrl(scene.id)
@@ -111,7 +112,7 @@ class SceneDetailActivity : FragmentActivity() {
 
         // Mark Watched / Unwatched toggle
         Log.d("Sinema", "SceneDetail: id=${scene.id} playCount=${scene.playCount} isWatched=${scene.isWatched} rating100=${scene.rating100}")
-        btnMarkWatched.text = WatchedToggle.buttonLabel(scene.isWatched)
+        bindWatchedButton()
         btnMarkWatched.setOnClickListener {
             lifecycleScope.launch {
                 try {
@@ -125,9 +126,9 @@ class SceneDetailActivity : FragmentActivity() {
                         Log.d("Sinema", "Mark Watched: incrementing play count for scene ${scene.id}")
                         app.api.incrementPlayCount(scene.id)
                     }
-                    scene = scene.copy(playCount = WatchedToggle.nextPlayCount(scene.playCount, wasWatched))
+                    detailState.applyWatchedToggle(wasWatched)
                     runOnUiThread {
-                        btnMarkWatched.text = WatchedToggle.buttonLabel(scene.isWatched)
+                        bindWatchedButton()
                         Toast.makeText(this@SceneDetailActivity,
                             if (wasWatched) "Marked as unwatched" else "Marked as watched",
                             Toast.LENGTH_SHORT).show()
@@ -161,12 +162,15 @@ class SceneDetailActivity : FragmentActivity() {
     }
 
     private fun loadDetails() {
+        val generation = detailState.startRefresh()
         lifecycleScope.launch {
             try {
                 val details = app.api.findSceneFull(scene.id) ?: return@launch
-                scene = scene.copy(width = details.scene.width, height = details.scene.height)
+                if (!detailState.applyRefresh(generation, details.scene)) return@launch
                 captions = details.scene.captions
                 markers = details.markers
+                bindSceneText(scene)
+                bindWatchedButton()
                 bindResume(details)
                 bindMeta(details.scene)
                 bindChips(details.scene)
@@ -176,6 +180,20 @@ class SceneDetailActivity : FragmentActivity() {
                 Log.e("Sinema", "Failed to load scene details for ${scene.id}", e)
             }
         }
+    }
+
+    private fun bindWatchedButton() {
+        btnMarkWatched.text = WatchedToggle.buttonLabel(scene.isWatched)
+    }
+
+    private fun bindSceneText(s: Scene) {
+        findViewById<TextView>(R.id.detail_title).text = s.displayTitle
+        findViewById<TextView>(R.id.detail_subtitle).text =
+            "${s.formatDuration()}  •  ${s.width}x${s.height}"
+        findViewById<TextView>(R.id.detail_filename).text = s.filename
+        findViewById<TextView>(R.id.detail_path).text = s.path
+        findViewById<TextView>(R.id.detail_technical).text =
+            "${s.formatDuration()}  •  ${s.formatSize()}  •  ${s.width}x${s.height}"
     }
 
     private fun bindResume(details: SceneDetails) {
@@ -314,7 +332,7 @@ class SceneDetailActivity : FragmentActivity() {
                     val title = card.findViewById<TextView>(R.id.card_title)
                     val content = card.findViewById<TextView>(R.id.card_content)
 
-                    title.text = s.filename
+                    title.text = s.displayTitle
                     content.text = s.formatDuration()
 
                     val url = app.api.getScreenshotUrl(s.id)

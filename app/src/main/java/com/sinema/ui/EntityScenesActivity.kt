@@ -19,16 +19,21 @@ class EntityScenesActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_grid)
         if (savedInstanceState == null) {
             val kind = parseKind(intent.getStringExtra("kind"))
+            val fragment = EntityScenesFragment.create(
+                kind,
+                intent.getStringExtra("id") ?: "",
+                intent.getStringExtra("name") ?: ""
+            )
             supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, EntityScenesFragment.create(
-                    kind,
-                    intent.getStringExtra("id") ?: "",
-                    intent.getStringExtra("name") ?: ""
-                ))
+                .replace(R.id.main_frame, fragment)
                 .commit()
+            bindGridControls(fragment)
+        } else {
+            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
+                ?.let { bindGridControls(it) }
         }
     }
 
@@ -56,6 +61,8 @@ class EntityScenesFragment : SceneGridFragment() {
     override val sortScreenKey: String? get() = "entity_scenes_${kind.name}_${requireArguments().getString("id")}"
     override val gridTitle get() = requireArguments().getString("name") ?: ""
     override val emptyMessage = "No scenes"
+    override val canFilter = true
+    override val paged = true
 
     private fun parseKind(raw: String?): EntityItem.Kind =
         try {
@@ -64,11 +71,16 @@ class EntityScenesFragment : SceneGridFragment() {
             EntityItem.Kind.TAG
         }
 
-    override suspend fun loadItems(): List<Any> {
-        // Keep this bounded for TV navigation; server count is available in .first if pagination is added later.
-        return app.api.findScenesForEntity(
-            kind, requireArguments().getString("id")!!,
-            perPage = 200, sort = sort.apiSort(randomSeed), direction = sort.direction
-        ).second
-    }
+    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
+
+    override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> =
+        app.api.findScenesForEntity(
+            kind,
+            requireArguments().getString("id")!!,
+            page = page,
+            perPage = perPage,
+            sort = sort.apiSort(randomSeed),
+            direction = sort.direction,
+            filters = sceneFilter
+        )
 }

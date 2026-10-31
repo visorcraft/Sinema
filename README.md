@@ -109,12 +109,13 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 ## Features
 
 - **🏠 Home Screen** — Continue Playing, Recently Played, Recently Added, Favorites.
-- **🏷️ Metadata Browsing** — Browse by Tags, Performers, and Studios with scene counts and images.
+- **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with scene counts and images.
 - **📁 Folder Browser** — Navigate your library by directory structure.
-- **🔍 Search** — Find scenes by filename with sortable results; voice search via the remote microphone where available.
+- **🔍 Unified Search** — Find scenes, tags, performers, and studios together; voice search via the remote microphone where available.
+- **🎛️ Grid Controls** — D-pad-reachable sorting plus watched and favorite filters on scene grids.
 - **🎲 Surprise Me** — One press on the home screen jumps straight into a random scene.
 - **▶️ Resume Playback** — Pause anywhere, pick up where you left off (persisted to Stash). Scene cards show a thin progress bar for partially watched scenes.
-- **🎬 Scene Detail** — Thumbnail, metadata, date, rating, O-count, studio, tag/performer chips, and the scene's synopsis. Tap chips to browse related scenes.
+- **🎬 Scene Detail** — Friendly titles, synopsis, metadata chips, and collapsible technical details for filenames, paths, and file information.
 - **📝 Subtitles, Tracks & Aspect Ratio** — Select subtitles and audio tracks, adjust playback speed, and choose Auto, 16:9, 4:3, or 9:16 display ratios.
 - **📑 Scene Markers as Chapters** — Jump between markers via chapters dialog or media keys.
 - **▶️ Play All & Autoplay** — Queue all scenes in a folder or entity grid; auto-advances when one ends.

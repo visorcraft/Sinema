@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
+import com.sinema.model.SceneFilterOptions
 import com.sinema.model.SortOption
 import com.sinema.util.FolderHelper
 import com.sinema.util.SceneIntents
@@ -24,7 +25,7 @@ import kotlinx.coroutines.launch
 class FolderBrowseActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_grid)
         val path = intent.getStringExtra("path") ?: "/data"
         if (savedInstanceState == null) {
             val fragment = FolderGridFragment().apply {
@@ -33,6 +34,10 @@ class FolderBrowseActivity : FragmentActivity() {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_frame, fragment)
                 .commit()
+            bindGridControls(fragment)
+        } else {
+            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
+                ?.let { bindGridControls(it) }
         }
     }
 
@@ -46,8 +51,21 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
     private var currentPath = "/data"
 
     private var sort: SortOption = SortOption.PATH_ASC
+    private var sceneFilter = SceneFilterOptions()
     private val randomSeed: Int = (0..99_999_999).random()
     private var loadJob: Job? = null
+
+    override val canFilter = true
+    override val filterLabel get() = sceneFilter.summary
+
+    override fun showFilterDialog() {
+        FilterDialog.show(requireContext(), sceneFilter) { chosen ->
+            sceneFilter = chosen
+            app.prefs.setSceneFilterFor("folder", chosen)
+            activity?.refreshGridControls()
+            loadFolder()
+        }
+    }
 
     override fun showGridMenu() {
         GridMenuDialog.show(requireContext(), sort, canPlayAll = true,
@@ -88,12 +106,14 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         val vPad = (20 * density).toInt()
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
+        activity?.refreshGridControls()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         currentPath = arguments?.getString("path") ?: "/data"
         sort = SortOption.fromName(app.prefs.sortFor("folder"))
+        sceneFilter = app.prefs.sceneFilterFor("folder")
         updateTitle()
         badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
 
@@ -139,7 +159,9 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
                     fetchAllPages { page ->
                         app.api.findScenesByPath(
                             currentPath, page, PAGE_SIZE,
-                            sort = sort.apiSort(randomSeed), direction = sort.direction
+                            sort = sort.apiSort(randomSeed),
+                            direction = sort.direction,
+                            filters = sceneFilter
                         )
                     }
                 }

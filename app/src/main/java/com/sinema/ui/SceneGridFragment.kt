@@ -1,43 +1,58 @@
 package com.sinema.ui
 
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.leanback.app.VerticalGridSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.FocusHighlight
 import androidx.leanback.widget.VerticalGridPresenter
+import androidx.leanback.widget.VerticalGridView
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.RecyclerView
 import com.sinema.R
 import com.sinema.SinemaApp
-import androidx.core.content.ContextCompat
 import com.sinema.model.Scene
+import com.sinema.model.SceneFilterOptions
 import com.sinema.model.SortOption
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-/**
- * Shared vertical-grid screen: overscan padding, card presenter, click-to-detail,
- * and error handling. Subclasses provide a title and an item loader.
- */
 abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen {
     protected val app get() = SinemaApp.instance
     protected lateinit var gridAdapter: ArrayObjectAdapter
 
     protected open val columns = 3
+    protected open val paged = false
+    protected open val pageSize = 100
     protected abstract val gridTitle: String
     protected abstract val emptyMessage: String
     protected abstract suspend fun loadItems(): List<Any>
 
-    /** Prefs key for persisting this screen's sort; null = screen is not sortable. */
+    protected open suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> {
+        if (page > 1) return Pair(0, emptyList())
+        val items = loadItems()
+        return Pair(items.size, items)
+    }
+
     protected open val sortScreenKey: String? = null
+    protected open val filterScreenKey: String? get() = sortScreenKey
     protected open val defaultSort: SortOption = SortOption.PATH_ASC
     protected var sort: SortOption = SortOption.PATH_ASC
+    protected var sceneFilter = SceneFilterOptions()
     protected var randomSeed: Int = 0
     private var loadJob: Job? = null
+    private var loadGeneration = 0
+    private var loadingPage = false
+    private lateinit var pageState: GridPageState
+    private var pagingGrid: VerticalGridView? = null
+
+    override val filterLabel: String get() = sceneFilter.summary
 
     override fun showSortDialog() {
         val key = sortScreenKey ?: return
@@ -45,6 +60,15 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             sort = chosen
             app.prefs.setSortFor(key, chosen.name)
             updateTitle()
+            reload()
+        }
+    }
+
+    override fun showFilterDialog() {
+        FilterDialog.show(requireContext(), sceneFilter) { chosen ->
+            sceneFilter = chosen
+            filterScreenKey?.let { app.prefs.setSceneFilterFor(it, chosen) }
+            activity?.refreshGridControls()
             reload()
         }
     }
@@ -95,16 +119,17 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         title = if (sortScreenKey != null) "$gridTitle  •  ${sort.label}" else gridTitle
     }
 
-    /** Subclasses with non-Scene items override to handle their own clicks. */
     protected open fun onItemClicked(item: Any) {
         if (item is Scene) startActivity(SceneIntents.detail(requireContext(), item))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pageState = GridPageState(paged)
         randomSeed = savedInstanceState?.getInt("random_seed")
             ?: (0..99_999_999).random()
         sortScreenKey?.let { sort = SortOption.fromName(app.prefs.sortFor(it), defaultSort) }
+        if (canFilter) filterScreenKey?.let { sceneFilter = app.prefs.sceneFilterFor(it) }
         updateTitle()
         badgeDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.sinema_logo)
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
@@ -124,18 +149,43 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         val vPad = (27 * density).toInt()
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
+        activity?.refreshGridControls()
         view.viewTreeObserver.addOnGlobalLayoutListener {
             findGridView(view as? ViewGroup)?.let { grid ->
                 if (grid.paddingLeft != hPad) {
                     grid.setPadding(hPad, vPad, hPad, vPad)
                     grid.clipToPadding = false
                 }
+                attachPagination(grid)
             }
         }
     }
 
+    override fun onDestroyView() {
+        pagingGrid = null
+        super.onDestroyView()
+    }
+
+    private fun attachPagination(grid: VerticalGridView) {
+        if (!paged || pagingGrid === grid) return
+        pagingGrid = grid
+        grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy <= 0 || loadingPage || !pageState.canLoadMore) return
+                val lastVisible = (0 until recyclerView.childCount).maxOfOrNull { index ->
+                    recyclerView.getChildAdapterPosition(recyclerView.getChildAt(index))
+                } ?: return
+                if (lastVisible >= gridAdapter.size() - columns * 2) loadNextPage()
+            }
+        })
+    }
+
     protected fun reload() {
+        updateTitle()
         loadJob?.cancel()
+        val generation = ++loadGeneration
+        pageState.reset()
+        loadingPage = true
         var oldIndex = gridView?.focusedChild
             ?.let { gridView!!.getChildAdapterPosition(it) } ?: -1
         var oldKey: String? = null
@@ -148,9 +198,11 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         }
         loadJob = lifecycleScope.launch {
             try {
-                val items = loadItems()
+                val (count, items) = loadPage(1, pageSize)
+                if (generation != loadGeneration) return@launch
                 gridAdapter.clear()
                 items.forEach { gridAdapter.add(it) }
+                pageState.record(count, items.size, gridAdapter.size())
                 if (items.isEmpty()) {
                     Toast.makeText(requireContext(), emptyMessage, Toast.LENGTH_SHORT).show()
                 }
@@ -164,18 +216,43 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     }
                 }
             } catch (e: CancellationException) {
-                throw e // back-press cancels the scope; not a real error
+                throw e
             } catch (e: Exception) {
+                Log.e("Sinema", "Failed to load first page for $gridTitle", e)
                 Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                if (generation == loadGeneration) loadingPage = false
             }
         }
     }
 
-    private fun findGridView(vg: ViewGroup?): androidx.leanback.widget.VerticalGridView? {
+    private fun loadNextPage() {
+        if (loadingPage || !pageState.canLoadMore) return
+        loadingPage = true
+        val generation = loadGeneration
+        val page = pageState.nextPage
+        loadJob = lifecycleScope.launch {
+            try {
+                val (count, items) = loadPage(page, pageSize)
+                if (generation != loadGeneration) return@launch
+                items.forEach { gridAdapter.add(it) }
+                pageState.record(count, items.size, gridAdapter.size())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Failed to load page $page for $gridTitle", e)
+                Toast.makeText(requireContext(), "Error loading more: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                if (generation == loadGeneration) loadingPage = false
+            }
+        }
+    }
+
+    private fun findGridView(vg: ViewGroup?): VerticalGridView? {
         if (vg == null) return null
         for (i in 0 until vg.childCount) {
             val child = vg.getChildAt(i)
-            if (child is androidx.leanback.widget.VerticalGridView) return child
+            if (child is VerticalGridView) return child
             if (child is ViewGroup) findGridView(child)?.let { return it }
         }
         return null

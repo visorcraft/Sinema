@@ -9,11 +9,16 @@ import com.sinema.model.SortOption
 class FavoritesActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_grid)
         if (savedInstanceState == null) {
+            val fragment = FavoritesGridFragment()
             supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, FavoritesGridFragment())
+                .replace(R.id.main_frame, fragment)
                 .commit()
+            bindGridControls(fragment)
+        } else {
+            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
+                ?.let { bindGridControls(it) }
         }
     }
 

@@ -153,6 +153,14 @@ class Prefs(context: Context) {
     fun setSortFor(screen: String, optionName: String) =
         prefs.edit().putString("sort_$screen", optionName).apply()
 
+    fun sceneFilterFor(screen: String): com.sinema.model.SceneFilterOptions =
+        com.sinema.model.SceneFilterOptions.fromPreferenceValue(
+            prefs.getString("scene_filter_$screen", null)
+        )
+
+    fun setSceneFilterFor(screen: String, filter: com.sinema.model.SceneFilterOptions) =
+        prefs.edit().putString("scene_filter_$screen", filter.toPreferenceValue()).apply()
+
     fun getAllResumePositions(): Map<String, Long> {
         return prefs.all.filter { it.key.startsWith("resume_") && it.value is Long && (it.value as Long) > 0 }
             .map { it.key.removePrefix("resume_") to (it.value as Long) }

@@ -123,6 +123,7 @@ class SinemaApi(
         direction: String = "ASC",
         searchTerm: String? = null,
         sceneFilter: Map<String, Any?>? = null,
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
         fields: String = SCENE_FIELDS
     ): Pair<Int, List<Scene>> {
         val query = """
@@ -137,7 +138,9 @@ class SinemaApi(
             "page" to page, "per_page" to perPage, "sort" to sort, "direction" to direction
         )
         if (searchTerm != null) filter["q"] = searchTerm
-        val result = graphql(query, mapOf("filter" to filter, "scene_filter" to sceneFilter))
+        val combinedSceneFilter = (sceneFilter.orEmpty() + filters.toStashFilter())
+            .takeIf { it.isNotEmpty() }
+        val result = graphql(query, mapOf("filter" to filter, "scene_filter" to combinedSceneFilter))
         val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes")
             ?: return Pair(0, emptyList())
         val count = data.get("count").asInt
@@ -238,11 +241,13 @@ class SinemaApi(
 
     suspend fun findScenesByPath(
         pathPrefix: String, page: Int = 1, perPage: Int = 100,
-        sort: String = "path", direction: String = "ASC"
+        sort: String = "path", direction: String = "ASC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
     ): Pair<Int, List<Scene>> =
         findScenesInternal(
             page = page, perPage = perPage, sort = sort, direction = direction,
-            sceneFilter = mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+            sceneFilter = mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX")),
+            filters = filters
         )
 
     suspend fun findImagesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<ImageItem>> {
@@ -348,9 +353,16 @@ class SinemaApi(
 
     suspend fun searchScenes(
         searchTerm: String, page: Int = 1, perPage: Int = 40,
-        sort: String = "path", direction: String = "ASC"
-    ): Pair<Int, List<Scene>> =
-        findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, searchTerm = searchTerm)
+        sort: String = "path", direction: String = "ASC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> = findScenesInternal(
+        page = page,
+        perPage = perPage,
+        sort = sort,
+        direction = direction,
+        searchTerm = searchTerm,
+        filters = filters
+    )
 
     suspend fun setSceneRating(sceneId: String, rating: Int?): Boolean {
         val query = """
@@ -679,10 +691,17 @@ class SinemaApi(
     }
 
     /**
-     * Fetch a paginated list of tags, performers, or studios sorted by scene count descending.
-     * Note: sort field is "scenes_count" (plural) — confirmed in stashapp/stash pkg/sqlite tag.go, performer.go, studio.go.
+     * Fetch a paginated list of tags, performers, or studios with optional name search.
+     * The default scene-count sort field is "scenes_count" (plural).
      */
-    suspend fun findEntities(kind: EntityItem.Kind, page: Int = 1, perPage: Int = 100): Pair<Int, List<EntityItem>> {
+    suspend fun findEntities(
+        kind: EntityItem.Kind,
+        page: Int = 1,
+        perPage: Int = 100,
+        searchTerm: String? = null,
+        sort: String = "scenes_count",
+        direction: String = "DESC"
+    ): Pair<Int, List<EntityItem>> {
         val (queryName, listKey) = when (kind) {
             EntityItem.Kind.TAG -> "findTags" to "tags"
             EntityItem.Kind.PERFORMER -> "findPerformers" to "performers"
@@ -696,9 +715,14 @@ class SinemaApi(
                 }
             }
         """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "scenes_count", "direction" to "DESC")
+        val filter = mutableMapOf<String, Any?>(
+            "page" to page,
+            "per_page" to perPage,
+            "sort" to sort,
+            "direction" to direction
         )
+        if (!searchTerm.isNullOrBlank()) filter["q"] = searchTerm
+        val variables = mapOf("filter" to filter)
         val result = graphql(query, variables)
         val data = result.getAsJsonObject("data")?.getAsJsonObject(queryName) ?: return Pair(0, emptyList())
         val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
@@ -724,7 +748,8 @@ class SinemaApi(
     suspend fun findScenesForEntity(
         kind: EntityItem.Kind, entityId: String,
         page: Int = 1, perPage: Int = 100,
-        sort: String = "path", direction: String = "ASC"
+        sort: String = "path", direction: String = "ASC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
     ): Pair<Int, List<Scene>> {
         val sceneFilter = when (kind) {
             EntityItem.Kind.TAG ->
@@ -734,7 +759,14 @@ class SinemaApi(
             EntityItem.Kind.STUDIO ->
                 mapOf("studios" to mapOf("value" to listOf(entityId), "modifier" to "INCLUDES", "depth" to 0))
         }
-        return findScenesInternal(page = page, perPage = perPage, sort = sort, direction = direction, sceneFilter = sceneFilter)
+        return findScenesInternal(
+            page = page,
+            perPage = perPage,
+            sort = sort,
+            direction = direction,
+            sceneFilter = sceneFilter,
+            filters = filters
+        )
     }
 
     /**

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <RadioGroup
+        android:id="@+id/filter_watch_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/filter_watch_all"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:checked="true"
+            android:text="All scenes"
+            android:textColor="@android:color/white"
+            android:textSize="16sp" />
+
+        <RadioButton
+            android:id="@+id/filter_watch_watched"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Watched"
+            android:textColor="@android:color/white"
+            android:textSize="16sp" />
+
+        <RadioButton
+            android:id="@+id/filter_watch_unwatched"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Unwatched"
+            android:textColor="@android:color/white"
+            android:textSize="16sp" />
+    </RadioGroup>
+
+    <CheckBox
+        android:id="@+id/filter_favorites"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:text="Favorites only"
+        android:textColor="@android:color/white"
+        android:textSize="16sp" />
+</LinearLayout>

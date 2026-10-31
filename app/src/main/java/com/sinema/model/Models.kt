@@ -52,6 +52,7 @@ data class Scene(
     val isWatched: Boolean get() = playCount > 0
     val isFavorite: Boolean get() = (rating100 ?: 0) > 0
     val filename: String get() = path.substringAfterLast('/')
+    val displayTitle: String get() = title.ifBlank { filename }
     val folder: String get() = path.substringBeforeLast('/')
 
     /**

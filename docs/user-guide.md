@@ -43,11 +43,12 @@ Open `Search` from the main screen.
 - Start typing with the Android TV keyboard or a connected keyboard.
 - If your remote has a microphone, select the mic button in the search bar to search by voice. The first use asks for microphone permission; it is only used while searching.
 - Sinema searches after at least two characters.
-- Results are loaded from Stash and shown as scene cards.
-- Select a result to open its scene detail screen.
-- Press Menu, if available on your remote, to choose a sort order.
+- Results are grouped into Scenes, Tags, Performers, and Studios with their Stash result counts.
+- Select a scene to open its details, or an entity to browse its scenes.
+- Use the on-screen Sort button to choose a scene sort order.
+- Use Filter to show all, watched, or unwatched scenes and optionally limit scene results to favorites. Filters do not change entity results.
 
-The selected search sort is saved and reused later.
+The selected search sort and filters are saved and reused later. Filters also apply to folder and entity scene views.
 
 ## Favorites
 
@@ -112,9 +113,9 @@ Entity grids show:
 - Scene count.
 - Entity image when Stash provides one.
 
-Sinema currently loads up to 200 tags, performers, or studios per entity grid, sorted by scene count descending.
+Use Search to filter the current entity type by name. Sort offers scene count, Name A-Z, and Name Z-A. Sinema loads 100 entities at a time and appends more as you scroll near the end.
 
-Selecting an entity opens the scenes for that entity. Entity scene grids are sortable and support Play All through the Menu key.
+Selecting an entity opens its scenes. Entity scene grids also load incrementally and provide Sort and Filter controls. Play All is available through the Menu key.
 
 Scene detail screens also show metadata chips:
 
@@ -128,15 +129,13 @@ Selecting a scene opens its detail screen.
 
 The detail screen shows:
 
-- Screenshot.
-- File name.
-- Duration.
-- File size.
-- Resolution.
-- Full path.
+- Screenshot and friendly Stash title, falling back to the filename when no title is set.
+- Duration and resolution.
 - Date, studio, rating, and chapter count when available.
-- Studio, tag, and performer chips when available.
+- Synopsis and studio, tag, and performer chips when available.
 - A small `More from this folder` row when related scenes are found.
+
+Select Technical details to show or hide the filename, full path, file size, duration, and resolution.
 
 Available actions:
 
@@ -149,13 +148,14 @@ Available actions:
 
 ## Sorting
 
-Sortable screens listen for the remote's Menu key.
+Sortable screens provide an on-screen Sort button and also listen for the remote's Menu key.
 
 Sortable screens include:
 
 - Search results.
 - Favorites.
 - Folder scene views.
+- Tag, performer, and studio grids.
 - Entity scene views.
 
 Sort choices:
@@ -180,8 +180,8 @@ Press Menu on folder, favorite, or entity scene grids to open the grid menu, the
 
 Play All behavior:
 
-- Queues the visible scenes from the current grid.
-- Does not include scenes hidden inside unopened subfolders.
+- Queues the currently loaded scenes from the current grid, respecting active scene filters.
+- Does not include scenes hidden inside unopened subfolders or entity results that have not loaded yet.
 - Starts playback from the first visible scene.
 - Advances automatically when a scene ends.
 - Caps the queue at 500 scenes and shows a toast when it truncates the queue.
