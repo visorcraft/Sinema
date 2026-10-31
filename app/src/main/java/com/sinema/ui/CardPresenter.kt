@@ -29,12 +29,22 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
         val content = view.findViewById<TextView>(R.id.card_content)
         val heart = view.findViewById<TextView>(R.id.card_heart)
         val checkmark = view.findViewById<TextView>(R.id.card_checkmark)
+        val progress = view.findViewById<android.widget.ProgressBar>(R.id.card_progress)
         when (item) {
             is Scene -> {
                 title.text = item.filename
                 content.text = item.formatDuration()
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE
+                val percent = item.watchProgressPercent
+                progress?.let { bar ->
+                    if (percent > 0) {
+                        bar.progress = percent
+                        bar.visibility = View.VISIBLE
+                    } else {
+                        bar.visibility = View.GONE
+                    }
+                }
                 val url = api.getScreenshotUrl(item.id)
                 image.scaleType = ImageView.ScaleType.CENTER_CROP
                 image.setBackgroundColor(0xFF333333.toInt())
@@ -48,6 +58,7 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
                 content.text = "${item.sceneCount} " + if (item.sceneCount == 1) "scene" else "scenes"
                 heart?.visibility = View.GONE
                 checkmark?.visibility = View.GONE
+                progress?.visibility = View.GONE
                 if (item.imagePath != null) {
                     image.scaleType = ImageView.ScaleType.CENTER_CROP
                     image.setBackgroundColor(0xFF333333.toInt())
@@ -163,6 +174,13 @@ class SettingsPresenter : Presenter() {
                 title.text = "🔍 Search"
                 content.text = "Find scenes"
                 image.setImageResource(android.R.drawable.ic_menu_search)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Surprise Me" -> {
+                title.text = "🎲 Surprise Me"
+                content.text = "Play a random scene"
+                image.setImageResource(android.R.drawable.ic_media_play)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }

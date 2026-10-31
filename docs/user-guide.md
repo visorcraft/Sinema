@@ -7,6 +7,7 @@ This guide explains the browsing and library features in Sinema.
 The top shortcut row contains:
 
 - Search
+- Surprise Me: plays a random scene from your library right away.
 - Favorites
 - Browse Folders
 - Tags
@@ -21,6 +22,12 @@ The content rows are loaded from Stash:
 - Recently Added: recently created scenes in Stash.
 - Favorites: rated scenes, where `rating100` is greater than zero.
 
+Scene cards show at a glance:
+
+- A heart when the scene is a favorite.
+- A checkmark when the scene has been played.
+- A thin progress bar along the bottom edge when a scene is partially watched.
+
 The bottom row contains:
 
 - Refresh: reloads the home screen rows.
@@ -34,6 +41,7 @@ Sinema refreshes the home screen when you return to it, so changes made in playb
 Open `Search` from the main screen.
 
 - Start typing with the Android TV keyboard or a connected keyboard.
+- If your remote has a microphone, select the mic button in the search bar to search by voice. The first use asks for microphone permission; it is only used while searching.
 - Sinema searches after at least two characters.
 - Results are loaded from Stash and shown as scene cards.
 - Select a result to open its scene detail screen.

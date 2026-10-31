@@ -40,6 +40,11 @@ data class Scene(
     val tags: List<TagRef> = emptyList(),
     val performers: List<PerformerRef> = emptyList(),
     val captions: List<CaptionRef> = emptyList(),
+    // Populated by list queries (Stash ≥ 0.24) and used for the card progress bar.
+    val resumeTime: Double = 0.0,
+    // Synopsis text and O-count come from the full scene query only.
+    val details: String? = null,
+    val oCounter: Int = 0,
     // ISO-8601 timestamp populated only when the query asked for `last_played_at`
     // (currently just the Recently Played row). Null if unscored.
     val lastPlayedAt: String? = null
@@ -48,7 +53,20 @@ data class Scene(
     val isFavorite: Boolean get() = (rating100 ?: 0) > 0
     val filename: String get() = path.substringAfterLast('/')
     val folder: String get() = path.substringBeforeLast('/')
-    
+
+    /**
+     * Resume progress 0..100 for card overlays, or 0 when there is nothing
+     * meaningful to show: no resume point, unknown duration, barely started
+     * (<2%), or nearly finished (≥98% — finishing playback clears
+     * resume_time server-side, so a full bar would just flash and vanish).
+     */
+    val watchProgressPercent: Int get() {
+        if (duration <= 0.0 || resumeTime <= 0.0) return 0
+        val fraction = resumeTime / duration
+        if (fraction < 0.02 || fraction >= 0.98) return 0
+        return (fraction * 100).toInt().coerceIn(1, 100)
+    }
+
     fun formatDuration(): String = com.sinema.util.TimeFormat.formatSeconds(duration)
     
     fun formatSize(): String {

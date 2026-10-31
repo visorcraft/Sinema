@@ -35,6 +35,7 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var btnMarkWatched: Button
     private var btnFolder: Button? = null
     private lateinit var metaView: TextView
+    private lateinit var detailsView: TextView
     private lateinit var tagsScroll: View
     private lateinit var tagsRow: LinearLayout
     private lateinit var performersScroll: View
@@ -64,6 +65,7 @@ class SceneDetailActivity : FragmentActivity() {
         btnMarkWatched = findViewById(R.id.btn_mark_watched)
         btnFolder = findViewById(R.id.btn_folder)
         metaView = findViewById(R.id.detail_meta)
+        detailsView = findViewById(R.id.detail_details)
         tagsScroll = findViewById(R.id.detail_tags_scroll)
         tagsRow = findViewById(R.id.detail_tags_row)
         performersScroll = findViewById(R.id.detail_performers_scroll)
@@ -193,6 +195,7 @@ class SceneDetailActivity : FragmentActivity() {
             s.date?.takeIf { it.isNotBlank() }?.let { add(it) }
             s.studio?.let { add(it.name) }
             s.rating100?.takeIf { it > 0 }?.let { add("★ ${"%.1f".format(it / 20.0)}") }
+            if (s.oCounter > 0) add("O × ${s.oCounter}")
             if (markers.isNotEmpty()) add("${markers.size} chapters")
         }
         if (metaParts.isNotEmpty()) {
@@ -200,6 +203,14 @@ class SceneDetailActivity : FragmentActivity() {
             metaView.visibility = View.VISIBLE
         } else {
             metaView.visibility = View.GONE
+        }
+
+        // Synopsis from the scene's Stash details field
+        if (s.details.isNullOrBlank()) {
+            detailsView.visibility = View.GONE
+        } else {
+            detailsView.text = s.details
+            detailsView.visibility = View.VISIBLE
         }
     }
 

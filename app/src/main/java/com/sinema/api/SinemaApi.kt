@@ -35,12 +35,16 @@ class SinemaApi(
 
     companion object {
         // Single source of truth for scene list payloads.
+        // resume_time ships on Scene since Stash 0.24 and powers the
+        // watch-progress bar on cards (see Scene.watchProgressPercent).
         internal const val SCENE_FIELDS =
-            "id title play_count rating100 files { path size duration width height }"
+            "id title play_count rating100 resume_time files { path size duration width height }"
 
         // Full scene payload — used by findSceneFull for detail/player screens.
         internal const val SCENE_FIELDS_FULL = SCENE_FIELDS +
             " date" +
+            " details" +
+            " o_counter" +
             " studio { id name }" +
             " tags { id name }" +
             " performers { id name }" +
@@ -380,6 +384,13 @@ class SinemaApi(
     suspend fun findRecentScenes(perPage: Int = 25): List<Scene> =
         findScenesInternal(perPage = perPage, sort = "created_at", direction = "DESC").second
 
+    /**
+     * One random scene from the whole library, for the "Surprise Me" card.
+     * @return a scene, or null when the library is empty.
+     */
+    suspend fun findRandomScene(): Scene? =
+        findScenesInternal(perPage = 1, sort = "random").second.firstOrNull()
+
     suspend fun findTopLevelFolders(): List<Pair<String, String>> {
         val idQuery = """
             query {
@@ -512,6 +523,8 @@ class SinemaApi(
         // nulls last so Recently Played is always true recency order.
         // Do not send a last_played_at scene_filter — see
         // RECENTLY_PLAYED_SCENE_FILTER for why (compat + Stash no-op).
+        // last_played_at is appended on top of SCENE_FIELDS for the client-side
+        // recency re-sort below; resume_time already comes via SCENE_FIELDS.
         val scenes = findScenesInternal(
             perPage = perPage,
             sort = "last_played_at",
@@ -527,7 +540,7 @@ class SinemaApi(
         val query = """
             query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
                 findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
-                    scenes { $SCENE_FIELDS resume_time }
+                    scenes { $SCENE_FIELDS }
                 }
             }
         """.trimIndent()
@@ -648,7 +661,10 @@ class SinemaApi(
             height = file?.get("height")?.asInt ?: 0,
             playCount = obj.get("play_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
             rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt,
+            resumeTime = obj.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
             date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
+            details = obj.get("details")?.takeIf { !it.isJsonNull }?.asString?.trim(),
+            oCounter = obj.get("o_counter")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
             studio = studioObj?.let { s ->
                 StudioRef(
                     id = s.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",

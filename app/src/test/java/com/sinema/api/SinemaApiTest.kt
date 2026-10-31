@@ -124,6 +124,95 @@ class SinemaApiTest {
     }
 
     @Test
+    fun `scene list fields include resume_time for card progress`() {
+        // CardPresenter's watch-progress bar depends on list queries shipping
+        // resume_time; guard the shared field list so a refactor cannot
+        // silently drop it.
+        org.junit.Assert.assertTrue(
+            "SCENE_FIELDS must select resume_time: ${SinemaApi.SCENE_FIELDS}",
+            Regex("\\bresume_time\\b").containsMatchIn(SinemaApi.SCENE_FIELDS)
+        )
+    }
+
+    @Test
+    fun `full scene fields include details and o_counter`() {
+        org.junit.Assert.assertTrue(SinemaApi.SCENE_FIELDS_FULL.contains(" details"))
+        org.junit.Assert.assertTrue(SinemaApi.SCENE_FIELDS_FULL.contains(" o_counter"))
+    }
+
+    @Test
+    fun `parseScene reads resume_time when present`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val withResume = com.google.gson.JsonParser.parseString(
+            """{"id":"1","title":"t","resume_time":42.5,"files":[]}"""
+        ).asJsonObject
+        val nullResume = com.google.gson.JsonParser.parseString(
+            """{"id":"2","title":"t","resume_time":null,"files":[]}"""
+        ).asJsonObject
+        val lean = com.google.gson.JsonParser.parseString(
+            """{"id":"3","title":"t","files":[]}"""
+        ).asJsonObject
+        assertEquals(42.5, api.parseScene(withResume).resumeTime, 0.0)
+        assertEquals(0.0, api.parseScene(nullResume).resumeTime, 0.0)
+        assertEquals(0.0, api.parseScene(lean).resumeTime, 0.0)
+    }
+
+    @Test
+    fun `parseScene reads details and o_counter`() {
+        val api = SinemaApi("http://server", "k", "", "apikey")
+        val full = com.google.gson.JsonParser.parseString(
+            """{"id":"1","title":"t","details":"  A synopsis.\nSecond line.  ","o_counter":3,"files":[]}"""
+        ).asJsonObject
+        val nulls = com.google.gson.JsonParser.parseString(
+            """{"id":"2","title":"t","details":null,"o_counter":null,"files":[]}"""
+        ).asJsonObject
+        val scene = api.parseScene(full)
+        assertEquals("A synopsis.\nSecond line.", scene.details)
+        assertEquals(3, scene.oCounter)
+        assertEquals(null, api.parseScene(nulls).details)
+        assertEquals(0, api.parseScene(nulls).oCounter)
+    }
+
+    @Test
+    fun `findRandomScene requests one random scene and parses it`() {
+        val requestBody = java.util.concurrent.atomic.AtomicReference("")
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBody.set(exchange.requestBody.bufferedReader().readText())
+            val response = """{"data":{"findScenes":{"count":9,"scenes":[
+                {"id":"9","title":"r","play_count":1,"rating100":null,"resume_time":10.0,
+                 "files":[{"path":"/data/r.mp4","size":10,"duration":100.0,"width":1920,"height":1080}]}
+            ]}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            val scene = kotlinx.coroutines.runBlocking { api.findRandomScene() }
+            org.junit.Assert.assertNotNull(scene)
+            assertEquals("9", scene!!.id)
+            assertEquals("/data/r.mp4", scene.path)
+            assertEquals(10.0, scene.resumeTime, 0.0)
+            org.junit.Assert.assertTrue(
+                "Expected random sort in request body: ${requestBody.get()}",
+                requestBody.get().contains("\"sort\":\"random\"")
+            )
+            org.junit.Assert.assertTrue(
+                "Expected per_page 1 in request body: ${requestBody.get()}",
+                requestBody.get().contains("\"per_page\":1")
+            )
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `recently-played filter omits last_played_at for Stash 0_24 compat`() {
         // Regression guard for 1.17.0:
         // 1) Used invalid CriterionModifier IS_NOT_NULL → HTTP 422

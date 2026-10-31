@@ -146,6 +146,17 @@
                     android:layout_marginTop="6dp"
                     android:visibility="gone" />
 
+                <TextView
+                    android:id="@+id/detail_details"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#999999"
+                    android:textSize="13sp"
+                    android:layout_marginTop="8dp"
+                    android:maxLines="6"
+                    android:ellipsize="end"
+                    android:visibility="gone" />
+
                 <!-- Studio + tag chips -->
                 <HorizontalScrollView
                     android:id="@+id/detail_tags_scroll"

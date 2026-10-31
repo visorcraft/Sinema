@@ -16,6 +16,9 @@ import com.sinema.SinemaApp
 import com.sinema.model.EntityItem
 import com.sinema.model.Scene
 import com.sinema.util.SceneIntents
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -119,6 +122,7 @@ class MainFragment : RowsSupportFragment() {
                     when (item) {
                         "Settings" -> startActivity(Intent(requireContext(), SettingsActivity::class.java))
                         "Search" -> startActivity(Intent(requireContext(), SearchActivity::class.java))
+                        "Surprise Me" -> playRandomScene()
                         "Favorites" -> startActivity(Intent(requireContext(), FavoritesActivity::class.java))
                         "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
                         "Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))
@@ -165,6 +169,35 @@ class MainFragment : RowsSupportFragment() {
 
     fun forceReload() {
         loadContent()
+    }
+
+    /**
+     * "Surprise Me" — pick one random scene from the whole library and
+     * jump straight into playback (no queue). In-flight guard keeps a
+     * double D-pad press from stacking two player activities.
+     */
+    private var randomSceneJob: Job? = null
+
+    private fun playRandomScene() {
+        if (randomSceneJob?.isActive == true) return
+        val appCtx = context?.applicationContext ?: return
+        Toast.makeText(appCtx, "Picking a random scene...", Toast.LENGTH_SHORT).show()
+        randomSceneJob = lifecycleScope.launch {
+            try {
+                val scene = app.api.findRandomScene()
+                if (scene == null) {
+                    Toast.makeText(appCtx, "No scenes found on server", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                if (!isAdded) return@launch
+                startActivity(SceneIntents.playback(requireContext(), scene.id, 0L, scene.width, scene.height))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Surprise Me failed", e)
+                Toast.makeText(appCtx, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private data class RowFocus(val rowIndex: Int, val rowKey: String?,
@@ -218,9 +251,10 @@ class MainFragment : RowsSupportFragment() {
                 Log.d("Sinema", "loadContent starting")
                 rowsAdapter.clear()
 
-                // 1. Top row: Search | Favorites | Browse Folders | Tags | Performers | Studios (+ Log Out)
+                // 1. Top row: Search | Surprise Me | Favorites | Browse Folders | Tags | Performers | Studios (+ Log Out)
                 val topAdapter = ArrayObjectAdapter(SettingsPresenter())
                 topAdapter.add("Search")
+                topAdapter.add("Surprise Me")
                 topAdapter.add("Favorites")
                 topAdapter.add("Browse Folders")
                 topAdapter.add("Tags")
@@ -235,8 +269,11 @@ class MainFragment : RowsSupportFragment() {
                 // query cannot blank the rest of the dashboard (seen when a
                 // single bad CriterionModifier made findRecentlyPlayed throw
                 // 422 and aborted Recently Added + Favorites).
-                var continuePairs: List<Pair<Scene, Double>> = emptyList()
-                var recentScenes: List<Scene> = emptyList()
+                // The four queries are independent, so they run concurrently —
+                // dashboard latency is the slowest query, not the sum of all
+                // four round trips — but rows are assembled in fixed order
+                // and errors noted in that same order, matching the previous
+                // sequential behavior.
                 var firstError: Exception? = null
 
                 fun noteError(label: String, e: Exception) {
@@ -245,48 +282,44 @@ class MainFragment : RowsSupportFragment() {
                     if (firstError == null) firstError = e
                 }
 
-                try {
-                    continuePairs = app.api.findContinuePlaying()
-                    if (continuePairs.isNotEmpty()) {
-                        val continueAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                        continuePairs.forEach { (scene, _) -> continueAdapter.add(scene) }
-                        rowsAdapter.add(ListRow(HeaderItem("Continue Playing"), continueAdapter))
-                    }
-                } catch (e: Exception) {
-                    noteError("Continue Playing", e)
+                val rows = coroutineScope {
+                    val continueJob = async { loadRow { app.api.findContinuePlaying() } }
+                    val playedJob = async { loadRow { app.api.findRecentlyPlayed(25) } }
+                    val recentJob = async { loadRow { app.api.findRecentScenes(25) } }
+                    val favJob = async { loadRow { app.api.findFavoriteScenes() } }
+                    DashboardLoad(continueJob.await(), playedJob.await(), recentJob.await(), favJob.await())
                 }
 
-                try {
-                    val recentlyPlayed = app.api.findRecentlyPlayed(25)
-                    if (recentlyPlayed.isNotEmpty()) {
-                        val watchedAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                        recentlyPlayed.forEach { watchedAdapter.add(it) }
-                        rowsAdapter.add(ListRow(HeaderItem("Recently Played"), watchedAdapter))
-                    }
-                } catch (e: Exception) {
-                    noteError("Recently Played", e)
+                val continuePairs = rows.continuePlaying.value ?: emptyList<Pair<Scene, Double>>()
+                rows.continuePlaying.error?.let { noteError("Continue Playing", it) }
+                if (continuePairs.isNotEmpty()) {
+                    val continueAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                    continuePairs.forEach { (scene, _) -> continueAdapter.add(scene) }
+                    rowsAdapter.add(ListRow(HeaderItem("Continue Playing"), continueAdapter))
                 }
 
-                try {
-                    recentScenes = app.api.findRecentScenes(25)
-                    if (recentScenes.isNotEmpty()) {
-                        val recentAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                        recentScenes.forEach { recentAdapter.add(it) }
-                        rowsAdapter.add(ListRow(HeaderItem("Recently Added"), recentAdapter))
-                    }
-                } catch (e: Exception) {
-                    noteError("Recently Added", e)
+                rows.recentlyPlayed.error?.let { noteError("Recently Played", it) }
+                val recentlyPlayed = rows.recentlyPlayed.value ?: emptyList()
+                if (recentlyPlayed.isNotEmpty()) {
+                    val watchedAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                    recentlyPlayed.forEach { watchedAdapter.add(it) }
+                    rowsAdapter.add(ListRow(HeaderItem("Recently Played"), watchedAdapter))
                 }
 
-                try {
-                    val favScenes = app.api.findFavoriteScenes()
-                    if (favScenes.isNotEmpty()) {
-                        val favAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                        favScenes.take(20).forEach { favAdapter.add(it) }
-                        rowsAdapter.add(ListRow(HeaderItem("Favorites"), favAdapter))
-                    }
-                } catch (e: Exception) {
-                    noteError("Favorites", e)
+                rows.recentlyAdded.error?.let { noteError("Recently Added", it) }
+                val recentScenes = rows.recentlyAdded.value ?: emptyList()
+                if (recentScenes.isNotEmpty()) {
+                    val recentAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                    recentScenes.forEach { recentAdapter.add(it) }
+                    rowsAdapter.add(ListRow(HeaderItem("Recently Added"), recentAdapter))
+                }
+
+                rows.favorites.error?.let { noteError("Favorites", it) }
+                val favScenes = rows.favorites.value ?: emptyList()
+                if (favScenes.isNotEmpty()) {
+                    val favAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+                    favScenes.take(20).forEach { favAdapter.add(it) }
+                    rowsAdapter.add(ListRow(HeaderItem("Favorites"), favAdapter))
                 }
 
                 Log.d("Sinema", "Rows loaded: ${rowsAdapter.size()}")
@@ -384,3 +417,28 @@ class MainFragment : RowsSupportFragment() {
         }
     }
 }
+
+/** Result of one independently-failing dashboard row load. */
+internal class RowResult<out T>(val value: T? = null, val error: Exception? = null)
+
+/**
+ * Runs a dashboard row query, converting any failure (except cancellation)
+ * into a [RowResult.error] so one bad Stash response cannot cancel sibling
+ * loads — structured concurrency would otherwise fail the whole scope on
+ * the first child exception. Internal for unit tests.
+ */
+internal suspend fun <T> loadRow(block: suspend () -> T): RowResult<T> = try {
+    RowResult(block())
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    RowResult(error = e)
+}
+
+/** The four home-screen row queries, fetched concurrently. */
+private class DashboardLoad(
+    val continuePlaying: RowResult<List<Pair<Scene, Double>>>,
+    val recentlyPlayed: RowResult<List<Scene>>,
+    val recentlyAdded: RowResult<List<Scene>>,
+    val favorites: RowResult<List<Scene>>
+)

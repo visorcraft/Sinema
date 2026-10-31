@@ -1,10 +1,14 @@
 package com.sinema.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.leanback.app.SearchSupportFragment
 import androidx.leanback.widget.*
 import androidx.fragment.app.FragmentActivity
@@ -42,6 +46,34 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private val randomSeed: Int = (0..99_999_999).random()
     private var currentQuery: String = ""
 
+    // Voice search: Leanback shows a mic button in the search bar once a
+    // SpeechRecognitionCallback is registered. SearchSupportFragment has no
+    // recognizeSpeech() launcher (only the old SearchFragment does), so the
+    // callback starts the recognizer intent itself and the result launcher
+    // feeds the transcript back into the query field. The system recognizer
+    // needs RECORD_AUDIO, requested on demand the first time the mic is used.
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startSpeechRecognizer()
+        } else {
+            context?.let {
+                Toast.makeText(it, "Voice search needs microphone permission", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private val speechResultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        // setSearchQuery(Intent, submit) reads the recognizer's
+        // EXTRA_RESULTS transcript itself.
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            result.data?.let { setSearchQuery(it, true) }
+        }
+    }
+
     override fun showSortDialog() {
         SortDialog.show(requireContext(), sort) { chosen ->
             sort = chosen
@@ -68,12 +100,39 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         lrp.shadowEnabled = false
         rowsAdapter = ArrayObjectAdapter(lrp)
         setSearchResultProvider(this)
+        setSpeechRecognitionCallback {
+            val ctx = context ?: return@setSpeechRecognitionCallback
+            if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED
+            ) {
+                startSpeechRecognizer()
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        // A fresh SearchSupportFragment auto-starts speech recognition ~300ms
+        // after the result provider registers (mStartRecognitionRunnable while
+        // mAutoStartRecognition is true), which would pop the mic permission
+        // dialog just for opening Search. Setting any query clears the flag
+        // and removes the pending callback, so recognition only starts when
+        // the mic button is actually pressed.
+        setSearchQuery("", false)
         setOnItemViewClickedListener { _, item, _, _ ->
             if (item is Scene) startActivity(SceneIntents.detail(requireContext(), item))
         }
     }
 
     override fun getResultsAdapter(): ObjectAdapter = rowsAdapter
+
+    private fun startSpeechRecognizer() {
+        try {
+            speechResultLauncher.launch(getRecognizerIntent())
+        } catch (e: android.content.ActivityNotFoundException) {
+            context?.let {
+                Toast.makeText(it, "Voice recognition is not available on this device", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     override fun onQueryTextChange(newQuery: String): Boolean {
         search(newQuery)
