@@ -1,6 +1,7 @@
 package com.sinema.ui
 
 import com.sinema.model.EntityItem
+import com.sinema.model.GroupItem
 import com.sinema.model.Scene
 
 /** Restores focus to the same logical item after a grid/row reload, or the
@@ -9,6 +10,7 @@ object FocusRestore {
     fun keyOf(item: Any): String = when (item) {
         is Scene -> "scene:${item.id}"
         is EntityItem -> "entity:${item.kind}:${item.id}"
+        is GroupItem -> "group:${item.id}"
         is String -> "string:$item"
         is HomeViewAll -> item.key
         else -> "obj:$item"

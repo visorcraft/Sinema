@@ -106,8 +106,15 @@ object SceneIntents {
      * Launch playback for the first scene of a queue seeded from [scenes].
      * @param startAt grid index to start from ("Play from here")
      * @param shuffle randomize the queue before starting ("Shuffle play")
+     * @param resumeMs saved position for the first scene, or zero to start at the beginning
      */
-    fun playAll(context: Context, scenes: List<Scene>, startAt: Int = 0, shuffle: Boolean = false) {
+    fun playAll(
+        context: Context,
+        scenes: List<Scene>,
+        startAt: Int = 0,
+        shuffle: Boolean = false,
+        resumeMs: Long = 0L
+    ) {
         val plan = QueuePlanning.plan(scenes, startAt, shuffle)
         if (plan.ordered.isEmpty()) return
         if (plan.capped) {
@@ -115,6 +122,6 @@ object SceneIntents {
         }
         PlaybackQueue.start(QueuePlanning.toQueueItems(plan.ordered), startAt = 0)
         val first = plan.ordered[0]
-        context.startActivity(playback(context, first.id, resumeMs = 0L, width = first.width, height = first.height))
+        context.startActivity(playback(context, first.id, resumeMs = resumeMs, width = first.width, height = first.height))
     }
 }

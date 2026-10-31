@@ -50,6 +50,23 @@ data class EntityHeader(
     val tags: List<TagRef> = emptyList()
 )
 
+data class GroupItem(
+    val id: String,
+    val name: String,
+    val sceneCount: Int,
+    val frontImagePath: String? = null,
+    val backImagePath: String? = null,
+    val date: String? = null,
+    val director: String? = null,
+    val synopsis: String? = null,
+    val studioName: String? = null
+)
+
+data class GroupDetails(
+    val group: GroupItem,
+    val scenes: List<Scene>
+)
+
 /**
  * A scene saved filter stored server-side in Stash (built in the Stash web
  * UI). [sceneFilter] is the raw SceneFilterType map forwarded as-is — the

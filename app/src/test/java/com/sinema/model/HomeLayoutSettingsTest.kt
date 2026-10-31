@@ -17,6 +17,10 @@ class HomeLayoutSettingsTest {
         assertFalse(settings.isRowVisible(HomeContentRow.UNWATCHED_FAVORITES))
         assertFalse(settings.isRowVisible(HomeContentRow.RECENTLY_RELEASED))
         assertFalse(settings.isRowVisible(HomeContentRow.SAVED_FILTER))
+        assertFalse(settings.isRowVisible(HomeContentRow.GROUPS))
+        assertFalse(settings.isRowVisible(HomeContentRow.DISCOVER))
+        assertFalse(settings.isRowVisible(HomeContentRow.UNWATCHED_PERFORMERS))
+        assertTrue(HomeShortcut.customizable.contains(HomeShortcut.GROUPS))
         assertEquals(HomeCardSize.COMPACT, settings.cardSize)
         assertTrue(settings.showHero)
     }
@@ -37,11 +41,27 @@ class HomeLayoutSettingsTest {
     }
 
     @Test
+    fun `legacy layouts hide new optional rows once without locking user choices`() {
+        val migrated = HomeLayoutSettings(
+            hiddenRows = emptySet(),
+            optionalRowsVersion = 0
+        ).normalized()
+
+        assertTrue(migrated.isRowVisible(HomeContentRow.RECENTLY_RELEASED))
+        assertFalse(migrated.isRowVisible(HomeContentRow.GROUPS))
+        assertFalse(migrated.isRowVisible(HomeContentRow.DISCOVER))
+        assertFalse(migrated.isRowVisible(HomeContentRow.UNWATCHED_PERFORMERS))
+
+        val enabled = migrated.toggleRow(HomeContentRow.GROUPS).normalized()
+        assertTrue(enabled.isRowVisible(HomeContentRow.GROUPS))
+    }
+
+    @Test
     fun `moving items clamps at both ends`() {
         val settings = HomeLayoutSettings().normalized()
 
         assertEquals(settings, settings.moveShortcut(HomeShortcut.SEARCH, -1))
-        assertEquals(settings, settings.moveRow(HomeContentRow.SAVED_FILTER, 1))
+        assertEquals(settings, settings.moveRow(HomeContentRow.UNWATCHED_PERFORMERS, 1))
         assertEquals(
             HomeShortcut.SURPRISE_ME,
             settings.moveShortcut(HomeShortcut.SEARCH, 1).shortcutOrder?.first()

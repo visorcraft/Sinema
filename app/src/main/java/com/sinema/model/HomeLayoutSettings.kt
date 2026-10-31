@@ -5,6 +5,7 @@ enum class HomeShortcut(val label: String, val primary: Boolean = false) {
     SURPRISE_ME("Surprise Me", primary = true),
     FAVORITES("Favorites", primary = true),
     BROWSE_FOLDERS("Browse Folders"),
+    GROUPS("Groups"),
     TAGS("Tags"),
     PERFORMERS("Performers"),
     STUDIOS("Studios"),
@@ -25,7 +26,10 @@ enum class HomeContentRow(val label: String, val optional: Boolean = false) {
     FAVORITES("Favorites"),
     UNWATCHED_FAVORITES("Unwatched Favorites", optional = true),
     RECENTLY_RELEASED("Recently Released", optional = true),
-    SAVED_FILTER("Saved Filter", optional = true)
+    SAVED_FILTER("Saved Filter", optional = true),
+    GROUPS("Groups", optional = true),
+    DISCOVER("Because You Watched", optional = true),
+    UNWATCHED_PERFORMERS("Unwatched from Favorite Performers", optional = true)
 }
 
 enum class HomeCardSize(val widthDp: Int, val heightDp: Int, val imageHeightDp: Int) {
@@ -42,17 +46,25 @@ data class HomeLayoutSettings(
     val groupLibrary: Boolean = false,
     val showHero: Boolean = true,
     val savedFilterId: String = "",
-    val savedFilterName: String = ""
+    val savedFilterName: String = "",
+    val optionalRowsVersion: Int = 0
 ) {
     fun normalized(): HomeLayoutSettings {
         val shortcuts = (shortcutOrder.orEmpty().filter { it != HomeShortcut.LIBRARY } +
             HomeShortcut.customizable).distinct()
         val rows = (rowOrder.orEmpty() + HomeContentRow.entries).distinct()
+        val newOptionalRows = if (optionalRowsVersion < 1) {
+            setOf(HomeContentRow.GROUPS, HomeContentRow.DISCOVER, HomeContentRow.UNWATCHED_PERFORMERS)
+        } else {
+            emptySet()
+        }
         return copy(
             shortcutOrder = shortcuts,
             hiddenShortcuts = hiddenShortcuts.orEmpty().intersect(HomeShortcut.customizable.toSet()),
             rowOrder = rows,
-            hiddenRows = hiddenRows ?: HomeContentRow.entries.filter { it.optional }.toSet()
+            hiddenRows = hiddenRows?.plus(newOptionalRows)
+                ?: HomeContentRow.entries.filter { it.optional }.toSet(),
+            optionalRowsVersion = 1
         )
     }
 

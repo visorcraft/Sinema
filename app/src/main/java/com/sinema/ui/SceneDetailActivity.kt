@@ -58,6 +58,7 @@ class SceneDetailActivity : FragmentActivity() {
 
     // Cache key to skip chip rebuild when metadata is unchanged on re-resume
     private var boundChipsKey: String? = null
+    private var relatedSceneId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -170,9 +171,6 @@ class SceneDetailActivity : FragmentActivity() {
             startActivity(intent)
         }
 
-        // Load related scenes from same folder
-        loadRelatedScenes()
-
         // Initial focus
         btnPlay.requestFocus()
     }
@@ -196,6 +194,10 @@ class SceneDetailActivity : FragmentActivity() {
                 bindResume(details)
                 bindMeta(details.scene)
                 bindChips(details.scene)
+                if (relatedSceneId != details.scene.id) {
+                    relatedSceneId = details.scene.id
+                    loadRelatedScenes(details.scene)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -362,20 +364,31 @@ class SceneDetailActivity : FragmentActivity() {
         startActivity(intent)
     }
 
-    private fun loadRelatedScenes() {
+    private fun loadRelatedScenes(source: Scene) {
         val relatedRow = findViewById<LinearLayout>(R.id.related_row)
+        val relatedScroll = findViewById<View>(R.id.related_scroll)
         val relatedLabel = findViewById<TextView>(R.id.related_label)
+        relatedRow.removeAllViews()
+        relatedScroll.visibility = View.GONE
+        relatedLabel.visibility = View.GONE
 
         lifecycleScope.launch {
             try {
-                val (_, scenes) = app.api.findScenesInFolderDirect(scene.folder, 1, 20)
-                val others = scenes.filter { it.id != scene.id }.shuffled().take(3)
-                if (others.isEmpty()) return@launch
+                val related = app.api.findRelatedScenes(source).take(6)
+                val (label, scenes) = if (related.isNotEmpty()) {
+                    "More Like This" to related
+                } else {
+                    val (_, folderScenes) = app.api.findScenesInFolderDirect(source.folder, 1, 20)
+                    "More from this folder" to folderScenes.filter { it.id != source.id }.shuffled().take(3)
+                }
+                if (scenes.isEmpty() || relatedSceneId != source.id) return@launch
 
+                relatedLabel.text = label
                 relatedLabel.visibility = View.VISIBLE
                 relatedRow.visibility = View.VISIBLE
+                relatedScroll.visibility = View.VISIBLE
 
-                for (s in others) {
+                for (s in scenes) {
                     val card = LayoutInflater.from(this@SceneDetailActivity)
                         .inflate(R.layout.view_card, relatedRow, false)
 
@@ -405,8 +418,10 @@ class SceneDetailActivity : FragmentActivity() {
                     card.layoutParams = params
                     relatedRow.addView(card)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.w("Sinema", "Failed to load related scenes for ${scene.folder}", e)
+                Log.w("Sinema", "Failed to load related scenes for ${source.id}", e)
             }
         }
     }

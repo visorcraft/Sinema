@@ -95,6 +95,14 @@ Full details include:
 
 `EntityScenesActivity` lists scenes for one entity.
 
+### Groups and related discovery
+
+`GroupGridActivity` provides paged, searchable Stash Group browsing. `GroupScenesActivity` shows group artwork/metadata and preserves Stash's scene order for Play All, Shuffle Play, and resume progression. `SinemaApi.findGroups` and `findGroupDetails` use Groups on current Stash and retry with legacy Movies only when the server reports that the Groups query field is absent (Stash 0.24); transport and unrelated GraphQL errors are not retried. `GroupPlayback` selects the first partial scene and its saved timestamp, then the first unwatched scene.
+
+`RelatedScenes` is the pure deterministic recommendation ranker: six points per shared performer, four for the studio, and two per shared tag, with rating and scene ID tie-breakers. `SinemaApi.findRelatedScenes` issues at most three 40-item full-metadata queries (performers, studio, tags), isolates candidate-query failures, deduplicates by scene ID, and never scans the whole library. `SceneDetailActivity` shows the top six as More Like This, with folder scenes as an empty-result fallback. `RelatedScenesActivity` supplies the personalized Home row's View All grid; Unwatched from Favorite Performers uses Stash's `performer_favorite` and `play_count` criteria through the normal paged scene grid.
+
+`HomeLayoutSettings.optionalRowsVersion` performs a one-time migration that hides newly introduced optional rows for existing users without preventing those rows from being enabled later.
+
 ### Shared grids
 
 `SceneGridFragment` centralizes:

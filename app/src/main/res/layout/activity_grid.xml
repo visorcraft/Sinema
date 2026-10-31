@@ -49,6 +49,17 @@
                 android:textColor="#AAAAAA"
                 android:textSize="14sp" />
 
+            <TextView
+                android:id="@+id/entity_header_details"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:ellipsize="end"
+                android:maxLines="3"
+                android:textColor="#BBBBBB"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
             <HorizontalScrollView
                 android:id="@+id/entity_header_tags_scroll"
                 android:layout_width="match_parent"
@@ -75,6 +86,18 @@
         android:paddingTop="12dp"
         android:paddingEnd="48dp"
         android:clipChildren="false">
+
+        <Button
+            android:id="@+id/btn_group_resume"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/action_button_background"
+            android:focusable="true"
+            android:minWidth="160dp"
+            android:text="▶ Resume Group"
+            android:textColor="@android:color/white"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/btn_grid_filter"

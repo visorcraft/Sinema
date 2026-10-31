@@ -5,7 +5,7 @@ This directory contains user and maintainer documentation for Sinema, an Android
 ## Start here
 
 - [Getting started](getting-started.md): prerequisites, building, installing, and first-run setup.
-- [User guide](user-guide.md): home screen, searching, folders, favorites, metadata browsing, scene details, images, sorting, play all, and deep links.
+- [User guide](user-guide.md): home screen, searching, folders, Groups, related discovery, favorites, metadata browsing, scene details, images, sorting, play all, and deep links.
 - [Playback guide](playback.md): video controls, resume behavior, subtitles, audio tracks, speed controls, chapters, and autoplay queues.
 - [Settings and privacy](settings-and-privacy.md): server settings, multi-server profiles, PIN lock, Android TV launcher channels, updates, and local storage.
 - [Troubleshooting](troubleshooting.md): fixes for common setup, authentication, playback, folder, metadata, and launcher-channel issues.

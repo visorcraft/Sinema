@@ -99,6 +99,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **Scenes** — browsing, searching, thumbnails, streaming
 - **Folders** — directory-based browsing
 - **Tags / Performers / Studios** — metadata browsing and filtering
+- **Groups / Movies** — collections, ordered scenes, and legacy Stash 0.24 compatibility
 - **Captions** — subtitle tracks (SRT/VTT)
 - **Scene Markers** — chapters for navigation
 - **Ratings** — favorites (rating100 > 0 = ❤️)
@@ -109,6 +110,8 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 ## Features
 
 - **🏠 Personalized Home** — Reorder/hide shortcuts and rows, group secondary destinations under Library, choose card sizes, pin optional rows and a saved filter, and open full grids with View All.
+- **🎞️ Groups & Collections** — Browse Stash Groups with artwork and detailed headers, play their scenes in order, shuffle, or resume progression. Legacy Movies on Stash 0.24 are supported automatically.
+- **✨ Related Discovery** — More Like This recommendations ranked from shared performers, studio, and tags, plus optional personalized and unwatched-favorite-performer home rows.
 - **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with scene counts and images.
 - **📁 Folder Browser** — Navigate your library by directory structure.
 - **🔍 Unified Search** — Find scenes, tags, performers, and studios together; voice search via the remote microphone where available.

@@ -109,6 +109,18 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".ui.GroupGridActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.GroupScenesActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.RelatedScenesActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ui.SavedFiltersActivity"
             android:screenOrientation="landscape" />
 

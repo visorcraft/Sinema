@@ -16,5 +16,8 @@ val HomeContentRow.defaultSort: SortOption
         HomeContentRow.RECENTLY_RELEASED -> SortOption.DATE_DESC
         HomeContentRow.FAVORITES,
         HomeContentRow.UNWATCHED_FAVORITES,
-        HomeContentRow.SAVED_FILTER -> SortOption.UPDATED_DESC
+        HomeContentRow.SAVED_FILTER,
+        HomeContentRow.GROUPS,
+        HomeContentRow.DISCOVER,
+        HomeContentRow.UNWATCHED_PERFORMERS -> SortOption.UPDATED_DESC
     }

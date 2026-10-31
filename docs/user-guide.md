@@ -12,6 +12,7 @@ By default, the top shortcut row contains:
 - Surprise Me: plays a random scene from your library right away.
 - Favorites
 - Browse Folders
+- Groups
 - Tags
 - Performers
 - Studios
@@ -48,10 +49,10 @@ Open `Settings` → `Home Settings` to:
 - Reorder, show, or hide shortcuts and content rows.
 - Choose compact or large scene artwork and show or hide the hero banner.
 - Group secondary shortcuts under `Library`, keeping Search, Surprise Me, and Favorites on home.
-- Enable Unwatched Favorites and Recently Released rows.
+- Enable Unwatched Favorites, Recently Released, Groups, Because You Watched, and Unwatched from Favorite Performers rows.
 - Choose one Stash saved filter to pin as a home row.
 
-Every non-empty scene row ends with `View All`, which opens a full paged grid with sorting and filtering. Changes apply when you return home.
+Every non-empty content row ends with `View All`. Scene grids provide sorting and filtering where applicable; Groups opens the full Group browser, and Because You Watched opens its bounded recommendation grid. Changes apply when you return home.
 
 ## Search
 
@@ -60,8 +61,8 @@ Open `Search` from the main screen.
 - Start typing with the Android TV keyboard or a connected keyboard.
 - If your remote has a microphone, select the mic button in the search bar to search by voice. The first use asks for microphone permission; it is only used while searching.
 - Sinema searches after at least two characters.
-- Results are grouped into Scenes, Tags, Performers, and Studios with their Stash result counts.
-- Select a scene to open its details, or an entity to browse its scenes.
+- Results are grouped into Scenes, Tags, Performers, Studios, and Groups with their Stash result counts.
+- Select a scene to open its details, an entity to browse its scenes, or a Group to open its ordered scenes.
 - Use the on-screen Sort button to choose a scene sort order.
 - Use Filter to show all, watched, or unwatched scenes and optionally limit scene results to favorites. Filters do not change entity results.
 
@@ -146,6 +147,29 @@ Controls:
 
 The caption at the bottom shows the file name and current position in the folder image list.
 
+## Groups
+
+Open `Groups` from the main screen or Library to browse Stash Groups (called Movies on Stash 0.24). Sinema automatically uses the legacy Movie API when Groups are unavailable.
+
+The Group grid supports name search, sorting, and incremental loading. Cards show front artwork and scene counts. Selecting a Group opens its artwork, scene count, available date/director/studio metadata, synopsis, and scenes in Stash's Group order.
+
+Playback actions:
+
+- Press Menu for `Play All` or `Shuffle Play`.
+- Select `Resume Group` to start at the first partially watched scene and its saved position. If no scene is partial, it selects the first unwatched scene; if all scenes are watched, it starts at the beginning.
+- Both actions queue the remaining Group scenes, subject to the normal 500-scene queue cap.
+
+## Related discovery
+
+Scene details show up to six `More Like This` cards ranked by shared performers, studio, and tags. Recommendations are deterministic and exclude the current scene. When no metadata-based recommendations are available, Sinema falls back to scenes from the same folder.
+
+Optional Home Settings rows provide:
+
+- `Because You Watched`: recommendations based on the most recently completed scene, with a `View All` grid. Partially watched scenes remain in Continue Playing.
+- `Unwatched from Favorite Performers`: unwatched scenes featuring performers marked as favorites in Stash. Manage performer favorites in the Stash web UI; this row also supports sorting and filtering in its full grid.
+
+Metadata recommendations use at most three bounded Stash queries (performers, studio, and tags), then rank results locally. No external recommendation service or library-wide scan is used.
+
 ## Tags, performers, and studios
 
 Open `Tags`, `Performers`, or `Studios` from the main screen.
@@ -176,7 +200,7 @@ The detail screen shows:
 - Duration and resolution.
 - Date, studio, rating, and chapter count when available.
 - Synopsis and studio, tag, and performer chips when available.
-- A small `More from this folder` row when related scenes are found.
+- A `More Like This` row ranked from shared metadata, or `More from this folder` when no metadata recommendations are available.
 
 Select Technical details to show or hide the filename, full path, file size, duration, and resolution.
 

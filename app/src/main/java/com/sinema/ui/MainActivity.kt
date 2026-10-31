@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.EntityItem
+import com.sinema.model.GroupItem
 import com.sinema.model.HomeContentRow
 import com.sinema.model.HomeLayoutSettings
 import com.sinema.model.SavedSceneFilter
@@ -78,6 +79,10 @@ class MainFragment : RowsSupportFragment() {
     private var unwatchedFavoritesState = HomeRowState<Scene>(UNWATCHED_ROW_ID, "Unwatched Favorites")
     private var recentlyReleasedState = HomeRowState<Scene>(RELEASED_ROW_ID, "Recently Released")
     private var savedFilterState = HomeRowState<Scene>(SAVED_FILTER_ROW_ID, "Saved Filter")
+    private var groupsState = HomeRowState<GroupItem>(GROUPS_ROW_ID, "Groups")
+    private var discoveryState = HomeRowState<Scene>(DISCOVERY_ROW_ID, "Because You Watched")
+    private var unwatchedPerformersState = HomeRowState<Scene>(UNWATCHED_PERFORMERS_ROW_ID, "Unwatched from Favorite Performers")
+    private var discoverySource: Scene? = null
     private var pinnedFilter: SavedSceneFilter? = null
     private lateinit var layoutSnapshot: HomeLayoutSettings
     private val contentRows = mutableMapOf<Long, ListRow>()
@@ -136,6 +141,7 @@ class MainFragment : RowsSupportFragment() {
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
                 is Scene -> startActivity(SceneIntents.detail(requireContext(), item))
+                is GroupItem -> startActivity(GroupScenesActivity.intent(requireContext(), item))
                 is HeroItem -> {
                     // One click on the hero resumes (or plays) directly —
                     // the scene detail screen stays available via rows/cards.
@@ -155,6 +161,7 @@ class MainFragment : RowsSupportFragment() {
                         "Favorites" -> startActivity(Intent(requireContext(), FavoritesActivity::class.java))
                         "Library" -> startActivity(Intent(requireContext(), LibraryActivity::class.java))
                         "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
+                        "Groups" -> startActivity(GroupGridActivity.intent(requireContext()))
                         "Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))
                         "Performers" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.PERFORMER))
                         "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))
@@ -338,15 +345,21 @@ class MainFragment : RowsSupportFragment() {
         HomeContentRow.UNWATCHED_FAVORITES -> UNWATCHED_ROW_ID
         HomeContentRow.RECENTLY_RELEASED -> RELEASED_ROW_ID
         HomeContentRow.SAVED_FILTER -> SAVED_FILTER_ROW_ID
+        HomeContentRow.GROUPS -> GROUPS_ROW_ID
+        HomeContentRow.DISCOVER -> DISCOVERY_ROW_ID
+        HomeContentRow.UNWATCHED_PERFORMERS -> UNWATCHED_PERFORMERS_ROW_ID
     }
 
     private fun openViewAll(item: HomeViewAll) {
-        if (item.row == HomeContentRow.SAVED_FILTER) {
-            pinnedFilter?.let {
+        when (item.row) {
+            HomeContentRow.SAVED_FILTER -> pinnedFilter?.let {
                 startActivity(SavedFilterScenesActivity.intent(requireContext(), it))
             } ?: Toast.makeText(requireContext(), "Saved filter unavailable", Toast.LENGTH_LONG).show()
-        } else {
-            startActivity(HomeRowScenesActivity.intent(requireContext(), item.row))
+            HomeContentRow.GROUPS -> startActivity(GroupGridActivity.intent(requireContext()))
+            HomeContentRow.DISCOVER -> discoverySource?.let {
+                startActivity(RelatedScenesActivity.intent(requireContext(), it))
+            } ?: Toast.makeText(requireContext(), "Recommendations unavailable", Toast.LENGTH_LONG).show()
+            else -> startActivity(HomeRowScenesActivity.intent(requireContext(), item.row))
         }
     }
 
@@ -397,6 +410,9 @@ class MainFragment : RowsSupportFragment() {
         reconcileContentRow(HomeContentRow.UNWATCHED_FAVORITES, unwatchedFavoritesState, unwatchedFavoritesState.items)
         reconcileContentRow(HomeContentRow.RECENTLY_RELEASED, recentlyReleasedState, recentlyReleasedState.items)
         reconcileContentRow(HomeContentRow.SAVED_FILTER, savedFilterState, savedFilterState.items)
+        reconcileContentRow(HomeContentRow.GROUPS, groupsState, groupsState.items)
+        reconcileContentRow(HomeContentRow.DISCOVER, discoveryState, discoveryState.items)
+        reconcileContentRow(HomeContentRow.UNWATCHED_PERFORMERS, unwatchedPerformersState, unwatchedPerformersState.items)
 
         val orderedRows = buildList {
             heroRow?.let(::add)
@@ -437,6 +453,14 @@ class MainFragment : RowsSupportFragment() {
                 title = layoutSnapshot.savedFilterName.ifBlank { "Saved Filter" }
             ).refreshing()
             pinnedFilter = null
+        }
+        if (enabled(HomeContentRow.GROUPS)) groupsState = groupsState.refreshing()
+        if (enabled(HomeContentRow.DISCOVER)) {
+            discoveryState = discoveryState.copy(title = "Because You Watched").refreshing()
+            discoverySource = null
+        }
+        if (enabled(HomeContentRow.UNWATCHED_PERFORMERS)) {
+            unwatchedPerformersState = unwatchedPerformersState.refreshing()
         }
         reconcileHomeRows()
         lifecycleScope.launch {
@@ -496,9 +520,35 @@ class MainFragment : RowsSupportFragment() {
                             app.api.findScenesForSavedFilter(filter, page = 1, perPage = 25).second
                         } else RowResult<List<Scene>>(emptyList())
                     }
+                    val groupsJob = async {
+                        if (enabled(HomeContentRow.GROUPS)) loadRow {
+                            app.api.findGroups(page = 1, perPage = 25).second
+                        } else RowResult<List<GroupItem>>(emptyList())
+                    }
+                    val discoveryJob = async {
+                        if (enabled(HomeContentRow.DISCOVER)) loadRow {
+                            val recent = app.api.findRecentlyPlayed(1).firstOrNull()
+                            val full = recent?.let { app.api.findSceneFull(it.id)?.scene }
+                            if (full == null) {
+                                emptyList()
+                            } else {
+                                discoverySource = full
+                                discoveryState = discoveryState.copy(
+                                    title = "Because You Watched · ${full.displayTitle}"
+                                )
+                                app.api.findRelatedScenes(full).take(25)
+                            }
+                        } else RowResult<List<Scene>>(emptyList())
+                    }
+                    val unwatchedPerformersJob = async {
+                        if (enabled(HomeContentRow.UNWATCHED_PERFORMERS)) loadRow {
+                            app.api.findUnwatchedForFavoritePerformersPaged(page = 1, perPage = 25).second
+                        } else RowResult<List<Scene>>(emptyList())
+                    }
                     DashboardLoad(
                         continueJob.await(), playedJob.await(), recentJob.await(), favJob.await(),
-                        unwatchedJob.await(), releasedJob.await(), savedJob.await()
+                        unwatchedJob.await(), releasedJob.await(), savedJob.await(), groupsJob.await(),
+                        discoveryJob.await(), unwatchedPerformersJob.await()
                     )
                 }
 
@@ -509,6 +559,9 @@ class MainFragment : RowsSupportFragment() {
                 unwatchedFavoritesState = applyResult(unwatchedFavoritesState, rows.unwatchedFavorites)
                 recentlyReleasedState = applyResult(recentlyReleasedState, rows.recentlyReleased)
                 savedFilterState = applyResult(savedFilterState, rows.savedFilter)
+                groupsState = applyResult(groupsState, rows.groups)
+                discoveryState = applyResult(discoveryState, rows.discovery)
+                unwatchedPerformersState = applyResult(unwatchedPerformersState, rows.unwatchedPerformers)
                 rows.continuePlaying.error?.let { noteError("Continue Playing", it) }
                 rows.recentlyPlayed.error?.let { noteError("Recently Played", it) }
                 rows.recentlyAdded.error?.let { noteError("Recently Added", it) }
@@ -516,6 +569,9 @@ class MainFragment : RowsSupportFragment() {
                 rows.unwatchedFavorites.error?.let { noteError("Unwatched Favorites", it) }
                 rows.recentlyReleased.error?.let { noteError("Recently Released", it) }
                 rows.savedFilter.error?.let { noteError("Saved Filter", it) }
+                rows.groups.error?.let { noteError("Groups", it) }
+                rows.discovery.error?.let { noteError("Because You Watched", it) }
+                rows.unwatchedPerformers.error?.let { noteError("Unwatched from Favorite Performers", it) }
                 reconcileHomeRows()
 
                 val continuePairs = rows.continuePlaying.value.orEmpty()
@@ -565,6 +621,9 @@ class MainFragment : RowsSupportFragment() {
                 if (unwatchedFavoritesState.loading) unwatchedFavoritesState = unwatchedFavoritesState.failed(e)
                 if (recentlyReleasedState.loading) recentlyReleasedState = recentlyReleasedState.failed(e)
                 if (savedFilterState.loading) savedFilterState = savedFilterState.failed(e)
+                if (groupsState.loading) groupsState = groupsState.failed(e)
+                if (discoveryState.loading) discoveryState = discoveryState.failed(e)
+                if (unwatchedPerformersState.loading) unwatchedPerformersState = unwatchedPerformersState.failed(e)
                 reconcileHomeRows()
                 if (!isAdded) return@launch
                 val message = e.message ?: "Unknown error"
@@ -634,6 +693,9 @@ class MainFragment : RowsSupportFragment() {
         private const val UNWATCHED_ROW_ID = 8L
         private const val RELEASED_ROW_ID = 9L
         private const val SAVED_FILTER_ROW_ID = 10L
+        private const val GROUPS_ROW_ID = 11L
+        private const val DISCOVERY_ROW_ID = 12L
+        private const val UNWATCHED_PERFORMERS_ROW_ID = 13L
     }
 }
 
@@ -673,5 +735,8 @@ private class DashboardLoad(
     val favorites: RowResult<List<Scene>>,
     val unwatchedFavorites: RowResult<List<Scene>>,
     val recentlyReleased: RowResult<List<Scene>>,
-    val savedFilter: RowResult<List<Scene>>
+    val savedFilter: RowResult<List<Scene>>,
+    val groups: RowResult<List<GroupItem>>,
+    val discovery: RowResult<List<Scene>>,
+    val unwatchedPerformers: RowResult<List<Scene>>
 )

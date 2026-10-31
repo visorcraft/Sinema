@@ -76,6 +76,11 @@ class HomeRowScenesFragment : SceneGridFragment() {
                 page, perPage, sortField, direction, sceneFilter
             )
             HomeContentRow.SAVED_FILTER -> throw IllegalArgumentException("Saved filters use SavedFilterScenesActivity")
+            HomeContentRow.GROUPS -> throw IllegalArgumentException("Groups use GroupGridActivity")
+            HomeContentRow.DISCOVER -> throw IllegalArgumentException("Discovery uses RelatedScenesActivity")
+            HomeContentRow.UNWATCHED_PERFORMERS -> app.api.findUnwatchedForFavoritePerformersPaged(
+                page, perPage, sortField, direction, sceneFilter
+            )
         }
         return result.first to result.second
     }

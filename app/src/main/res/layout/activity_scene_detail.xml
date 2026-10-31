@@ -322,11 +322,18 @@
             android:textSize="14sp"
             android:visibility="gone" />
 
-        <LinearLayout
-            android:id="@+id/related_row"
+        <HorizontalScrollView
+            android:id="@+id/related_scroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:visibility="gone" />
+            android:focusable="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/related_row"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
     </LinearLayout>
 </ScrollView>

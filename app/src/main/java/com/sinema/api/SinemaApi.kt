@@ -8,6 +8,8 @@ import com.google.gson.JsonObject
 import com.sinema.model.CaptionRef
 import com.sinema.model.EntityHeader
 import com.sinema.model.EntityItem
+import com.sinema.model.GroupDetails
+import com.sinema.model.GroupItem
 import com.sinema.model.SavedSceneFilter
 import com.sinema.model.SceneMarkerItem
 import com.sinema.model.StatsSummary
@@ -19,6 +21,8 @@ import com.sinema.model.SceneDetails
 import com.sinema.model.StudioRef
 import com.sinema.model.TagRef
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
 import okhttp3.FormBody
@@ -58,6 +62,9 @@ class SinemaApi(
             " tags { id name }" +
             " performers { id name }" +
             " captions { language_code caption_type }"
+
+        private const val GROUP_FIELDS =
+            "id name scene_count front_image_path back_image_path date director synopsis studio { name }"
 
         /**
          * Scene filter for Recently Played.
@@ -258,14 +265,18 @@ class SinemaApi(
     }
 
     private fun parseGraphqlResponse(code: Int, body: String): JsonObject {
-        if (code !in 200..299) throw IOException("Server error $code")
-
-        val obj = gson.fromJson(body, JsonObject::class.java)
+        val obj = try {
+            gson.fromJson(body, JsonObject::class.java)
+        } catch (e: Exception) {
+            if (code !in 200..299) throw IOException("Server error $code")
+            throw e
+        }
         if (obj.has("errors") && obj.getAsJsonArray("errors").size() > 0) {
             val first = obj.getAsJsonArray("errors")[0].asJsonObject
             val msg = first.get("message")?.asString ?: "GraphQL error"
             throw IOException(msg)
         }
+        if (code !in 200..299) throw IOException("Server error $code")
         return obj
     }
 
@@ -979,6 +990,92 @@ class SinemaApi(
         tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList()
     )
 
+    suspend fun findGroups(
+        page: Int = 1,
+        perPage: Int = 100,
+        searchTerm: String? = null,
+        sort: String = "updated_at",
+        direction: String = "DESC"
+    ): Pair<Int, List<GroupItem>> {
+        val filter = mutableMapOf<String, Any?>(
+            "page" to page,
+            "per_page" to perPage,
+            "sort" to sort,
+            "direction" to direction
+        )
+        if (!searchTerm.isNullOrBlank()) filter["q"] = searchTerm
+        return try {
+            findGroupsUsing("findGroups", "groups", filter)
+        } catch (e: IOException) {
+            if (!isMissingGroupsApi(e)) throw e
+            findGroupsUsing("findMovies", "movies", filter)
+        }
+    }
+
+    private suspend fun findGroupsUsing(
+        queryName: String,
+        listKey: String,
+        filter: Map<String, Any?>
+    ): Pair<Int, List<GroupItem>> {
+        val query = """
+            query(${"$"}filter: FindFilterType) {
+                $queryName(filter: ${"$"}filter) {
+                    count
+                    $listKey { $GROUP_FIELDS }
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("filter" to filter))
+        val data = result.getAsJsonObject("data")?.get(queryName)
+            ?.takeIf { !it.isJsonNull }?.asJsonObject ?: return Pair(0, emptyList())
+        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val groups = (data.get(listKey) as? JsonArray)?.map { parseGroup(it.asJsonObject) } ?: emptyList()
+        return Pair(count, groups)
+    }
+
+    suspend fun findGroupDetails(groupId: String): GroupDetails? = try {
+        findGroupDetailsUsing("findGroup", groupId)
+    } catch (e: IOException) {
+        if (!isMissingGroupsApi(e)) throw e
+        findGroupDetailsUsing("findMovie", groupId)
+    }
+
+    private suspend fun findGroupDetailsUsing(queryName: String, groupId: String): GroupDetails? {
+        val query = """
+            query(${"$"}id: ID!) {
+                $queryName(id: ${"$"}id) {
+                    $GROUP_FIELDS
+                    scenes { $SCENE_FIELDS }
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("id" to groupId))
+        val obj = result.getAsJsonObject("data")?.get(queryName)
+            ?.takeIf { !it.isJsonNull }?.asJsonObject ?: return null
+        val scenes = (obj.get("scenes") as? JsonArray)?.map { parseScene(it.asJsonObject) } ?: emptyList()
+        return GroupDetails(parseGroup(obj), scenes)
+    }
+
+    private fun isMissingGroupsApi(error: IOException): Boolean {
+        val message = error.message.orEmpty()
+        return message.contains("Cannot query field", ignoreCase = true) &&
+            message.contains("findGroup", ignoreCase = true)
+    }
+
+    @VisibleForTesting
+    internal fun parseGroup(obj: JsonObject): GroupItem = GroupItem(
+        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+        frontImagePath = obj.get("front_image_path")?.takeIf { !it.isJsonNull }?.asString,
+        backImagePath = obj.get("back_image_path")?.takeIf { !it.isJsonNull }?.asString,
+        date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
+        director = obj.get("director")?.takeIf { !it.isJsonNull }?.asString,
+        synopsis = obj.get("synopsis")?.takeIf { !it.isJsonNull }?.asString?.trim(),
+        studioName = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?.get("name")?.takeIf { !it.isJsonNull }?.asString
+    )
+
     /**
      * Lists scene-mode saved filters stored in Stash (created via the Stash
      * web UI). Available since Stash 0.16; safe for the 0.24+ baseline.
@@ -1183,6 +1280,75 @@ class SinemaApi(
             filters = filters
         )
     }
+
+    suspend fun findRelatedScenes(source: Scene, perPage: Int = 40): List<Scene> {
+        val performerIds = source.performers.map { it.id }.filter { it.isNotBlank() }
+        val tagIds = source.tags.map { it.id }.filter { it.isNotBlank() }
+        val studioId = source.studio?.id?.takeIf { it.isNotBlank() }
+        if (performerIds.isEmpty() && tagIds.isEmpty() && studioId == null) return emptyList()
+        return supervisorScope {
+            val performers = async {
+                if (performerIds.isEmpty()) emptyList() else findRelatedCandidates(
+                    mapOf("performers" to mapOf("value" to performerIds, "modifier" to "INCLUDES")),
+                    perPage
+                )
+            }
+            val studio = async {
+                if (studioId == null) emptyList() else findRelatedCandidates(
+                    mapOf("studios" to mapOf("value" to listOf(studioId), "modifier" to "INCLUDES", "depth" to 0)),
+                    perPage
+                )
+            }
+            val tags = async {
+                if (tagIds.isEmpty()) emptyList() else findRelatedCandidates(
+                    mapOf("tags" to mapOf("value" to tagIds, "modifier" to "INCLUDES", "depth" to 0)),
+                    perPage
+                )
+            }
+            com.sinema.model.RelatedScenes.rank(
+                source,
+                performers.await() + studio.await() + tags.await(),
+                limit = 40
+            )
+        }
+    }
+
+    private suspend fun findRelatedCandidates(
+        sceneFilter: Map<String, Any?>,
+        perPage: Int
+    ): List<Scene> = try {
+        findScenesInternal(
+            page = 1,
+            perPage = perPage.coerceIn(1, 40),
+            sort = "updated_at",
+            direction = "DESC",
+            sceneFilter = sceneFilter,
+            fields = SCENE_FIELDS_FULL
+        ).second
+    } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w("Sinema", "Related-scene candidate query failed", e)
+        emptyList()
+    }
+
+    suspend fun findUnwatchedForFavoritePerformersPaged(
+        page: Int,
+        perPage: Int,
+        sort: String = "updated_at",
+        direction: String = "DESC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> = findScenesInternal(
+        page = page,
+        perPage = perPage,
+        sort = sort,
+        direction = direction,
+        sceneFilter = mapOf(
+            "performer_favorite" to true,
+            "play_count" to mapOf("value" to 0, "modifier" to "EQUALS")
+        ),
+        filters = filters
+    )
 
     /**
      * Fetches the full metadata payload for one scene.

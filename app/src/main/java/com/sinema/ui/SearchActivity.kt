@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.EntityItem
+import com.sinema.model.GroupItem
 import com.sinema.model.Scene
 import com.sinema.model.SceneFilterOptions
 import com.sinema.model.SortOption
@@ -150,6 +151,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
             when (item) {
                 is Scene -> startActivity(SceneIntents.detail(requireContext(), item))
                 is EntityItem -> startActivity(EntityScenesActivity.intent(requireContext(), item))
+                is GroupItem -> startActivity(GroupScenesActivity.intent(requireContext(), item))
             }
         }
     }
@@ -204,7 +206,10 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
                     val studios = async {
                         app.api.findEntities(EntityItem.Kind.STUDIO, perPage = 20, searchTerm = query, sort = "name", direction = "ASC")
                     }
-                    SearchResults(scenes.await(), tags.await(), performers.await(), studios.await())
+                    val groups = async {
+                        app.api.findGroups(perPage = 20, searchTerm = query, sort = "name", direction = "ASC")
+                    }
+                    SearchResults(scenes.await(), tags.await(), performers.await(), studios.await(), groups.await())
                 }
                 renderResults(results)
             } catch (e: CancellationException) {
@@ -228,6 +233,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         addEntityRow("Tags", results.tags)
         addEntityRow("Performers", results.performers)
         addEntityRow("Studios", results.studios)
+        addGroupRow(results.groups)
     }
 
     private fun addEntityRow(label: String, result: Pair<Int, List<EntityItem>>) {
@@ -238,10 +244,19 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         rowsAdapter.add(ListRow(HeaderItem("$label ($count)"), listAdapter))
     }
 
+    private fun addGroupRow(result: Pair<Int, List<GroupItem>>) {
+        val (count, items) = result
+        if (items.isEmpty()) return
+        val listAdapter = ArrayObjectAdapter(CardPresenter(app.api))
+        items.forEach { listAdapter.add(it) }
+        rowsAdapter.add(ListRow(HeaderItem("Groups ($count)"), listAdapter))
+    }
+
     private data class SearchResults(
         val scenes: Pair<Int, List<Scene>>,
         val tags: Pair<Int, List<EntityItem>>,
         val performers: Pair<Int, List<EntityItem>>,
-        val studios: Pair<Int, List<EntityItem>>
+        val studios: Pair<Int, List<EntityItem>>,
+        val groups: Pair<Int, List<GroupItem>>
     )
 }

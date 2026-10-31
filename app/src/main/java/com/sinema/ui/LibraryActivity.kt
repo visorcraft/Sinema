@@ -39,6 +39,7 @@ class LibraryFragment : VerticalGridSupportFragment() {
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
                 "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
+                "Groups" -> startActivity(GroupGridActivity.intent(requireContext()))
                 "Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))
                 "Performers" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.PERFORMER))
                 "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))
