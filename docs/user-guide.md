@@ -37,7 +37,7 @@ The bottom row contains:
 - Settings: opens server, profile, PIN, channel, and update settings.
 - About: shows the installed Sinema version and can manually check for updates.
 
-Sinema refreshes the home screen when you return to it, so changes made in playback or scene detail screens are reflected quickly.
+Sinema refreshes the home screen when you return to it, so changes made in playback or scene detail screens are reflected quickly. Existing cards stay visible while rows refresh, and row headers show loading or refresh status. If a refresh fails, Sinema keeps the last loaded cards and marks that row as `Refresh failed`; if the first load fails, the row is marked `Unavailable`.
 
 ## Search
 

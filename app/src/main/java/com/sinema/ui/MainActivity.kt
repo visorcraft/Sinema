@@ -68,6 +68,14 @@ class MainFragment : RowsSupportFragment() {
     private val app get() = SinemaApp.instance
     private lateinit var rowsAdapter: ArrayObjectAdapter
     private var isLoading = false
+    private var continueState = HomeRowState<Pair<Scene, Double>>(CONTINUE_ROW_ID, "Continue Playing")
+    private var recentlyPlayedState = HomeRowState<Scene>(PLAYED_ROW_ID, "Recently Played")
+    private var recentlyAddedState = HomeRowState<Scene>(RECENT_ROW_ID, "Recently Added")
+    private var favoritesState = HomeRowState<Scene>(FAVORITES_ROW_ID, "Favorites")
+    private val contentRows = mutableMapOf<Long, ListRow>()
+    private var heroRow: ListRow? = null
+    private lateinit var shortcutsRow: ListRow
+    private lateinit var settingsRow: ListRow
 
     private var logoView: android.widget.ImageView? = null
 
@@ -114,6 +122,7 @@ class MainFragment : RowsSupportFragment() {
         lrp.shadowEnabled = false
         rowsAdapter = ArrayObjectAdapter(lrp)
         adapter = rowsAdapter
+        createStaticRows()
 
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
@@ -171,7 +180,28 @@ class MainFragment : RowsSupportFragment() {
         }
     }
 
-    // hasLoaded removed — always refresh on resume so Mark Watched etc. reflect immediately
+    private fun createStaticRows() {
+        val shortcutsAdapter = ArrayObjectAdapter(SettingsPresenter())
+        shortcutsAdapter.add("Search")
+        shortcutsAdapter.add("Surprise Me")
+        shortcutsAdapter.add("Favorites")
+        shortcutsAdapter.add("Browse Folders")
+        shortcutsAdapter.add("Tags")
+        shortcutsAdapter.add("Performers")
+        shortcutsAdapter.add("Studios")
+        shortcutsAdapter.add("Saved Filters")
+        if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
+        shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, ""), shortcutsAdapter)
+
+        val settingsAdapter = ArrayObjectAdapter(SettingsPresenter())
+        settingsAdapter.add("Refresh")
+        settingsAdapter.add("Settings")
+        settingsAdapter.add("About")
+        settingsRow = ListRow(HeaderItem(SETTINGS_ROW_ID, ""), settingsAdapter)
+
+        rowsAdapter.add(shortcutsRow)
+        rowsAdapter.add(settingsRow)
+    }
 
     override fun onResume() {
         super.onResume()
@@ -222,6 +252,8 @@ class MainFragment : RowsSupportFragment() {
     }
 
     private fun rowKey(row: ListRow): String {
+        val headerId = row.headerItem?.id ?: 0L
+        if (headerId != 0L) return "row:$headerId"
         val first = (row.adapter as? ArrayObjectAdapter)
             ?.takeIf { it.size() > 0 }?.get(0)
         return "${row.headerItem?.name ?: ""}|${first?.let(FocusRestore::keyOf) ?: ""}"
@@ -252,25 +284,91 @@ class MainFragment : RowsSupportFragment() {
         return RowFocus(rowIndex, row?.let { rowKey(it) }, itemIndex, itemKey)
     }
 
+    private fun updateItems(row: ListRow, items: List<Any>) {
+        val adapter = row.adapter as ArrayObjectAdapter
+        val current = (0 until adapter.size()).map { adapter.get(it) }
+        if (current == items) return
+        adapter.clear()
+        items.forEach(adapter::add)
+    }
+
+    private fun indexOfRow(row: ListRow): Int =
+        (0 until rowsAdapter.size()).indexOfFirst { rowsAdapter.get(it) === row }
+
+    private fun reconcileContentRow(state: HomeRowState<out Any>, items: List<Any>?) {
+        val existing = contentRows[state.id]
+        if (!state.visible) {
+            existing?.let(rowsAdapter::remove)
+            contentRows.remove(state.id)
+            return
+        }
+        val row = existing ?: ListRow(
+            HeaderItem(state.id, state.displayTitle),
+            ArrayObjectAdapter(CardPresenter(app.api))
+        ).also { contentRows[state.id] = it }
+        if (row.headerItem?.name != state.displayTitle) {
+            row.headerItem = HeaderItem(state.id, state.displayTitle)
+            val index = indexOfRow(row)
+            if (index >= 0) rowsAdapter.notifyItemRangeChanged(index, 1)
+        }
+        if (items != null) updateItems(row, items)
+    }
+
+    private fun reconcileHomeRows() {
+        val heroItem = continueState.items.orEmpty().firstOrNull()?.let { (scene, resumeSeconds) ->
+            HeroItem(scene, (resumeSeconds * 1000).toLong())
+        }
+        if (heroItem == null) {
+            heroRow?.let(rowsAdapter::remove)
+            heroRow = null
+        } else {
+            val row = heroRow ?: ListRow(
+                HeaderItem(HERO_ROW_ID, ""),
+                ArrayObjectAdapter(HeroPresenter(app.api))
+            ).also { heroRow = it }
+            updateItems(row, listOf(heroItem))
+        }
+
+        reconcileContentRow(continueState, continueState.items?.map { it.first })
+        reconcileContentRow(recentlyPlayedState, recentlyPlayedState.items)
+        reconcileContentRow(recentlyAddedState, recentlyAddedState.items)
+        reconcileContentRow(favoritesState, favoritesState.items?.take(20))
+
+        val orderedRows = buildList {
+            heroRow?.let(::add)
+            add(shortcutsRow)
+            listOf(continueState, recentlyPlayedState, recentlyAddedState, favoritesState).forEach { state ->
+                if (state.visible) contentRows[state.id]?.let(::add)
+            }
+            add(settingsRow)
+        }
+        orderedRows.forEachIndexed { index, row ->
+            val currentIndex = indexOfRow(row)
+            if (currentIndex < 0) {
+                rowsAdapter.add(index, row)
+            } else if (currentIndex != index) {
+                rowsAdapter.remove(row)
+                rowsAdapter.add(index, row)
+            }
+        }
+    }
+
+    private fun <T> applyResult(state: HomeRowState<T>, result: RowResult<List<T>>): HomeRowState<T> =
+        result.error?.let(state::failed) ?: state.loaded(result.value.orEmpty())
+
     private fun loadContent() {
         if (isLoading) return
         isLoading = true
         val live = captureFocus()
         val focus = if (live.rowIndex >= 0) live else pausedFocus
+        continueState = continueState.refreshing()
+        recentlyPlayedState = recentlyPlayedState.refreshing()
+        recentlyAddedState = recentlyAddedState.refreshing()
+        favoritesState = favoritesState.refreshing()
+        reconcileHomeRows()
         lifecycleScope.launch {
             try {
                 Log.d("Sinema", "loadContent starting")
-                rowsAdapter.clear()
-
-                // Each content row is loaded independently so one failed Stash
-                // query cannot blank the rest of the dashboard (seen when a
-                // single bad CriterionModifier made findRecentlyPlayed throw
-                // 422 and aborted Recently Added + Favorites).
-                // The four queries are independent, so they run concurrently —
-                // dashboard latency is the slowest query, not the sum of all
-                // four round trips — but rows are assembled in fixed order
-                // and errors noted in that same order, matching the previous
-                // sequential behavior.
                 var firstError: Exception? = null
 
                 fun noteError(label: String, e: Exception) {
@@ -287,61 +385,18 @@ class MainFragment : RowsSupportFragment() {
                     DashboardLoad(continueJob.await(), playedJob.await(), recentJob.await(), favJob.await())
                 }
 
-                val continuePairs = rows.continuePlaying.value ?: emptyList<Pair<Scene, Double>>()
+                continueState = applyResult(continueState, rows.continuePlaying)
+                recentlyPlayedState = applyResult(recentlyPlayedState, rows.recentlyPlayed)
+                recentlyAddedState = applyResult(recentlyAddedState, rows.recentlyAdded)
+                favoritesState = applyResult(favoritesState, rows.favorites)
                 rows.continuePlaying.error?.let { noteError("Continue Playing", it) }
-
-                // 0. Hero: the freshest continue-playing scene, one click to resume.
-                continuePairs.firstOrNull()?.let { (heroScene, resumeSeconds) ->
-                    val heroAdapter = ArrayObjectAdapter(HeroPresenter(app.api))
-                    heroAdapter.add(HeroItem(heroScene, (resumeSeconds * 1000).toLong()))
-                    rowsAdapter.add(ListRow(HeaderItem(""), heroAdapter))
-                }
-
-                // 1. Top row: Search | Surprise Me | Favorites | Browse Folders | Tags | Performers | Studios | Saved Filters (+ Log Out)
-                val topAdapter = ArrayObjectAdapter(SettingsPresenter())
-                topAdapter.add("Search")
-                topAdapter.add("Surprise Me")
-                topAdapter.add("Favorites")
-                topAdapter.add("Browse Folders")
-                topAdapter.add("Tags")
-                topAdapter.add("Performers")
-                topAdapter.add("Studios")
-                topAdapter.add("Saved Filters")
-                if (app.prefs.hasPinSet()) {
-                    topAdapter.add("Log Out")
-                }
-                rowsAdapter.add(ListRow(HeaderItem(""), topAdapter))
-
-                if (continuePairs.isNotEmpty()) {
-                    val continueAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    continuePairs.forEach { (scene, _) -> continueAdapter.add(scene) }
-                    rowsAdapter.add(ListRow(HeaderItem("Continue Playing"), continueAdapter))
-                }
-
                 rows.recentlyPlayed.error?.let { noteError("Recently Played", it) }
-                val recentlyPlayed = rows.recentlyPlayed.value ?: emptyList()
-                if (recentlyPlayed.isNotEmpty()) {
-                    val watchedAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    recentlyPlayed.forEach { watchedAdapter.add(it) }
-                    rowsAdapter.add(ListRow(HeaderItem("Recently Played"), watchedAdapter))
-                }
-
                 rows.recentlyAdded.error?.let { noteError("Recently Added", it) }
-                val recentScenes = rows.recentlyAdded.value ?: emptyList()
-                if (recentScenes.isNotEmpty()) {
-                    val recentAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    recentScenes.forEach { recentAdapter.add(it) }
-                    rowsAdapter.add(ListRow(HeaderItem("Recently Added"), recentAdapter))
-                }
-
                 rows.favorites.error?.let { noteError("Favorites", it) }
-                val favScenes = rows.favorites.value ?: emptyList()
-                if (favScenes.isNotEmpty()) {
-                    val favAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-                    favScenes.take(20).forEach { favAdapter.add(it) }
-                    rowsAdapter.add(ListRow(HeaderItem("Favorites"), favAdapter))
-                }
+                reconcileHomeRows()
 
+                val continuePairs = rows.continuePlaying.value.orEmpty()
+                val recentScenes = rows.recentlyAdded.value.orEmpty()
                 Log.d("Sinema", "Rows loaded: ${rowsAdapter.size()}")
 
                 // Sync TV channels (fire-and-forget on appScope). Capture the
@@ -373,6 +428,11 @@ class MainFragment : RowsSupportFragment() {
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 Log.e("Sinema", "loadContent failed", e)
+                if (continueState.loading) continueState = continueState.failed(e)
+                if (recentlyPlayedState.loading) recentlyPlayedState = recentlyPlayedState.failed(e)
+                if (recentlyAddedState.loading) recentlyAddedState = recentlyAddedState.failed(e)
+                if (favoritesState.loading) favoritesState = favoritesState.failed(e)
+                reconcileHomeRows()
                 if (!isAdded) return@launch
                 val message = e.message ?: "Unknown error"
                 if (message.contains("401")) {
@@ -384,17 +444,10 @@ class MainFragment : RowsSupportFragment() {
                     Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
                 }
             } finally {
-                // Always add bottom settings row (even if content load fails)
-                val settingsAdapter = ArrayObjectAdapter(SettingsPresenter())
-                settingsAdapter.add("Refresh")
-                settingsAdapter.add("Settings")
-                settingsAdapter.add("About")
-                rowsAdapter.add(ListRow(HeaderItem(""), settingsAdapter))
-
                 isLoading = false
             }
 
-            // Restore focus to the same row/item after the rebuild.
+            // Restore focus to the same logical row/item after reconciliation.
             if (focus.rowIndex >= 0) {
                 val newRowIndex = FocusRestore.positionAfterReload(focus.rowKey, focus.rowIndex,
                     (0 until rowsAdapter.size()).mapNotNull { i ->
@@ -435,6 +488,16 @@ class MainFragment : RowsSupportFragment() {
                 }
             }
         }
+    }
+
+    companion object {
+        private const val HERO_ROW_ID = 1L
+        private const val CONTINUE_ROW_ID = 2L
+        private const val PLAYED_ROW_ID = 3L
+        private const val RECENT_ROW_ID = 4L
+        private const val FAVORITES_ROW_ID = 5L
+        private const val SHORTCUTS_ROW_ID = 6L
+        private const val SETTINGS_ROW_ID = 7L
     }
 }
 
