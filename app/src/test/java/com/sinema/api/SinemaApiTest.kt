@@ -785,7 +785,7 @@ class SinemaApiTest {
             org.junit.Assert.assertTrue(resume, resume.contains("GREATER_THAN"))
             val recentlyPlayed = requestBodies[2]
             org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"page\":1"))
-            org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"per_page\":0"))
+            org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"per_page\":-1"))
         } finally {
             server.stop(0)
         }

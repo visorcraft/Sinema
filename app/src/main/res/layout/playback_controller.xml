@@ -30,6 +30,25 @@
             android:ellipsize="end"
             android:textColor="@android:color/white"
             android:textSize="22sp" />
+
+        <TextView
+            android:id="@+id/playback_queue_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/card_focus_border"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:visibility="gone"
+            tools:ignore="HardcodedText" />
     </LinearLayout>
 
     <LinearLayout
@@ -71,8 +90,12 @@
         android:clipToPadding="false"
         android:layoutDirection="ltr">
 
+        <!-- Marker navigation must keep working with a single MediaItem and
+             repeat off: Media3 disables its own exo_prev/exo_next buttons
+             whenever COMMAND_SEEK_TO_PREVIOUS/NEXT is unavailable, so these
+             use custom ids that PlayerControlView does not manage. -->
         <ImageButton
-            android:id="@id/exo_prev"
+            android:id="@+id/playback_prev_marker_button"
             style="@style/ExoStyledControls.Button.Center.Previous"
             android:contentDescription="@string/playback_previous_marker" />
 
@@ -83,7 +106,7 @@
         <include layout="@layout/exo_player_control_ffwd_button" />
 
         <ImageButton
-            android:id="@id/exo_next"
+            android:id="@+id/playback_next_marker_button"
             style="@style/ExoStyledControls.Button.Center.Next"
             android:contentDescription="@string/playback_next_marker" />
     </LinearLayout>

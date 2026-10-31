@@ -102,15 +102,19 @@ object SceneIntents {
 
     fun videoHeightFrom(intent: Intent): Int = intent.getIntExtra(KEY_HEIGHT, 0)
 
-    /** Launch playback for the first scene in a list, seeding the queue with up to 500 ids. */
-    fun playAll(context: Context, scenes: List<Scene>) {
-        val capped = scenes.take(500)
-        if (capped.isEmpty()) return
-        if (scenes.size > 500) {
-            Toast.makeText(context, "Queued first 500", Toast.LENGTH_SHORT).show()
+    /**
+     * Launch playback for the first scene of a queue seeded from [scenes].
+     * @param startAt grid index to start from ("Play from here")
+     * @param shuffle randomize the queue before starting ("Shuffle play")
+     */
+    fun playAll(context: Context, scenes: List<Scene>, startAt: Int = 0, shuffle: Boolean = false) {
+        val plan = QueuePlanning.plan(scenes, startAt, shuffle)
+        if (plan.ordered.isEmpty()) return
+        if (plan.capped) {
+            Toast.makeText(context, "Queued first ${QueuePlanning.MAX_QUEUE}", Toast.LENGTH_SHORT).show()
         }
-        PlaybackQueue.start(capped.map { it.id }, startAt = 0)
-        val first = capped[0]
+        PlaybackQueue.start(QueuePlanning.toQueueItems(plan.ordered), startAt = 0)
+        val first = plan.ordered[0]
         context.startActivity(playback(context, first.id, resumeMs = 0L, width = first.width, height = first.height))
     }
 }

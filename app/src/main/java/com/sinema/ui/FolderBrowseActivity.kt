@@ -75,14 +75,15 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
                 updateTitle()
                 loadFolder()
             },
-            onPlayAll = { playAll() }
+            onPlayAll = { playAll() },
+            onShuffle = { playAll(shuffle = true) }
         )
     }
 
-    private fun playAll() {
+    private fun playAll(shuffle: Boolean = false) {
         val scenes = (0 until gridAdapter.size())
             .mapNotNull { (gridAdapter.get(it) as? FolderItem)?.scene }
-        SceneIntents.playAll(requireContext(), scenes)
+        SceneIntents.playAll(requireContext(), scenes, shuffle = shuffle)
     }
 
     override fun showSortDialog() {

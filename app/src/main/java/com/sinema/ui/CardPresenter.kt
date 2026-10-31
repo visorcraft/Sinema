@@ -19,7 +19,8 @@ import com.sinema.util.GlideAuth
 
 class CardPresenter(
     private val api: SinemaApi,
-    private val cardSize: HomeCardSize = HomeCardSize.COMPACT
+    private val cardSize: HomeCardSize = HomeCardSize.COMPACT,
+    private val onItemLongClick: ((Any) -> Unit)? = null
 ) : Presenter() {
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -40,6 +41,13 @@ class CardPresenter(
         val heart = view.findViewById<TextView>(R.id.card_heart)
         val checkmark = view.findViewById<TextView>(R.id.card_checkmark)
         val progress = view.findViewById<android.widget.ProgressBar>(R.id.card_progress)
+        // Long-press OK on a focused card opens per-card actions (grids only).
+        // Lambda parameter must not be named — it would shadow the bound item.
+        view.setOnLongClickListener(
+            onItemLongClick?.let { hook ->
+                android.view.View.OnLongClickListener { _ -> item?.let(hook); true }
+            }
+        )
         when (item) {
             is Scene -> {
                 title.text = item.displayTitle

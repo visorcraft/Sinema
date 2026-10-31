@@ -55,6 +55,14 @@ class PlaybackActivity : FragmentActivity() {
     private var playerMenuDialog: android.app.AlertDialog? = null
     private var rateDialog: android.app.AlertDialog? = null
     private var streamQualityDialog: android.app.AlertDialog? = null
+    private var resumePromptDialog: android.app.AlertDialog? = null
+    private var upNextDialog: android.app.AlertDialog? = null
+    /** True once the user picked Resume/Start-over or started playback manually. */
+    private var resumePromptResolved = false
+    /** Paused with the resume prompt outstanding (Back keeps it outstanding). */
+    private var resumeAwaitingChoice = false
+    private var suppressingPromptDismiss = false
+    private var sceneSwitchJob: kotlinx.coroutines.Job? = null
     private var aspectRatio = PlaybackAspectRatio.AUTO
     private var streamQuality = PlaybackStreamQuality.AUTO
     private var seekPreset = SeekPreset.TEN_THIRTY
@@ -112,7 +120,15 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
-        initPlayer()
+        // Prompt whenever a meaningful saved position is still unresolved —
+        // including after a lifecycle dismissal (backgrounding the dialog),
+        // which must never silently approve resuming. Once resolved (choice
+        // made or manual play), background restarts resume silently at the
+        // live position onStop persisted.
+        val promptResume = !resumePromptResolved && shouldPromptResume(resumePositionMs)
+        resumeAwaitingChoice = promptResume
+        initPlayer(startPaused = promptResume)
+        if (promptResume) showResumePrompt()
         handler.post(progressRunnable)
         startTimeMs = System.currentTimeMillis()
     }
@@ -133,6 +149,14 @@ class PlaybackActivity : FragmentActivity() {
         rateDialog = null
         streamQualityDialog?.dismiss()
         streamQualityDialog = null
+        resumePromptDialog?.let { dialog ->
+            suppressingPromptDismiss = true
+            dialog.dismiss()
+            suppressingPromptDismiss = false
+        }
+        resumePromptDialog = null
+        upNextDialog?.dismiss()
+        upNextDialog = null
     }
 
     override fun onStop() {
@@ -151,6 +175,24 @@ class PlaybackActivity : FragmentActivity() {
         rateDialog = null
         streamQualityDialog?.dismiss()
         streamQualityDialog = null
+        resumePromptDialog?.let { dialog ->
+            suppressingPromptDismiss = true
+            dialog.dismiss()
+            suppressingPromptDismiss = false
+        }
+        resumePromptDialog = null
+        upNextDialog?.dismiss()
+        upNextDialog = null
+        // Keep the in-session position so a restart resumes where the user
+        // left off instead of the intent's original resume point. Always
+        // update — leaving a stale value would jump backwards after seeks to
+        // near the start, or forwards after seeking near the end.
+        player?.let { exo ->
+            val pos = exo.currentPosition
+            val duration = exo.duration
+            val nearEnd = duration > 0 && duration - pos < 30_000
+            resumePositionMs = if (nearEnd) 0L else pos.coerceAtLeast(0L)
+        }
         releasePlayer()
         if (isFinishing) PlaybackQueue.clear()
     }
@@ -309,7 +351,7 @@ class PlaybackActivity : FragmentActivity() {
         playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
         playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).apply {
             setSceneMarkers(markers)
-            setKeyTimeIncrement(seekPreset.forwardMs)
+            setKeyTimeIncrements(seekPreset.backwardMs, seekPreset.forwardMs)
             scrubPreviewListener = object : MarkerTimeBar.ScrubPreviewListener {
                 override fun onPreviewStart(positionMs: Long) = showSeekPreview(positionMs)
                 override fun onPreviewMove(positionMs: Long) = showSeekPreview(positionMs)
@@ -328,15 +370,18 @@ class PlaybackActivity : FragmentActivity() {
         playerView.findViewById<View>(R.id.playback_marker_button).setOnClickListener {
             seekToAdjacentMarker(true)
         }
+        playerView.findViewById<View>(R.id.playback_prev_marker_button).setOnClickListener {
+            seekToAdjacentMarker(false)
+        }
+        playerView.findViewById<View>(R.id.playback_next_marker_button).setOnClickListener {
+            seekToAdjacentMarker(true)
+        }
+        playerView.findViewById<View>(R.id.playback_queue_chip).setOnClickListener {
+            showUpNextDialog()
+        }
         playerView.findViewById<android.widget.Button>(R.id.playback_seek_preset_button).apply {
             text = "Seek: ${seekPreset.label}"
             setOnClickListener { cycleSeekPreset() }
-        }
-        playerView.findViewById<View>(androidx.media3.ui.R.id.exo_prev).setOnClickListener {
-            seekToAdjacentMarker(false)
-        }
-        playerView.findViewById<View>(androidx.media3.ui.R.id.exo_next).setOnClickListener {
-            seekToAdjacentMarker(true)
         }
         playerView.findViewById<View>(androidx.media3.ui.R.id.exo_rew_with_amount).apply {
             contentDescription = "Rewind ${seekPreset.backwardMs / 1000} seconds"
@@ -355,6 +400,15 @@ class PlaybackActivity : FragmentActivity() {
         val exo = player
         playerView.findViewById<android.widget.TextView>(R.id.playback_remaining).text =
             if (exo == null) "" else formatRemainingMs(exo.currentPosition, exo.duration)
+        playerView.findViewById<android.widget.TextView>(R.id.playback_queue_chip).apply {
+            val remaining = PlaybackQueue.remainingCount()
+            if (remaining > 0) {
+                text = upNextChipLabel(remaining)
+                visibility = View.VISIBLE
+            } else {
+                visibility = View.GONE
+            }
+        }
         playerView.findViewById<View>(R.id.playback_marker_button).apply {
             isEnabled = markers.isNotEmpty()
             alpha = if (markers.isEmpty()) 0.5f else 1.0f
@@ -471,11 +525,13 @@ class PlaybackActivity : FragmentActivity() {
         exo.setMediaItem(buildMediaItem())
         exo.prepare()
         if (positionMs > 0L) exo.seekTo(positionMs)
-        exo.playWhenReady = true
+        // A stream rebuild (quality switch/fallback) must not unpause playback
+        // while the resume prompt is still outstanding.
+        exo.playWhenReady = !resumeAwaitingChoice
         scheduleVideoOutputTimeout()
     }
 
-    private fun initPlayer() {
+    private fun initPlayer(startPaused: Boolean = false) {
         if (sceneId.isEmpty()) return
         hasVideoOutput = false
         mountPlayerView()
@@ -499,7 +555,7 @@ class PlaybackActivity : FragmentActivity() {
                 if (resumePositionMs > 0) {
                     exo.seekTo(resumePositionMs)
                 }
-                exo.playWhenReady = true
+                exo.playWhenReady = !startPaused
                 exo.repeatMode = if (prefs.loopEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                 scheduleVideoOutputTimeout()
                 exo.addListener(object : Player.Listener {
@@ -525,6 +581,12 @@ class PlaybackActivity : FragmentActivity() {
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        if (isPlaying) {
+                            // Any playback start (prompt choice or manual
+                            // controller press) resolves the resume prompt.
+                            resumePromptResolved = true
+                            resumeAwaitingChoice = false
+                        }
                         isPaused = !isPlaying
                         val exo = player
                         if (isPlaying) {
@@ -568,6 +630,11 @@ class PlaybackActivity : FragmentActivity() {
                         if (state != Player.STATE_ENDED) return
                         handler.removeCallbacks(videoOutputTimeout)
                         handler.removeCallbacks(hideRunnable)
+                        // A scene switch (manual Up Next jump or an earlier
+                        // auto-advance still fetching metadata) owns the
+                        // queue now; the outgoing player's EOF must not
+                        // consume another item or finish the activity.
+                        if (sceneSwitchJob?.isActive == true) return
                         // Subsequent loop iterations re-fire STATE_ENDED; skip savePlayback
                         // because its finished-clear branch would overwrite the user's actual
                         // resume position with "completed".
@@ -578,42 +645,12 @@ class PlaybackActivity : FragmentActivity() {
                         // queue advance would race with it and break the loop.
                         if (exo.repeatMode != Player.REPEAT_MODE_OFF) return
                         val wasActive = PlaybackQueue.isActive
-                        val nextId = PlaybackQueue.next()
-                        if (nextId == null) {
+                        val next = PlaybackQueue.next()
+                        if (next == null) {
                             if (wasActive) finish()
                             return
                         }
-                        lifecycleScope.launch {
-                            var nextWidth = 0
-                            var nextHeight = 0
-                            var nextTitle = ""
-                            try {
-                                val details = app.api.findSceneFull(nextId)
-                                captions = details?.scene?.captions ?: emptyList()
-                                markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
-                                nextWidth = details?.scene?.width ?: 0
-                                nextHeight = details?.scene?.height ?: 0
-                                nextTitle = details?.scene?.displayTitle ?: ""
-                            } catch (e: Exception) {
-                                android.util.Log.w("Sinema", "Failed to fetch next scene metadata, playing without captions/markers", e)
-                                captions = emptyList()
-                                markers = emptyList()
-                            }
-                            if (isFinishing) return@launch
-                            hideSeekPreview()
-                            sceneTitle = nextTitle
-                            sceneId = nextId
-                            videoWidth = nextWidth
-                            videoHeight = nextHeight
-                            hasFallenBackToDirect = false
-                            forceAlignedHls = false
-                            hasVideoOutput = false
-                            resumePositionMs = 0L
-                            playCountSent = false
-                            startTimeMs = System.currentTimeMillis()
-                            releasePlayer()
-                            initPlayer()
-                        }
+                        playSceneNow(next.id, next.title)
                     }
                 })
             }
@@ -766,6 +803,128 @@ class PlaybackActivity : FragmentActivity() {
         else
             markers.lastOrNull { it.second < posSec - 3 }
         target?.let { exo.seekTo((it.second * 1000).toLong()) }
+    }
+
+    /** Swap the player to [nextId] (queue advance or Up Next jump). */
+    private fun playSceneNow(
+        nextId: String,
+        fallbackTitle: String = "",
+        saveCurrent: Boolean = false
+    ) {
+        // Manual Up Next jumps leave without onPause, so progress for the
+        // current scene must be saved here (auto-advance saves at STATE_ENDED).
+        if (saveCurrent) savePlayback()
+        // Any switch invalidates an open Up Next dialog's snapshot.
+        upNextDialog?.dismiss()
+        upNextDialog = null
+        // Serialize switches: a superseded jump must not interleave metadata
+        // or sceneId updates with a newer one.
+        sceneSwitchJob?.cancel()
+        val app = SinemaApp.instance
+        sceneSwitchJob = lifecycleScope.launch {
+            var nextWidth = 0
+            var nextHeight = 0
+            var nextTitle = fallbackTitle
+            try {
+                val details = app.api.findSceneFull(nextId)
+                captions = details?.scene?.captions ?: emptyList()
+                markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
+                nextWidth = details?.scene?.width ?: 0
+                nextHeight = details?.scene?.height ?: 0
+                nextTitle = details?.scene?.displayTitle ?: fallbackTitle
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("Sinema", "Failed to fetch next scene metadata, playing without captions/markers", e)
+                captions = emptyList()
+                markers = emptyList()
+            }
+            if (isFinishing || isDestroyed) return@launch
+            hideSeekPreview()
+            sceneTitle = nextTitle
+            sceneId = nextId
+            videoWidth = nextWidth
+            videoHeight = nextHeight
+            hasFallenBackToDirect = false
+            forceAlignedHls = false
+            hasVideoOutput = false
+            resumePositionMs = 0L
+            playCountSent = false
+            startTimeMs = System.currentTimeMillis()
+            releasePlayer()
+            // Never prepare a player while stopped — the fetch can straddle
+            // onStop (which releases the player); onStart then re-inits with
+            // the already-swapped sceneId.
+            if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                initPlayer()
+            }
+        }
+    }
+
+    private fun showResumePrompt() {
+        if (resumePromptDialog?.isShowing == true) return
+        val exo = player ?: return
+        val at = com.sinema.util.TimeFormat.formatMs(resumePositionMs)
+        resumePromptDialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Resume playback")
+            .setMessage("Resume at $at or start over?")
+            .setPositiveButton("Resume") { _, _ ->
+                resumePromptResolved = true
+                resumeAwaitingChoice = false
+                exo.seekTo(resumePositionMs)
+                exo.playWhenReady = true
+            }
+            .setNeutralButton("Start over") { _, _ ->
+                resumePromptResolved = true
+                resumeAwaitingChoice = false
+                exo.seekTo(0L)
+                resumePositionMs = 0L
+                exo.playWhenReady = true
+            }
+            .setOnDismissListener {
+                // Back cancels: stay paused with controls shown; the choice
+                // stays unresolved so a later restart re-prompts instead of
+                // silently resuming. Lifecycle teardown dismissals are silent.
+                if (!suppressingPromptDismiss) playerView.showController()
+                playerView.requestFocus()
+            }
+            .show()
+    }
+
+    private fun showUpNextDialog() {
+        if (upNextDialog?.isShowing == true) return
+        val remaining = PlaybackQueue.remaining()
+        if (remaining.isEmpty()) {
+            Toast.makeText(this, "Queue empty", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = remaining.map { item ->
+            "${com.sinema.util.TimeFormat.formatSeconds(item.durationSec)}  ${item.title}"
+        }
+        upNextDialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Up Next (${remaining.size})")
+            .setItems(labels.toTypedArray()) { dialog, which ->
+                dialog.dismiss()
+                // Resolve by stable id: the queue may have advanced since
+                // this snapshot was built.
+                val targetId = remaining[which].id
+                if (PlaybackQueue.current()?.id == targetId) return@setItems
+                PlaybackQueue.jumpToItem(targetId)?.let {
+                    playSceneNow(it.id, it.title, saveCurrent = true)
+                } ?: Toast.makeText(this, "No longer in queue", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("Shuffle") { _, _ ->
+                if (PlaybackQueue.shuffleRemaining()) {
+                    Toast.makeText(this, "Shuffled ${PlaybackQueue.remainingCount()} upcoming", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setPositiveButton("Exit queue") { _, _ ->
+                PlaybackQueue.clear()
+                Toast.makeText(this, "Queue cleared", Toast.LENGTH_SHORT).show()
+                updatePlaybackText()
+            }
+            .setOnDismissListener { playerView.requestFocus() }
+            .show()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

@@ -39,6 +39,9 @@ class SinemaApi(
 ) {
 
     companion object {
+        // Stash FindFilterType.PerPageAll — fetch every matching row.
+        internal const val PER_PAGE_ALL = -1
+
         // Single source of truth for scene list payloads.
         // resume_time ships on Scene since Stash 0.24 and powers the
         // watch-progress bar on cards (see Scene.watchProgressPercent).
@@ -740,8 +743,11 @@ class SinemaApi(
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
     ): Pair<Int, List<Scene>> {
         val result = findScenesInternal(
+            // Stash's per_page = 0 means "LIMIT 0" (count only), and paging a
+            // null-timestamp-insensitive server sort is wrong anyway — fetch
+            // the complete filtered result (PerPageAll = -1) and slice below.
             page = if (sort == "last_played_at") 1 else page,
-            perPage = if (sort == "last_played_at") 0 else perPage,
+            perPage = if (sort == "last_played_at") PER_PAGE_ALL else perPage,
             sort = sort,
             direction = direction,
             sceneFilter = RECENTLY_PLAYED_SCENE_FILTER,

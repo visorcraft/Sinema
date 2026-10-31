@@ -248,6 +248,18 @@ Play All behavior:
 - Caps the queue at 500 scenes and shows a toast when it truncates the queue.
 - Does not persist the queue after the app process ends.
 
+`Shuffle Play` in the same menu queues the loaded scenes in random order.
+
+## Card actions
+
+Long-press OK on a focused scene card in any grid to open per-card actions:
+
+- `Resume` / `Play`: starts the scene, resuming saved progress when present (a prompt offers resume or start over for scenes ≥ 10 seconds in).
+- `Play from here`: queues the current grid from the selected card onward.
+- `Mark Watched` / `Mark Unwatched`: same semantics as the detail-screen toggle.
+- `Favorite` / `Unfavorite`: sets or clears the 5-star rating that marks a favorite.
+- `Details`: opens the scene detail screen.
+
 ## Deep links
 
 Sinema can open a scene detail screen from a deep link:

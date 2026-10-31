@@ -45,7 +45,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open val filterScreenKey: String? get() = sortScreenKey
     protected open val defaultSort: SortOption = SortOption.PATH_ASC
     /** Cards shown in this grid; grids of non-Scene items override this. */
-    protected open fun createCardPresenter(): Presenter = CardPresenter(app.api)
+    protected open fun createCardPresenter(): Presenter =
+        CardPresenter(app.api, onItemLongClick = ::showCardActions)
     protected var sort: SortOption = SortOption.PATH_ASC
     protected var sceneFilter = SceneFilterOptions()
     protected var randomSeed: Int = 0
@@ -86,17 +87,105 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     updateTitle()
                     reload()
                 },
-                onPlayAll = { playAll() }
+                onPlayAll = { playAll() },
+                onShuffle = { playAll(shuffle = true) }
             )
         } else {
             showSortDialog()
         }
     }
 
-    protected open fun playAll() {
+    protected open fun playAll(shuffle: Boolean = false) {
         val scenes = (0 until gridAdapter.size())
             .mapNotNull { gridAdapter.get(it) as? Scene }
-        SceneIntents.playAll(requireContext(), scenes)
+        SceneIntents.playAll(requireContext(), scenes, shuffle = shuffle)
+    }
+
+    /** Long-press actions for a focused scene card. */
+    private fun showCardActions(item: Any) {
+        val scene = item as? Scene ?: return
+        val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === scene } ?: return
+        val playLabel = if (scene.resumeTime > 0.0) "▶ Resume" else "▶ Play"
+        val labels = listOf(
+            playLabel,
+            "▶ Play from here",
+            WatchedToggle.buttonLabel(scene.isWatched),
+            if (scene.isFavorite) "💔 Unfavorite" else "❤️ Favorite",
+            "ℹ️ Details"
+        )
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle(scene.displayTitle)
+            .setItems(labels.toTypedArray()) { dialog, which ->
+                dialog.dismiss()
+                when (which) {
+                    0 -> startActivity(
+                        SceneIntents.playback(
+                            requireContext(), scene.id,
+                            resumeMs = (scene.resumeTime * 1000).toLong(),
+                            width = scene.width, height = scene.height
+                        )
+                    )
+                    1 -> {
+                        val rest = (index until gridAdapter.size())
+                            .mapNotNull { gridAdapter.get(it) as? Scene }
+                        SceneIntents.playAll(requireContext(), rest, startAt = 0)
+                    }
+                    2 -> toggleWatched(scene, index)
+                    3 -> toggleFavorite(scene, index)
+                    4 -> startActivity(SceneIntents.detail(requireContext(), scene))
+                }
+            }
+            .show()
+    }
+
+    private fun toggleWatched(scene: Scene, index: Int) {
+        lifecycleScope.launch {
+            try {
+                val wasWatched = scene.isWatched
+                if (wasWatched) {
+                    app.api.resetPlayCount(scene.id)
+                } else {
+                    app.api.clearResumeTime(scene.id)
+                    app.api.incrementPlayCount(scene.id)
+                }
+                val updated = scene.copy(
+                    playCount = WatchedToggle.nextPlayCount(scene.playCount, wasWatched),
+                    resumeTime = if (wasWatched) scene.resumeTime else 0.0
+                )
+                if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
+                    gridAdapter.replace(index, updated)
+                }
+                Toast.makeText(requireContext(),
+                    if (wasWatched) "Marked as unwatched" else "Marked as watched",
+                    Toast.LENGTH_SHORT).show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Watched toggle failed for ${scene.id}", e)
+                Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun toggleFavorite(scene: Scene, index: Int) {
+        lifecycleScope.launch {
+            try {
+                val wasFavorite = scene.isFavorite
+                app.api.setSceneRating(scene.id, if (wasFavorite) null else 100)
+                val updated = scene.copy(rating100 = if (wasFavorite) null else 100)
+                if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
+                    gridAdapter.replace(index, updated)
+                }
+                Toast.makeText(requireContext(),
+                    if (wasFavorite) "Removed from favorites" else "Added to favorites",
+                    Toast.LENGTH_SHORT).show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Favorite toggle failed for ${scene.id}", e)
+                Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

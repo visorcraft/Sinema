@@ -212,9 +212,34 @@ class MainFragment : RowsSupportFragment() {
     override fun onResume() {
         super.onResume()
         if (layoutSnapshot != app.prefs.homeLayout) {
+            applyHomeLayout()
+            return
+        }
+        loadContent()
+    }
+
+    /**
+     * Swap to a changed home layout in place: rebuild shortcut contents, drop
+     * content rows (their presenters may encode the old card size), then
+     * reload. Avoids the full activity recreation flash.
+     */
+    private fun applyHomeLayout() {
+        layoutSnapshot = app.prefs.homeLayout
+        val shortcutsAdapter = shortcutsRow.adapter as ArrayObjectAdapter
+        shortcutsAdapter.clear()
+        layoutSnapshot.visibleShortcuts().map { it.label }.forEach(shortcutsAdapter::add)
+        if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
+        contentRows.values.forEach(rowsAdapter::remove)
+        contentRows.clear()
+        heroRow?.let(rowsAdapter::remove)
+        heroRow = null
+        if (isLoading) {
+            // A load is mid-flight against the old layout; loadContent()
+            // refuses re-entry, so recreate for a clean slate.
             requireActivity().recreate()
             return
         }
+        reconcileHomeRows()
         loadContent()
     }
 

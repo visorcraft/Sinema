@@ -117,7 +117,11 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 ## Playback UI
 
-`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for native scrubbing plus marker ticks. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals; `previewBucketMs` throttles authenticated timestamp screenshot requests to five-second buckets. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
+`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for native scrubbing plus marker ticks. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`); `previewBucketMs` throttles authenticated timestamp screenshot requests to five-second buckets. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
+
+### Playback queue
+
+`PlaybackQueue` (util) keeps queued items with id/title/duration and exposes `next`, `jumpTo`, `remaining`, and seeded `shuffleRemaining`; the controller's `Up Next · N` chip opens a jump/shuffle/exit dialog, and the resume prompt (`shouldPromptResume`, 10 s threshold) asks before seeking into saved progress. `QueuePlanning` is the pure planning step (start-at, shuffle, 500 cap) behind `SceneIntents.playAll`; grid long-press actions live in `SceneGridFragment.showCardActions`.
 
 ## Playback state
 `PlaybackActivity.savePlayback` writes Stash activity through `sceneSaveActivity`.

@@ -18,13 +18,22 @@ import kotlinx.coroutines.launch
 
 class HomeSettingsActivity : FragmentActivity() {
     private val app get() = SinemaApp.instance
+    private lateinit var artworkButton: Button
+    private lateinit var heroButton: Button
+    private lateinit var groupLibraryButton: Button
+    private lateinit var filterButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        render()
+        setContentView(buildContentView())
+        update()
     }
 
-    private fun render() {
+    /**
+     * Buttons read prefs inside their click lambdas and only labels are
+     * refreshed in [update], so D-pad focus survives every toggle.
+     */
+    private fun buildContentView(): ScrollView {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)
@@ -42,37 +51,53 @@ class HomeSettingsActivity : FragmentActivity() {
             setPadding(0, 12, 0, 12)
         })
 
-        val settings = app.prefs.homeLayout
-        addButton(layout, "Artwork: ${settings.cardSize.name}") {
-            app.prefs.homeLayout = settings.copy(
-                cardSize = if (settings.cardSize == HomeCardSize.COMPACT) HomeCardSize.LARGE else HomeCardSize.COMPACT
+        artworkButton = addButton(layout, "Artwork") {
+            app.prefs.homeLayout = app.prefs.homeLayout.copy(
+                cardSize = if (app.prefs.homeLayout.cardSize == HomeCardSize.COMPACT) {
+                    HomeCardSize.LARGE
+                } else {
+                    HomeCardSize.COMPACT
+                }
             )
-            render()
+            update()
         }
-        addButton(layout, "Hero banner: ${if (settings.showHero) "ON" else "OFF"}") {
-            app.prefs.homeLayout = settings.copy(showHero = !settings.showHero)
-            render()
+        heroButton = addButton(layout, "Hero banner") {
+            app.prefs.homeLayout = app.prefs.homeLayout.copy(showHero = !app.prefs.homeLayout.showHero)
+            update()
         }
-        addButton(layout, "Group library shortcuts: ${if (settings.groupLibrary) "ON" else "OFF"}") {
-            app.prefs.homeLayout = settings.copy(groupLibrary = !settings.groupLibrary)
-            render()
+        groupLibraryButton = addButton(layout, "Group library shortcuts") {
+            app.prefs.homeLayout = app.prefs.homeLayout.copy(groupLibrary = !app.prefs.homeLayout.groupLibrary)
+            update()
         }
         addButton(layout, "Customize shortcuts") {
-            startActivity(Intent(this, HomeOrderActivity::class.java).putExtra(HomeOrderActivity.EXTRA_MODE, HomeOrderActivity.MODE_SHORTCUTS))
+            startActivity(
+                Intent(this, HomeOrderActivity::class.java)
+                    .putExtra(HomeOrderActivity.EXTRA_MODE, HomeOrderActivity.MODE_SHORTCUTS)
+            )
         }
         addButton(layout, "Customize content rows") {
-            startActivity(Intent(this, HomeOrderActivity::class.java).putExtra(HomeOrderActivity.EXTRA_MODE, HomeOrderActivity.MODE_ROWS))
+            startActivity(
+                Intent(this, HomeOrderActivity::class.java)
+                    .putExtra(HomeOrderActivity.EXTRA_MODE, HomeOrderActivity.MODE_ROWS)
+            )
         }
-        val filterLabel = settings.savedFilterName.ifBlank { "None" }
-        addButton(layout, "Saved Filter home row: $filterLabel") { chooseSavedFilter() }
+        filterButton = addButton(layout, "Saved Filter home row") { chooseSavedFilter() }
 
-        setContentView(ScrollView(this).apply {
+        return ScrollView(this).apply {
             setBackgroundColor(0xFF1B1B1B.toInt())
             addView(layout)
-        })
+        }
     }
 
-    private fun addButton(parent: LinearLayout, label: String, action: () -> Unit) {
+    private fun update() {
+        val settings = app.prefs.homeLayout
+        artworkButton.text = "Artwork: ${settings.cardSize.name}"
+        heroButton.text = "Hero banner: ${if (settings.showHero) "ON" else "OFF"}"
+        groupLibraryButton.text = "Group library shortcuts: ${if (settings.groupLibrary) "ON" else "OFF"}"
+        filterButton.text = "Saved Filter home row: ${settings.savedFilterName.ifBlank { "None" }}"
+    }
+
+    private fun addButton(parent: LinearLayout, label: String, action: () -> Unit): Button {
         val button = Button(this).apply {
             text = label
             isFocusable = true
@@ -87,6 +112,7 @@ class HomeSettingsActivity : FragmentActivity() {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = 12 })
+        return button
     }
 
     private fun chooseSavedFilter() {
@@ -117,7 +143,7 @@ class HomeSettingsActivity : FragmentActivity() {
                                 hiddenRows = settings.hiddenRows.orEmpty() - HomeContentRow.SAVED_FILTER
                             )
                         }
-                        render()
+                        update()
                     }
                     .show()
             } catch (e: CancellationException) {

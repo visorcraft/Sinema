@@ -49,4 +49,18 @@ class PlaybackControlsStateTest {
         assertEquals("-0:00", formatRemainingMs(90_000L, 60_000L))
         assertEquals("", formatRemainingMs(10_000L, 0L))
     }
+
+    @Test
+    fun `resume prompt only for meaningful positions`() {
+        assertTrue(shouldPromptResume(RESUME_PROMPT_THRESHOLD_MS))
+        assertTrue(shouldPromptResume(45 * 60_000L))
+        assertEquals(false, shouldPromptResume(RESUME_PROMPT_THRESHOLD_MS - 1))
+        assertEquals(false, shouldPromptResume(0L))
+    }
+
+    @Test
+    fun `up next chip shows remaining count`() {
+        assertEquals("Up Next · 12", upNextChipLabel(12))
+        assertEquals("Up Next · 1", upNextChipLabel(1))
+    }
 }

@@ -3,6 +3,7 @@ package com.sinema.ui
 import com.sinema.util.TimeFormat
 
 private const val PREVIEW_BUCKET_MS = 5_000L
+const val RESUME_PROMPT_THRESHOLD_MS = 10_000L
 
 enum class SeekPreset(val backwardMs: Long, val forwardMs: Long, val label: String) {
     TEN_THIRTY(10_000L, 30_000L, "−10s / +30s"),
@@ -32,3 +33,9 @@ fun markerFractions(markers: List<Pair<String, Double>>, durationMs: Long): List
 
 fun formatRemainingMs(positionMs: Long, durationMs: Long): String =
     if (durationMs <= 0L) "" else "-${TimeFormat.formatMs((durationMs - positionMs).coerceAtLeast(0L))}"
+
+/** Only offer the resume/start-over choice for meaningful positions. */
+fun shouldPromptResume(resumeMs: Long, thresholdMs: Long = RESUME_PROMPT_THRESHOLD_MS): Boolean =
+    resumeMs >= thresholdMs
+
+fun upNextChipLabel(remainingCount: Int): String = "Up Next · $remainingCount"
