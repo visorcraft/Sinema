@@ -6,6 +6,26 @@ data class StudioRef(val id: String, val name: String)
 data class CaptionRef(val languageCode: String, val captionType: String)
 data class MarkerRef(val id: String, val title: String, val seconds: Double, val primaryTag: String)
 
+/**
+ * Star rating conversion. Stash stores rating100 (0-100); Sinema exposes a
+ * 1-5 star picker where any rating > 0 keeps the scene a "favorite" —
+ * matching the pre-existing rating100 > 0 favorite semantics.
+ */
+object StarRating {
+    const val MAX_STARS = 5
+
+    fun toRating100(stars: Int): Int? =
+        if (stars in 1..MAX_STARS) stars * 20 else null
+
+    fun fromRating100(rating100: Int?): Int =
+        if (rating100 == null || rating100 <= 0) 0
+        else Math.round(rating100 / 20.0).toInt().coerceIn(1, MAX_STARS)
+
+    /** "★★★" style glyph row for compact display, empty when unrated. */
+    fun glyphs(stars: Int): String =
+        if (stars in 1..MAX_STARS) "★".repeat(stars) else ""
+}
+
 /** A browsable Stash entity (tag, performer, or studio). */
 data class EntityItem(
     val id: String,
@@ -16,6 +36,19 @@ data class EntityItem(
 ) {
     enum class Kind(val label: String) { TAG("Tags"), PERFORMER("Performers"), STUDIO("Studios") }
 }
+
+/**
+ * Extended info for the entity detail header: scene count, image, and for
+ * performers their tag list. Fields degrade gracefully when missing.
+ */
+data class EntityHeader(
+    val id: String,
+    val name: String,
+    val kind: EntityItem.Kind,
+    val sceneCount: Int = 0,
+    val imagePath: String? = null,
+    val tags: List<TagRef> = emptyList()
+)
 
 /** Full single-scene payload for the detail screen and player. */
 data class SceneDetails(
@@ -54,6 +87,8 @@ data class Scene(
     val filename: String get() = path.substringAfterLast('/')
     val displayTitle: String get() = title.ifBlank { filename }
     val folder: String get() = path.substringBeforeLast('/')
+    /** 1-5 stars, or 0 when unrated (see [StarRating]). */
+    val starCount: Int get() = StarRating.fromRating100(rating100)
 
     /**
      * Resume progress 0..100 for card overlays, or 0 when there is nothing

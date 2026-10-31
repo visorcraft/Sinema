@@ -2,4 +2,7 @@
 <resources>
     <string name="app_name">Sinema</string>
     <string name="playback_aspect_ratio">Aspect ratio</string>
+    <string name="global_search_label">Sinema</string>
+    <string name="global_search_hint">Search your Stash scenes</string>
+    <string name="global_search_settings_description">Scenes from your Stash server</string>
 </resources>

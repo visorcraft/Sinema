@@ -20,6 +20,7 @@ import com.sinema.model.EntityItem
 import com.sinema.model.MarkerRef
 import com.sinema.model.Scene
 import com.sinema.model.SceneDetails
+import com.sinema.model.StarRating
 import com.sinema.util.GlideAuth
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
@@ -32,7 +33,6 @@ class SceneDetailActivity : FragmentActivity() {
 
     private lateinit var btnResume: Button
     private lateinit var btnPlay: Button
-    private lateinit var btnFavorite: Button
     private lateinit var btnMarkWatched: Button
     private var btnFolder: Button? = null
     private lateinit var metaView: TextView
@@ -41,6 +41,15 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var tagsRow: LinearLayout
     private lateinit var performersScroll: View
     private lateinit var performersRow: LinearLayout
+    private val starButtons: List<Button> by lazy {
+        listOf(
+            findViewById(R.id.btn_star_1),
+            findViewById(R.id.btn_star_2),
+            findViewById(R.id.btn_star_3),
+            findViewById(R.id.btn_star_4),
+            findViewById(R.id.btn_star_5)
+        )
+    }
 
     // Captions and markers loaded from Stash after loadDetails completes
     private var captions: List<CaptionRef> = emptyList()
@@ -58,7 +67,6 @@ class SceneDetailActivity : FragmentActivity() {
         val screenshot = findViewById<ImageView>(R.id.detail_screenshot)
         btnResume = findViewById(R.id.btn_resume)
         btnPlay = findViewById(R.id.btn_play)
-        btnFavorite = findViewById(R.id.btn_favorite)
         btnMarkWatched = findViewById(R.id.btn_mark_watched)
         btnFolder = findViewById(R.id.btn_folder)
         metaView = findViewById(R.id.detail_meta)
@@ -90,25 +98,13 @@ class SceneDetailActivity : FragmentActivity() {
         // Play from start
         btnPlay.setOnClickListener { launchPlayback(0L) }
 
-        // Favorite toggle
-        btnFavorite.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    val currentRating = app.api.getSceneRating(scene.id)
-                    val isFavNow = currentRating != null && currentRating > 0
-                    val newFav = !isFavNow
-                    app.api.setSceneRating(scene.id, if (newFav) 100 else null)
-                    btnFavorite.text = if (newFav) "❤️ Unfavorite" else "🤍 Favorite"
-                    Toast.makeText(this@SceneDetailActivity,
-                        if (newFav) "Added to favorites" else "Removed from favorites",
-                        Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Log.e("Sinema", "Failed to toggle favorite", e)
-                    Toast.makeText(this@SceneDetailActivity,
-                        "Failed to update favorite: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
+        // Star rating: tapping star N sets rating100 = N*20; Clear removes
+        // the rating (and with it favorite status, which is rating > 0).
+        starButtons.forEachIndexed { index, button ->
+            button.setOnClickListener { setRating(index + 1) }
         }
+        findViewById<Button>(R.id.btn_rating_clear).setOnClickListener { setRating(0) }
+        bindStars()
 
         // Mark Watched / Unwatched toggle
         Log.d("Sinema", "SceneDetail: id=${scene.id} playCount=${scene.playCount} isWatched=${scene.isWatched} rating100=${scene.rating100}")
@@ -171,6 +167,7 @@ class SceneDetailActivity : FragmentActivity() {
                 markers = details.markers
                 bindSceneText(scene)
                 bindWatchedButton()
+                bindStars()
                 bindResume(details)
                 bindMeta(details.scene)
                 bindChips(details.scene)
@@ -184,6 +181,36 @@ class SceneDetailActivity : FragmentActivity() {
 
     private fun bindWatchedButton() {
         btnMarkWatched.text = WatchedToggle.buttonLabel(scene.isWatched)
+    }
+
+    /** Render ☆/★ states for the 1-5 star picker from the current rating. */
+    private fun bindStars() {
+        val stars = scene.starCount
+        starButtons.forEachIndexed { index, button ->
+            button.text = if (index < stars) "★" else "☆"
+        }
+    }
+
+    private fun setRating(stars: Int) {
+        lifecycleScope.launch {
+            try {
+                app.api.setSceneRating(scene.id, StarRating.toRating100(stars))
+                detailState.applyRating(stars)
+                bindStars()
+                bindMeta(scene)
+                Toast.makeText(
+                    this@SceneDetailActivity,
+                    if (stars > 0) "Rated ${StarRating.glyphs(stars)}" else "Rating cleared",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Failed to set rating for ${scene.id}", e)
+                Toast.makeText(this@SceneDetailActivity,
+                    "Failed to set rating: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun bindSceneText(s: Scene) {
@@ -205,7 +232,6 @@ class SceneDetailActivity : FragmentActivity() {
         } else {
             btnResume.visibility = View.GONE
         }
-        btnFavorite.text = if (details.scene.isFavorite) "❤️ Unfavorite" else "🤍 Favorite"
     }
 
     private fun bindMeta(s: Scene) {

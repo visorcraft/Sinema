@@ -1,48 +1,265 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Wrapped in ScrollView: the full option set exceeds one dialog height on TV. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:layout_height="wrap_content">
 
-    <RadioGroup
-        android:id="@+id/filter_watch_group"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="24dp">
 
-        <RadioButton
-            android:id="@+id/filter_watch_all"
+        <TextView
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:checked="true"
-            android:text="All scenes"
-            android:textColor="@android:color/white"
-            android:textSize="16sp" />
-
-        <RadioButton
-            android:id="@+id/filter_watch_watched"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:text="Watched"
-            android:textColor="@android:color/white"
-            android:textSize="16sp" />
+            android:textColor="#888888"
+            android:textSize="13sp" />
 
-        <RadioButton
-            android:id="@+id/filter_watch_unwatched"
+        <RadioGroup
+            android:id="@+id/filter_watch_group"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Unwatched"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/filter_watch_all"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:checked="true"
+                android:text="All scenes"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_watch_watched"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Watched"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_watch_unwatched"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Unwatched"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </RadioGroup>
+
+        <CheckBox
+            android:id="@+id/filter_favorites"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:text="Favorites only"
             android:textColor="@android:color/white"
             android:textSize="16sp" />
-    </RadioGroup>
 
-    <CheckBox
-        android:id="@+id/filter_favorites"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp"
-        android:text="Favorites only"
-        android:textColor="@android:color/white"
-        android:textSize="16sp" />
-</LinearLayout>
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Minimum rating"
+            android:textColor="#888888"
+            android:textSize="13sp" />
+
+        <RadioGroup
+            android:id="@+id/filter_rating_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/filter_rating_0"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:checked="true"
+                android:text="Any rating"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_rating_1"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="★ and up"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_rating_2"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="★★ and up"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_rating_3"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="★★★ and up"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_rating_4"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="★★★★ and up"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_rating_5"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="★★★★★ only"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Resolution"
+            android:textColor="#888888"
+            android:textSize="13sp" />
+
+        <RadioGroup
+            android:id="@+id/filter_resolution_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/filter_resolution_any"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:checked="true"
+                android:text="Any resolution"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_resolution_under_hd"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Under 720p"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_resolution_hd"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="720p or better"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_resolution_full_hd"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="1080p or better"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_resolution_four_k"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="4K or better"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Markers"
+            android:textColor="#888888"
+            android:textSize="13sp" />
+
+        <RadioGroup
+            android:id="@+id/filter_markers_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/filter_markers_any"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:checked="true"
+                android:text="Any"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_markers_with"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginStart="24dp"
+                android:text="With"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_markers_without"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginStart="24dp"
+                android:text="Without"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Captions"
+            android:textColor="#888888"
+            android:textSize="13sp" />
+
+        <RadioGroup
+            android:id="@+id/filter_captions_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/filter_captions_any"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:checked="true"
+                android:text="Any"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_captions_with"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginStart="24dp"
+                android:text="With"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/filter_captions_without"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginStart="24dp"
+                android:text="Without"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </RadioGroup>
+    </LinearLayout>
+</ScrollView>

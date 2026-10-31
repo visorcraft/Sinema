@@ -260,6 +260,49 @@ class SettingsFragment : Fragment() {
             ).apply { topMargin = 16 })
         }
 
+        // Global (system) search: opt-in participation in the Android TV
+        // search dialog. Flips the search provider + searchable activity
+        // components together; both ship disabled by default.
+        val globalSearchToggle = Button(ctx).apply {
+            text = if (app.prefs.globalSearchEnabled) "Global Search: ON" else "Global Search: OFF"
+            isFocusable = true
+            setBackgroundColor(0xFF333333.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            setOnFocusChangeListener { _, hasFocus ->
+                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
+            }
+            setOnClickListener {
+                val newState = !app.prefs.globalSearchEnabled
+                app.prefs.globalSearchEnabled = newState
+                val flag = android.content.pm.PackageManager.DONT_KILL_APP
+                pm.setComponentEnabledSetting(
+                    android.content.ComponentName(ctx, com.sinema.util.GlobalSearchProvider::class.java),
+                    if (newState) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    flag
+                )
+                pm.setComponentEnabledSetting(
+                    android.content.ComponentName(ctx, com.sinema.ui.GlobalSearchActivity::class.java),
+                    if (newState) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    flag
+                )
+                this.text = if (newState) "Global Search: ON" else "Global Search: OFF"
+                Toast.makeText(
+                    ctx,
+                    if (newState)
+                        "Global search enabled — Sinema scenes appear in Android TV search"
+                    else
+                        "Global search disabled",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+        layout.addView(globalSearchToggle, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 16 })
+
         val saveBtn = Button(ctx).apply {
             text = "Save Settings"
             isFocusable = true

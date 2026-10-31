@@ -45,4 +45,27 @@ class SceneDetailStateTest {
         assertTrue(state.applyRefresh(newRefresh, scene(playCount = 3)))
         assertEquals(3, state.scene.playCount)
     }
+
+    @Test
+    fun `rating mutation invalidates an older detail response`() {
+        // Mirrors the watched-toggle guarantee: a stale refresh carrying the
+        // old rating must not clobber a fresh star rating the user just set.
+        val state = SceneDetailState(scene())
+        val refresh = state.startRefresh()
+        state.applyRating(stars = 4)
+        assertFalse(state.applyRefresh(refresh, scene()))
+        assertEquals(80, state.scene.rating100)
+        assertEquals(4, state.scene.starCount)
+    }
+
+    @Test
+    fun `clearing the rating invalidates refreshes too`() {
+        val rated = scene().copy(rating100 = 100)
+        val state = SceneDetailState(rated)
+        val refresh = state.startRefresh()
+        state.applyRating(stars = 0)
+        assertFalse(state.applyRefresh(refresh, rated))
+        assertEquals(null, state.scene.rating100)
+        assertEquals(0, state.scene.starCount)
+    }
 }

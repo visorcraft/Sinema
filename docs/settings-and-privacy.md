@@ -125,6 +125,24 @@ Artwork behavior:
 
 Channel sync happens when the main screen loads and when playback state is saved.
 
+## Global search
+
+On Android TV devices, Settings shows a Global Search toggle (off by default).
+
+When enabled:
+
+- The Android TV system search dialog can query your Stash server for scenes and show them as results while you type.
+- Selecting a result opens that scene in Sinema (the PIN lock, if set, still applies first).
+- Searching "in Sinema" from the system dialog opens Sinema's own search with the query filled in.
+
+Privacy behavior:
+
+- Global search is strictly opt-in. Both search components ship disabled; the toggle enables or disables them together.
+- When disabled, the system search dialog cannot query Sinema at all — no requests are made and no titles leave the server.
+- While enabled, only the system search client can query Sinema. The suggestion provider requires Android's signature-level `GLOBAL_SEARCH` permission, so other installed apps are blocked from enumerating your library even when the feature is on.
+- While enabled, each keystroke in the system search dialog can trigger a query to your Stash server (title, filename, and metadata matching), like Sinema's in-app search.
+- Suggestions never embed credentials. Card artwork only renders when your Stash server allows unauthenticated media access; otherwise results appear without images.
+
 ## Updates
 
 Sinema checks GitHub releases once per app session from the main screen.

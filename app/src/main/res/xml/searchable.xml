@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Global (system) search integration. Effective only while the
+     GlobalSearchProvider + GlobalSearchActivity components are enabled
+     from Settings (both ship disabled; the feature is opt-in). -->
+<searchable xmlns:android="http://schemas.android.com/apk/res/android"
+    android:hint="@string/global_search_hint"
+    android:includeInGlobalSearch="true"
+    android:label="@string/global_search_label"
+    android:searchSettingsDescription="@string/global_search_settings_description"
+    android:searchSuggestAuthority="com.sinema.globalsearch"
+    android:searchSuggestIntentAction="android.intent.action.VIEW"
+    android:searchSuggestIntentData="com.sinema://app/scene"
+    android:searchSuggestSelection=" ?"
+    android:searchSuggestThreshold="2" />

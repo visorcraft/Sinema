@@ -55,14 +55,14 @@ The selected search sort and filters are saved and reused later. Filters also ap
 Favorites are backed by Stash ratings:
 
 - A scene is a favorite when its Stash `rating100` value is greater than zero.
-- Toggling favorite on a scene sets the rating to `100`.
-- Toggling favorite off clears the rating.
+- Rating a scene 1–5 stars sets `rating100` to stars × 20.
+- Clearing the rating clears the favorite.
 
 Ways to use favorites:
 
 - Open `Favorites` from the main screen to see favorite scenes.
-- Use the Favorite button on a scene detail screen.
-- Look for the heart overlay on scene and folder cards.
+- Rate from the star row on a scene detail screen, or press Menu during playback and choose `★ Rate scene`.
+- Look for the heart overlay on scene and folder cards, and the star count on scene cards.
 - Folders show a heart when they contain at least one favorited scene.
 
 Press Menu on the Favorites screen to sort or play all visible favorite scenes.
@@ -115,7 +115,7 @@ Entity grids show:
 
 Use Search to filter the current entity type by name. Sort offers scene count, Name A-Z, and Name Z-A. Sinema loads 100 entities at a time and appends more as you scroll near the end.
 
-Selecting an entity opens its scenes. Entity scene grids also load incrementally and provide Sort and Filter controls. Play All is available through the Menu key.
+Selecting an entity opens its scenes. The entity screen starts with a detail header — entity image, name, scene count, and for performers their tag chips (selecting a tag chip opens that tag's scenes). Entity scene grids load incrementally and provide Sort and Filter controls. Play All is available through the Menu key.
 
 Scene detail screens also show metadata chips:
 
@@ -141,7 +141,7 @@ Available actions:
 
 - Resume: appears only when Stash has a resume position greater than five seconds.
 - Play: starts from the beginning.
-- Favorite/Unfavorite: updates the Stash rating.
+- Rating: pick 1–5 stars, or Clear. Any rating above zero marks the scene as a favorite in Stash (`rating100` = stars × 20); Clear removes the rating and the favorite.
 - Mark Watched: clears resume time and increments the Stash play count.
 - Mark Unwatched: resets the Stash play count.
 - Browse Folder: opens the folder containing the scene.
@@ -173,6 +173,23 @@ Sort choices:
 Sort choices are saved per screen. Random uses a stable random seed for that screen instance so paging and reloads remain consistent within the current view.
 
 In folder views, sorting applies to scene queries. Folder and picture ordering stays folder-oriented.
+
+## Filtering
+
+Scene grids (search results, favorites, folder views, and entity scene views) provide a Filter button with the same Menu-key access as Sort. Filter choices:
+
+- Watched: All scenes, Watched, or Unwatched.
+- Favorites only.
+- Minimum rating: any, or ★ through ★★★★★.
+- Resolution: any, under 720p, 720p or better, 1080p or better, or 4K or better.
+- Markers: any, with, or without.
+- Captions: any, with, or without.
+
+Filters combine with each other and with the current sort, and are saved per screen. The Filter button label always shows the active filter summary.
+
+## Rating scenes
+
+Rate a scene 1–5 stars on its detail screen, or press Menu during playback and choose `★ Rate scene`. Stars map to Stash's `rating100` (stars × 20), so ratings are shared with other Stash clients. A scene with any rating counts as a favorite; clearing the rating clears the favorite. Scene cards show their star count next to the duration.
 
 ## Play All
 

@@ -1,6 +1,7 @@
 package com.sinema.ui
 
 import com.sinema.model.Scene
+import com.sinema.model.StarRating
 
 internal class SceneDetailState(initialScene: Scene) {
     var scene = initialScene
@@ -18,6 +19,13 @@ internal class SceneDetailState(initialScene: Scene) {
 
     fun applyWatchedToggle(wasWatched: Boolean) {
         scene = scene.copy(playCount = WatchedToggle.nextPlayCount(scene.playCount, wasWatched))
+        refreshGeneration++
+    }
+
+    /** Store a star rating (0 = unrated) so the next refresh doesn't clobber it. */
+    fun applyRating(stars: Int) {
+        val rating100 = StarRating.toRating100(stars)
+        scene = scene.copy(rating100 = rating100)
         refreshGeneration++
     }
 }

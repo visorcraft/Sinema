@@ -81,15 +81,87 @@
                         android:text="▶ Play"
                         android:textColor="@android:color/white"
                         android:textSize="14sp" />
+                </LinearLayout>
+
+                <!-- Star rating: 1-5 stars; any rating marks the scene as a favorite -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="12dp"
+                        android:text="Rating:"
+                        android:textColor="#AAAAAA"
+                        android:textSize="14sp" />
 
                     <Button
-                        android:id="@+id/btn_favorite"
+                        android:id="@+id/btn_star_1"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true"
+                        android:text="☆"
+                        android:textColor="@android:color/white"
+                        android:textSize="20sp" />
+
+                    <Button
+                        android:id="@+id/btn_star_2"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true"
+                        android:text="☆"
+                        android:textColor="@android:color/white"
+                        android:textSize="20sp" />
+
+                    <Button
+                        android:id="@+id/btn_star_3"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true"
+                        android:text="☆"
+                        android:textColor="@android:color/white"
+                        android:textSize="20sp" />
+
+                    <Button
+                        android:id="@+id/btn_star_4"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true"
+                        android:text="☆"
+                        android:textColor="@android:color/white"
+                        android:textSize="20sp" />
+
+                    <Button
+                        android:id="@+id/btn_star_5"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="@drawable/action_button_background"
+                        android:focusable="true"
+                        android:text="☆"
+                        android:textColor="@android:color/white"
+                        android:textSize="20sp" />
+
+                    <Button
+                        android:id="@+id/btn_rating_clear"
                         android:layout_width="wrap_content"
                         android:layout_height="48dp"
                         android:background="@drawable/action_button_background"
                         android:focusable="true"
-                        android:minWidth="140dp"
-                        android:text="🤍 Favorite"
+                        android:minWidth="120dp"
+                        android:text="Clear"
                         android:textColor="@android:color/white"
                         android:textSize="14sp" />
                 </LinearLayout>

@@ -8,6 +8,7 @@ import android.view.KeyEvent
 import android.view.TextureView
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
@@ -23,6 +24,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.PlaybackAspectRatio
 import com.sinema.model.CaptionRef
+import com.sinema.model.StarRating
 import com.sinema.util.PlaybackQueue
 import com.sinema.util.SceneIntents
 import com.sinema.util.TimeFormat
@@ -47,6 +49,8 @@ class PlaybackActivity : FragmentActivity() {
     private var markers: List<Pair<String, Double>> = emptyList()
     private var chaptersDialog: android.app.AlertDialog? = null
     private var aspectRatioDialog: android.app.AlertDialog? = null
+    private var playerMenuDialog: android.app.AlertDialog? = null
+    private var rateDialog: android.app.AlertDialog? = null
     private var aspectRatio = PlaybackAspectRatio.AUTO
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
@@ -101,6 +105,12 @@ class PlaybackActivity : FragmentActivity() {
         aspectRatioDialog = null
         chaptersDialog?.dismiss()
         chaptersDialog = null
+        playerMenuDialog?.dismiss()
+        playerMenuDialog = null
+        rateFetchJob?.cancel()
+        rateFetchJob = null
+        rateDialog?.dismiss()
+        rateDialog = null
     }
 
     override fun onStop() {
@@ -110,6 +120,12 @@ class PlaybackActivity : FragmentActivity() {
         aspectRatioDialog = null
         chaptersDialog?.dismiss()
         chaptersDialog = null
+        playerMenuDialog?.dismiss()
+        playerMenuDialog = null
+        rateFetchJob?.cancel()
+        rateFetchJob = null
+        rateDialog?.dismiss()
+        rateDialog = null
         releasePlayer()
         if (isFinishing) PlaybackQueue.clear()
     }
@@ -438,6 +454,84 @@ class PlaybackActivity : FragmentActivity() {
             .show()
     }
 
+    /** Player menu on the MENU key: chapters (when present), rating, aspect ratio. */
+    private fun showPlayerMenu() {
+        if (playerMenuDialog?.isShowing == true) return
+        val items = buildList {
+            if (markers.isNotEmpty()) add("Chapters")
+            add("★ Rate scene")
+            add("Aspect ratio")
+        }
+        playerMenuDialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Playback menu")
+            .setItems(items.toTypedArray()) { dialog, which ->
+                dialog.dismiss()
+                when (items[which]) {
+                    "Chapters" -> showChapters()
+                    "★ Rate scene" -> showRateDialog()
+                    "Aspect ratio" -> showAspectRatioDialog()
+                }
+            }
+            .setOnDismissListener {
+                if (playerMenuDialog === it) playerMenuDialog = null
+                playerView.requestFocus()
+            }
+            .show()
+    }
+
+    private var rateFetchJob: kotlinx.coroutines.Job? = null
+
+    private fun showRateDialog() {
+        val current = sceneId
+        if (current.isEmpty()) return
+        if (rateDialog?.isShowing == true || rateFetchJob?.isActive == true) return
+        rateFetchJob = lifecycleScope.launch {
+            var stars = 0
+            try {
+                stars = StarRating.fromRating100(SinemaApp.instance.api.getSceneRating(current))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("Sinema", "Could not fetch rating before rate dialog", e)
+            }
+            // The fetch can outlive onPause/onStop dismissal; never show a
+            // dialog on a stopped or finishing activity.
+            if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) ||
+                isFinishing || isDestroyed
+            ) return@launch
+            val options = (0..StarRating.MAX_STARS).map { count ->
+                if (count == 0) "No rating" else StarRating.glyphs(count)
+            }
+            rateDialog = android.app.AlertDialog.Builder(this@PlaybackActivity)
+                .setTitle("Rate scene")
+                .setSingleChoiceItems(options.toTypedArray(), stars) { dialog, which ->
+                    dialog.dismiss()
+                    val chosen = which
+                    lifecycleScope.launch {
+                        try {
+                            SinemaApp.instance.api.setSceneRating(current, StarRating.toRating100(chosen))
+                            Toast.makeText(
+                                this@PlaybackActivity,
+                                if (chosen > 0) "Rated ${StarRating.glyphs(chosen)}" else "Rating cleared",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            android.util.Log.e("Sinema", "Failed to set rating for $current", e)
+                            Toast.makeText(this@PlaybackActivity,
+                                "Failed to set rating: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .setOnDismissListener {
+                    if (rateDialog === it) rateDialog = null
+                    playerView.requestFocus()
+                }
+                .show()
+        }
+    }
+
     private fun seekToAdjacentMarker(forward: Boolean) {
         val exo = player ?: return
         val posSec = exo.currentPosition / 1000.0
@@ -456,7 +550,7 @@ class PlaybackActivity : FragmentActivity() {
                 playerSurfaceFocused = playerView.isFocused
             )
             when (event.keyCode) {
-                KeyEvent.KEYCODE_MENU -> { showChapters(); return true }
+                KeyEvent.KEYCODE_MENU -> { showPlayerMenu(); return true }
                 KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {

@@ -132,7 +132,20 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
-        setSearchQuery("", false)
+        // A fresh SearchSupportFragment auto-starts speech recognition ~300ms
+        // after the result provider registers (mStartRecognitionRunnable while
+        // mAutoStartRecognition is true), which would pop the mic permission
+        // dialog just for opening Search. Setting any query clears the flag
+        // and removes the pending callback. When launched from system search
+        // (GlobalSearchActivity) the forwarded query is submitted instead.
+        val prefill = if (savedInstanceState == null)
+            requireActivity().intent?.getStringExtra(GlobalSearchActivity.EXTRA_PREFILL_QUERY)
+        else null
+        if (!prefill.isNullOrBlank()) {
+            setSearchQuery(prefill, true)
+        } else {
+            setSearchQuery("", false)
+        }
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
                 is Scene -> startActivity(SceneIntents.detail(requireContext(), item))

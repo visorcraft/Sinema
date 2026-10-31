@@ -112,15 +112,18 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with scene counts and images.
 - **📁 Folder Browser** — Navigate your library by directory structure.
 - **🔍 Unified Search** — Find scenes, tags, performers, and studios together; voice search via the remote microphone where available.
-- **🎛️ Grid Controls** — D-pad-reachable sorting plus watched and favorite filters on scene grids.
+- **🎛️ Grid Controls** — D-pad-reachable sorting plus filters on scene grids: watched state, favorites, minimum rating, resolution, markers, and captions.
+- **⭐ Star Ratings** — Rate scenes 1–5 stars on the detail screen or from the player menu; any rating marks the scene as a favorite. Cards show their star count.
+- **👤 Entity Detail Headers** — Tags, performers, and studios open with a detail header: image, scene count, and — for performers — their tag chips.
 - **🎲 Surprise Me** — One press on the home screen jumps straight into a random scene.
 - **▶️ Resume Playback** — Pause anywhere, pick up where you left off (persisted to Stash). Scene cards show a thin progress bar for partially watched scenes.
 - **🎬 Scene Detail** — Friendly titles, synopsis, metadata chips, and collapsible technical details for filenames, paths, and file information.
 - **📝 Subtitles, Tracks & Aspect Ratio** — Select subtitles and audio tracks, adjust playback speed, and choose Auto, 16:9, 4:3, or 9:16 display ratios.
 - **📑 Scene Markers as Chapters** — Jump between markers via chapters dialog or media keys.
 - **▶️ Play All & Autoplay** — Queue all scenes in a folder or entity grid; auto-advances when one ends.
-- **❤️ Favorites** — One-tap favorite/unfavorite, synced with Stash ratings. Folders with favorited content show a heart overlay.
+- **❤️ Favorites** — One-tap favorite/unfavorite via star rating, synced with Stash ratings. Folders with favorited content show a heart overlay.
 - **📺 Android TV Channels** — Optional "Watch Next" (Continue Watching) and "Recently Added" rows on the launcher home screen (opt-in, privacy-first).
+- **🔎 Global Search** — Optional participation in the Android TV system search dialog (Settings toggle, off by default). Scene suggestions deep-link straight to scene details.
 - **🖥️ Multi-Server Profiles** — Switch between multiple Stash servers from Settings.
 - **🔒 PIN Lock** — Optional 4-digit PIN to keep things private. Log Out locks the app until PIN is re-entered.
 - **🎮 D-pad Native** — Built for TV remotes, no touchscreen needed.

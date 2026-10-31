@@ -46,6 +46,15 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("channels_enabled", false)
         set(value) = prefs.edit().putBoolean("channels_enabled", value).apply()
 
+    /**
+     * Opt-in participation in Android TV system search. The manifest ships
+     * the search components disabled; Settings flips them (and this flag)
+     * together. Default false — privacy-first.
+     */
+    var globalSearchEnabled: Boolean
+        get() = prefs.getBoolean("global_search_enabled", false)
+        set(value) = prefs.edit().putBoolean("global_search_enabled", value).apply()
+
     var loopEnabled: Boolean
         get() = prefs.getBoolean("loop_enabled", false)
         set(value) = prefs.edit().putBoolean("loop_enabled", value).apply()

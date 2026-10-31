@@ -13,6 +13,7 @@ import com.sinema.api.SinemaApi
 import com.sinema.model.EntityItem
 import com.sinema.model.FolderItem
 import com.sinema.model.Scene
+import com.sinema.model.StarRating
 import com.sinema.util.GlideAuth
 
 class CardPresenter(private val api: SinemaApi) : Presenter() {
@@ -33,7 +34,9 @@ class CardPresenter(private val api: SinemaApi) : Presenter() {
         when (item) {
             is Scene -> {
                 title.text = item.displayTitle
-                content.text = item.formatDuration()
+                content.text = if (item.starCount > 0)
+                    "${StarRating.glyphs(item.starCount)}  ${item.formatDuration()}"
+                else item.formatDuration()
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE
                 val percent = item.watchProgressPercent

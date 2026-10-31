@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.sinema.model.CaptionRef
+import com.sinema.model.EntityHeader
 import com.sinema.model.EntityItem
 import com.sinema.model.ImageItem
 import com.sinema.model.MarkerRef
@@ -81,6 +82,16 @@ class SinemaApi(
             maxRequestsPerHost = 12
         })
         .build()
+
+    /**
+     * Client for system-search suggestions. Runs on a binder thread inside
+     * GlobalSearchProvider where coroutine cancellation cannot interrupt a
+     * blocking execute(), so OkHttp's total callTimeout enforces the
+     * deadline instead (6s covers connect + read for a healthy server).
+     */
+    private val suggestionsClient: OkHttpClient by lazy {
+        client.newBuilder().callTimeout(6, TimeUnit.SECONDS).build()
+    }
     private val gson = Gson()
     private val gsonWithNulls = com.google.gson.GsonBuilder().serializeNulls().create()
 
@@ -363,6 +374,54 @@ class SinemaApi(
         searchTerm = searchTerm,
         filters = filters
     )
+
+    /**
+     * Best-effort scene search for system-search suggestions. Bounded by the
+     * 6s suggestionsClient callTimeout (binder-thread caller cannot rely on
+     * coroutine cancellation), no filters, no session re-login — a miss just
+     * means no suggestions.
+     */
+    suspend fun searchScenesForSuggestions(searchTerm: String, perPage: Int = 8): List<Scene> {
+        val query = """
+            query(${"$"}filter: FindFilterType) {
+                findScenes(filter: ${"$"}filter) {
+                    count
+                    scenes { $SCENE_FIELDS }
+                }
+            }
+        """.trimIndent()
+        return withContext(Dispatchers.IO) {
+            val body = gson.toJson(
+                mapOf(
+                    "query" to query,
+                    "variables" to mapOf(
+                        "filter" to mapOf(
+                            "page" to 1, "per_page" to perPage,
+                            "sort" to "path", "direction" to "ASC", "q" to searchTerm
+                        )
+                    )
+                )
+            )
+            val request = Request.Builder()
+                .url("$serverUrl/graphql")
+                .addHeader("Content-Type", "application/json")
+                .apply {
+                    if (authMode == "session" && sessionCookie.isNotBlank()) addHeader("Cookie", sessionCookie)
+                    else addHeader("ApiKey", apiKey)
+                }
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+            suggestionsClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext emptyList()
+                val parsed = runCatching {
+                    parseGraphqlResponse(response.code, response.body?.string() ?: "{}")
+                }.getOrNull() ?: return@withContext emptyList()
+                parsed.getAsJsonObject("data")?.getAsJsonObject("findScenes")
+                    ?.getAsJsonArray("scenes")?.map { parseScene(it.asJsonObject) }
+                    ?: emptyList()
+            }
+        }
+    }
 
     suspend fun setSceneRating(sceneId: String, rating: Int?): Boolean {
         val query = """
@@ -739,6 +798,42 @@ class SinemaApi(
         sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
         imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
         kind = kind
+    )
+
+    /**
+     * Fetches header info for one entity (detail header on the entity scenes
+     * screen). Performers include their tag list; tags and studios do not.
+     * @throws IOException on transport or GraphQL errors, like every method here.
+     */
+    suspend fun findEntityHeader(kind: EntityItem.Kind, entityId: String): EntityHeader? {
+        val queryName = when (kind) {
+            EntityItem.Kind.TAG -> "findTag"
+            EntityItem.Kind.PERFORMER -> "findPerformer"
+            EntityItem.Kind.STUDIO -> "findStudio"
+        }
+        val tagsField = if (kind == EntityItem.Kind.PERFORMER) " tags { id name }" else ""
+        val query = """
+            query(${"$"}id: ID!) {
+                $queryName(id: ${"$"}id) {
+                    id name scene_count image_path$tagsField
+                }
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("id" to entityId))
+        val obj = result.getAsJsonObject("data")
+            ?.get(queryName)?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?: return null
+        return parseEntityHeader(obj, kind)
+    }
+
+    @VisibleForTesting
+    internal fun parseEntityHeader(obj: JsonObject, kind: EntityItem.Kind): EntityHeader = EntityHeader(
+        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        kind = kind,
+        sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+        imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
+        tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList()
     )
 
     /**
