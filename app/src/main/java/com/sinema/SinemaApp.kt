@@ -11,7 +11,21 @@ class SinemaApp : Application() {
     lateinit var prefs: Prefs
     lateinit var api: SinemaApi
     var pinVerifiedThisSession = false
+    /** Decoy PIN unlocked the blank shell for this process. */
+    var decoySession = false
     var updateCheckedThisSession = false
+
+    /** Small ring buffer of recent user-facing errors for the server dashboard. */
+    private val recentErrorsBuffer = ArrayDeque<String>()
+    val recentErrors: List<String> get() = recentErrorsBuffer.toList()
+
+    fun noteError(message: String) {
+        synchronized(recentErrorsBuffer) {
+            if (recentErrorsBuffer.lastOrNull() == message) return
+            recentErrorsBuffer.addLast(message.take(200))
+            while (recentErrorsBuffer.size > 20) recentErrorsBuffer.removeFirst()
+        }
+    }
 
     // For work that must outlive an activity, e.g. saving playback state
     // while the playback activity is being destroyed.

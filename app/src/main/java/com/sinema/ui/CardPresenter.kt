@@ -149,7 +149,7 @@ class CardPresenter(
             is EntityItem -> {
                 title.text = item.name
                 content.text = "${item.sceneCount} " + if (item.sceneCount == 1) "scene" else "scenes"
-                heart?.visibility = View.GONE
+                heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = View.GONE
                 progress?.visibility = View.GONE
                 if (item.imagePath != null) {
@@ -366,6 +366,13 @@ class SettingsPresenter : Presenter() {
                 title.text = "🧹 Untagged Scenes"
                 content.text = "Curate the backlog"
                 image.setImageResource(android.R.drawable.ic_menu_edit)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Server" -> {
+                title.text = "🖥 Server"
+                content.text = "Version, jobs, recent errors"
+                image.setImageResource(android.R.drawable.ic_menu_info_details)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }

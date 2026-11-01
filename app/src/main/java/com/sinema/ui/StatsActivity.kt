@@ -24,6 +24,7 @@ import com.sinema.model.ScenePlayStats
 import com.sinema.model.StatsSummary
 import com.sinema.util.SceneIntents
 import com.sinema.util.TimeFormat
+import com.sinema.util.TasteInsights
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -126,6 +127,30 @@ class StatsFragment : RowsSupportFragment() {
         addEntityRow("Most watched performers$scope", ScenePlayStats.topPerformers(topScenes))
         addEntityRow("Most watched tags$scope", ScenePlayStats.topTags(topScenes))
         addEntityRow("Most watched studios$scope", ScenePlayStats.topStudios(topScenes))
+
+        // Taste trends: play-share inside the last 14 days vs everything
+        // before, from the same most-played snapshot (no extra queries).
+        val cutoff = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }.format(java.util.Date(System.currentTimeMillis() - 14L * 24 * 60 * 60 * 1000))
+        val recent = TasteInsights.recentScenes(topScenes, cutoff)
+        TasteInsights.summary(recent)?.let { text ->
+            val summaryAdapter = ArrayObjectAdapter(StatCardPresenter())
+            summaryAdapter.add(StatCard(text, "Your last two weeks"))
+            rows.add(ListRow(HeaderItem("Taste trends"), summaryAdapter))
+        }
+        TasteInsights.trends(topScenes, cutoff).takeIf { it.isNotEmpty() }?.let { trends ->
+            val trendAdapter = ArrayObjectAdapter(StatCardPresenter())
+            trends.forEach { trend ->
+                val arrow = when {
+                    trend.delta > 0 -> " ▲"
+                    trend.delta < 0 -> " ▼"
+                    else -> ""
+                }
+                trendAdapter.add(StatCard("${trend.scenes} scenes$arrow", trend.label))
+            }
+            rows.add(ListRow(HeaderItem("In your recent plays"), trendAdapter))
+        }
 
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {

@@ -47,6 +47,15 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open val sortScreenKey: String? = null
     /** Long-press "Assign tags" availability (Untagged triage grid). */
     protected open val canAssignTags: Boolean = false
+    /** Alpha jump: "Jump to letter" entry filters grids by path prefix. */
+    protected open val supportsAlphaJump: Boolean = false
+    protected var alphaPrefix: String? = null
+
+    /** Anchored regex for the active alpha filter, or null when off. */
+    protected fun alphaPathRegex(): String? =
+        alphaPrefix?.takeIf { it.isNotBlank() }?.let { prefix ->
+            if (prefix == "0-9") "^[0-9]" else "^$prefix"
+        }
     protected open val filterScreenKey: String? get() = sortScreenKey
     protected open val defaultSort: SortOption = SortOption.PATH_ASC
     /** Cards shown in this grid; grids of non-Scene items override this. */
@@ -121,7 +130,10 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 onPlayAll = { playAll() },
                 onShuffle = { playAll(shuffle = true) },
                 onMarkAllWatched = { markAllWatched() },
-                onRateAll = { showRateAllDialog() }
+                onRateAll = { showRateAllDialog() },
+                onJumpToLetter = if (supportsAlphaJump) {
+                    { showAlphaJumpDialog() }
+                } else null
             )
         } else {
             showSortDialog()
@@ -132,6 +144,67 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         val scenes = (0 until gridAdapter.size())
             .mapNotNull { gridAdapter.get(it) as? Scene }
         SceneIntents.playAll(requireContext(), scenes, shuffle = shuffle)
+    }
+
+    /** Long-press actions for an entity card: favorite toggle. */
+    private fun showEntityActions(entity: com.sinema.model.EntityItem) {
+        val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === entity } ?: return
+        val favoriteLabel = if (entity.isFavorite) "💔 Unfavorite" else "❤️ Favorite"
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle(entity.name)
+            .setItems(arrayOf(favoriteLabel)) { dialog, _ ->
+                dialog.dismiss()
+                toggleEntityFavorite(entity, index)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun toggleEntityFavorite(entity: com.sinema.model.EntityItem, index: Int) {
+        lifecycleScope.launch {
+            try {
+                val wasFavorite = entity.isFavorite
+                app.api.entitySetRating(entity.kind, entity.id, if (wasFavorite) null else 100)
+                val updated = entity.copy(rating100 = if (wasFavorite) null else 100)
+                if (index < gridAdapter.size() && gridAdapter.get(index) === entity) {
+                    gridAdapter.replace(index, updated)
+                }
+                if (isAdded) {
+                    Toast.makeText(
+                        requireContext(),
+                        if (wasFavorite) "Removed from favorites" else "Added to favorites",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Entity favorite toggle failed for ${entity.id}", e)
+                if (isAdded) {
+                    Toast.makeText(
+                        requireContext(),
+                        "Server does not support entity ratings: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    /** Alpha jump: filter the grid to scenes whose path starts with a letter. */
+    private fun showAlphaJumpDialog() {
+        val letters = listOf("All") + ('A'..'Z').map { it.toString() } + listOf("0-9")
+        val current = alphaPrefix?.takeIf { it.isNotBlank() } ?: "All"
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("Jump to letter")
+            .setSingleChoiceItems(letters.toTypedArray(), letters.indexOf(current)) { dialog, which ->
+                dialog.dismiss()
+                alphaPrefix = if (which == 0) null else letters[which]
+                updateTitle()
+                reload()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     /** Scenes currently visible in this grid (used by bulk actions). */
@@ -201,6 +274,10 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     /** Long-press actions for a focused scene card. */
     private fun showCardActions(item: Any) {
+        if (item is com.sinema.model.EntityItem) {
+            showEntityActions(item)
+            return
+        }
         val scene = item as? Scene ?: return
         val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === scene } ?: return
         val playLabel = if (scene.resumeTime > 0.0) "▶ Resume" else "▶ Play"
@@ -403,7 +480,10 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     }
 
     private fun updateTitle() {
-        title = if (sortScreenKey != null) "$gridTitle  •  ${sort.label}" else gridTitle
+        title = buildString {
+            append(if (sortScreenKey != null) "$gridTitle  •  ${sort.label}" else gridTitle)
+            alphaPrefix?.takeIf { it.isNotBlank() }?.let { append("  •  $it") }
+        }
     }
 
     protected open fun onItemClicked(item: Any) {

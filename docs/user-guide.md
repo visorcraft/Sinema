@@ -61,11 +61,17 @@ The `🌙 Tonight's Mix` card on the shortcut row builds a ~30-minute queue from
 
 ### Privacy
 
-`Settings` → `Privacy` exposes three privacy switches (Incognito also toggles from the playback menu):
+`Settings` → `Privacy` exposes (Incognito also toggles from the playback menu):
 
+- **PIN Lock** with **Auto-Lock** (never / 5 / 15 / 30 minutes idle) — Sinema re-asks for the PIN after the selected idle time.
+- **Decoy PIN** — entering it unlocks a blank "No content" shell instead of your library; Back from the shell backgrounds the app. Set a different PIN than your real one.
 - **Discreet Mode** — scene cards show a neutral label (for example `Scene 4271`), no overlays, and no artwork until the card is focused, and the home hero banner is hidden. A passing glance reveals nothing.
 - **Incognito (pause watch history)** — stops writing resume positions, play counts, and play durations to Stash and skips Watch Next syncing and search-history recording. Server data stays untouched from this device.
 - **Block Screenshots** — sets `FLAG_SECURE` on every screen, blocking screenshots and recents thumbnails.
+
+### Backup and restore
+
+`Settings` → `System` → `Export Settings Backup` writes a `sinema-backup.json` file with every setting and your server profiles. **The file contains credentials** — store it safely. `Import Settings Backup` restores it after confirmation; restart Sinema afterwards.
 
 ### Ambient gallery
 
@@ -74,6 +80,18 @@ Enable `Ambient Gallery` in `Settings` → `Home` and leave the home screen idle
 ### Untagged scenes
 
 `Library` → `🧹 Untagged Scenes` lists scenes with no tags and no performers — the curation backlog. Long-press a card and choose `🏷 Assign tags` to apply existing tags (multi-select); the scene leaves the grid once tagged. Requires a Stash version that supports null filters (≥ 0.26); older servers show an error.
+
+### Server dashboard
+
+`Library` → `🖥 Server` shows the Stash version, library totals, play totals, running Stash jobs (scan/generate/clean when your server exposes the job queue), and the most recent errors Sinema recorded.
+
+### Jumping big grids
+
+In View All grids, press Menu → `🔤 Jump to letter…` and pick a letter (or `0-9`) to filter the grid to scenes whose file path starts with it; `All` clears the filter. The letter shows next to the title and combines with sorting, filtering, and paging.
+
+### Favorite entities
+
+Long-press a performer, tag, or studio card in their browser grids to favorite or unfavorite it (heart overlay; same `rating100` rule as scenes). Requires a Stash whose entity updates accept ratings; older servers show an error.
 
 ## Search
 

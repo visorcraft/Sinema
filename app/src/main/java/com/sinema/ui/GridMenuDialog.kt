@@ -10,6 +10,7 @@ object GridMenuDialog {
     private const val SHUFFLE = "🔀 Shuffle Play"
     private const val MARK_ALL_WATCHED = "👁 Mark All Watched"
     private const val RATE_ALL = "★ Rate All…"
+    private const val JUMP_TO_LETTER = "🔤 Jump to letter…"
 
     fun show(
         context: Context,
@@ -19,7 +20,8 @@ object GridMenuDialog {
         onPlayAll: () -> Unit,
         onShuffle: () -> Unit = onPlayAll,
         onMarkAllWatched: (() -> Unit)? = null,
-        onRateAll: (() -> Unit)? = null
+        onRateAll: (() -> Unit)? = null,
+        onJumpToLetter: (() -> Unit)? = null
     ) {
         val items = buildList {
             add(SORT)
@@ -29,6 +31,7 @@ object GridMenuDialog {
             }
             onMarkAllWatched?.let { add(MARK_ALL_WATCHED) }
             onRateAll?.let { add(RATE_ALL) }
+            onJumpToLetter?.let { add(JUMP_TO_LETTER) }
         }
         AlertDialog.Builder(context)
             .setTitle("Menu")
@@ -40,6 +43,7 @@ object GridMenuDialog {
                     SHUFFLE -> onShuffle()
                     MARK_ALL_WATCHED -> onMarkAllWatched?.invoke()
                     RATE_ALL -> onRateAll?.invoke()
+                    JUMP_TO_LETTER -> onJumpToLetter?.invoke()
                 }
             }
             .show()

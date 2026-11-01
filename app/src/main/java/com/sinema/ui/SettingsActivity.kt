@@ -428,6 +428,14 @@ class SettingsFragment : Fragment() {
     private fun seekPresetLabel(): String =
         "Seek buttons: ${SeekPreset.fromName(app.prefs.playbackSeekPreset).label}"
 
+    private fun autoLockLabel(): String = when (app.prefs.autoLockMinutes) {
+        0 -> "Auto-Lock: never"
+        else -> "Auto-Lock: ${app.prefs.autoLockMinutes} min idle"
+    }
+
+    private fun decoyPinLabel(): String =
+        if (app.prefs.hasDecoyPinSet()) "Remove Decoy PIN" else "Set Decoy PIN"
+
     private fun showPrivacySettings() {
         showContent("Privacy", "These controls affect Sinema on this device unless stated otherwise.") { layout ->
             addLabel(layout, if (app.prefs.hasPinSet()) "PIN Lock: set" else "PIN Lock: not set")
@@ -438,6 +446,27 @@ class SettingsFragment : Fragment() {
                 pinActivityLauncher.launch(intent)
             }
             addDescription(layout, "A local four-digit lock for launching Sinema; it does not lock the Stash web interface.")
+
+            addButton(layout, autoLockLabel()) {
+                val next = when (app.prefs.autoLockMinutes) {
+                    0 -> 5; 5 -> 15; 15 -> 30; else -> 0
+                }
+                app.prefs.autoLockMinutes = next
+                (it as Button).text = autoLockLabel()
+            }
+            addDescription(layout, "Auto-Lock re-asks for the PIN after the selected idle time.")
+
+            addButton(layout, decoyPinLabel()) {
+                if (app.prefs.hasDecoyPinSet()) {
+                    app.prefs.removeDecoyPin()
+                    (it as Button).text = decoyPinLabel()
+                } else {
+                    startActivity(
+                        Intent(requireContext(), PinActivity::class.java).putExtra("decoy_setup", true)
+                    )
+                }
+            }
+            addDescription(layout, "Entering the Decoy PIN unlocks a blank shell instead of your library.")
 
             addToggle(
                 layout,
@@ -522,6 +551,61 @@ class SettingsFragment : Fragment() {
                 }
             )
             firstButton ?: globalSearchButton
+
+            addButton(layout, "Export Settings Backup") {
+                backupExportLauncher.launch("sinema-backup.json")
+            }.also { firstButton = firstButton ?: it }
+            addDescription(layout, "Writes a JSON file with all settings and server profiles — it contains credentials, store it safely.")
+
+            addButton(layout, "Import Settings Backup") {
+                android.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Import backup?")
+                    .setMessage("This overwrites all current settings and server profiles on this device.")
+                    .setPositiveButton("Import") { _, _ ->
+                        backupImportLauncher.launch(
+                            arrayOf("application/json")
+                        )
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            addDescription(layout, "Restores settings from a sinema-backup.json file. Restart Sinema afterwards.")
+            firstButton
+        }
+    }
+
+    private val backupExportLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        try {
+            requireContext().contentResolver.openOutputStream(uri)?.use { out ->
+                out.write(app.prefs.exportSnapshot().toByteArray())
+            }
+            Toast.makeText(requireContext(), "Backup exported", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            android.util.Log.e("Sinema", "Backup export failed", e)
+            Toast.makeText(requireContext(), "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private val backupImportLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        try {
+            val json = requireContext().contentResolver.openInputStream(uri)?.use { input ->
+                input.readBytes().toString(Charsets.UTF_8)
+            } ?: throw java.io.IOException("Could not read file")
+            val written = app.prefs.importSnapshot(json)
+            app.refreshApi()
+            Toast.makeText(
+                requireContext(),
+                "Imported $written entries — restart Sinema to apply fully", Toast.LENGTH_LONG
+            ).show()
+        } catch (e: Exception) {
+            android.util.Log.e("Sinema", "Backup import failed", e)
+            Toast.makeText(requireContext(), "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

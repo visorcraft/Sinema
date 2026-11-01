@@ -32,8 +32,12 @@ data class EntityItem(
     val name: String,
     val sceneCount: Int,
     val imagePath: String?,   // absolute URL from Stash, needs auth headers
-    val kind: Kind
+    val kind: Kind,
+    // Favorite = rating100 > 0, same rule as scenes. Null when the server
+    // does not expose entity ratings (older Stash).
+    val rating100: Int? = null
 ) {
+    val isFavorite: Boolean get() = (rating100 ?: 0) > 0
     enum class Kind(val label: String) { TAG("Tags"), PERFORMER("Performers"), STUDIO("Studios") }
 }
 

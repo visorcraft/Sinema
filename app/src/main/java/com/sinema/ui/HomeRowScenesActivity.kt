@@ -50,30 +50,34 @@ class HomeRowScenesFragment : SceneGridFragment() {
     override val paged = true
     override val sortScreenKey get() = "home_row_${row.name}"
     override val defaultSort get() = row.defaultSort
+    override val supportsAlphaJump get() = row != HomeContentRow.UNWATCHED_PERFORMERS
 
     override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
 
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> {
         val sortField = sort.apiSort(randomSeed)
         val direction = sort.direction
+        val prefix = alphaPathRegex()
         val result = when (row) {
             HomeContentRow.CONTINUE_PLAYING -> app.api.findContinuePlayingPaged(
-                page, perPage, sortField, direction, sceneFilter
+                page, perPage, sortField, direction, sceneFilter, prefix
             )
             HomeContentRow.RECENTLY_PLAYED -> app.api.findRecentlyPlayedPaged(
-                page, perPage, sortField, direction, sceneFilter
+                page, perPage, sortField, direction, sceneFilter, prefix
             )
             HomeContentRow.RECENTLY_ADDED -> app.api.findRecentScenesPaged(
-                page, perPage, sortField, direction, sceneFilter
+                page, perPage, sortField, direction, sceneFilter, prefix
             )
             HomeContentRow.FAVORITES -> app.api.findFavoriteScenesPaged(
-                page, perPage, sortField, direction, unwatchedOnly = false, filters = sceneFilter
+                page, perPage, sortField, direction, unwatchedOnly = false, filters = sceneFilter,
+                pathPrefixRegex = prefix
             )
             HomeContentRow.UNWATCHED_FAVORITES -> app.api.findFavoriteScenesPaged(
-                page, perPage, sortField, direction, unwatchedOnly = true, filters = sceneFilter
+                page, perPage, sortField, direction, unwatchedOnly = true, filters = sceneFilter,
+                pathPrefixRegex = prefix
             )
             HomeContentRow.RECENTLY_RELEASED -> app.api.findRecentlyReleasedPaged(
-                page, perPage, sortField, direction, sceneFilter
+                page, perPage, sortField, direction, sceneFilter, prefix
             )
             HomeContentRow.SAVED_FILTER -> throw IllegalArgumentException("Saved filters use SavedFilterScenesActivity")
             HomeContentRow.GROUPS -> throw IllegalArgumentException("Groups use GroupGridActivity")

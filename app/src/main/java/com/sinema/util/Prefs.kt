@@ -264,7 +264,37 @@ class Prefs(context: Context) {
 
     fun removePin() {
         prefs.edit().remove("pin_hash").remove("pin_salt").apply()
+        removeDecoyPin()
     }
+
+    // Decoy PIN: entering it unlocks a blank shell instead of the library.
+    fun hasDecoyPinSet(): Boolean = prefs.getString("decoy_pin_hash", null) != null
+
+    fun setDecoyPinHash(pin: String) {
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val saltHex = salt.joinToString("") { "%02x".format(it) }
+        val hash = hashPin(pin, salt)
+        prefs.edit()
+            .putString("decoy_pin_salt", saltHex)
+            .putString("decoy_pin_hash", hash)
+            .apply()
+    }
+
+    fun verifyDecoyPin(pin: String): Boolean {
+        val storedHash = prefs.getString("decoy_pin_hash", null) ?: return false
+        val saltHex = prefs.getString("decoy_pin_salt", null) ?: return false
+        val salt = saltHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        return storedHash == hashPin(pin, salt)
+    }
+
+    fun removeDecoyPin() {
+        prefs.edit().remove("decoy_pin_hash").remove("decoy_pin_salt").apply()
+    }
+
+    /** Auto-lock: re-ask for the PIN after this many idle minutes (0 = never). */
+    var autoLockMinutes: Int
+        get() = prefs.getInt("auto_lock_minutes", 0)
+        set(value) = prefs.edit().putInt("auto_lock_minutes", value).apply()
 
     private fun hashPin(pin: String, salt: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -320,5 +350,84 @@ class Prefs(context: Context) {
         } else {
             prefs.edit().putString(key, value).apply()
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Backup / restore. The snapshot carries regular prefs (settings,
+    // layout, filters, PIN hashes) plus the secure server profiles, so the
+    // JSON *contains credentials* — Settings warns before export.
+    // ------------------------------------------------------------------
+
+    fun exportSnapshot(): String {
+        val secureEntries = mutableMapOf<String, String>()
+        securePrefs?.all?.forEach { (key, value) ->
+            if (value is String) secureEntries[key] = value
+        }
+        val payload = mapOf(
+            "format" to "sinema-backup",
+            "version" to 1,
+            "prefs" to prefs.all,
+            "secure" to secureEntries
+        )
+        return com.google.gson.Gson().toJson(payload)
+    }
+
+    /** Applies a snapshot produced by [exportSnapshot]. Returns entries written. */
+    fun importSnapshot(json: String): Int {
+        val root = com.google.gson.JsonParser.parseString(json).asJsonObject
+        require(root.get("format")?.asString == "sinema-backup") { "Not a Sinema backup file" }
+        // Replace, not merge: the confirmation promises an overwrite, so keys
+        // absent from the snapshot (stale settings, deleted profiles) go away.
+        val editor = prefs.edit()
+        prefs.all.keys.forEach { editor.remove(it) }
+        var written = 0
+        root.getAsJsonObject("prefs")?.entrySet()?.forEach { (key, value) ->
+            when {
+                value.isJsonNull -> editor.remove(key)
+                value.isJsonPrimitive -> {
+                    val p = value.asJsonPrimitive
+                    when {
+                        p.isBoolean -> editor.putBoolean(key, p.asBoolean)
+                        p.isNumber -> when (BackupTypes.numberKind(key, p.asString)) {
+                            BackupTypes.Kind.FLOAT -> editor.putFloat(key, p.asFloat)
+                            BackupTypes.Kind.LONG -> editor.putLong(key, p.asLong)
+                            BackupTypes.Kind.INT -> editor.putInt(key, p.asInt)
+                        }
+                        else -> editor.putString(key, p.asString)
+                    }
+                    written++
+                }
+                value.isJsonArray -> {
+                    val set = value.asJsonArray.mapNotNull { el -> el.asJsonPrimitive?.asString }.toSet()
+                    editor.putStringSet(key, set)
+                    written++
+                }
+                else -> Unit
+            }
+        }
+        editor.apply()
+        val secure = securePrefs
+        if (secure != null) {
+            val secureEditor = secure.edit()
+            secure.all.keys.forEach { secureEditor.remove(it) }
+            root.getAsJsonObject("secure")?.entrySet()?.forEach { (key, value) ->
+                if (value.isJsonPrimitive && value.asJsonPrimitive.isString) {
+                    secureEditor.putString(key, value.asString)
+                    written++
+                }
+            }
+            secureEditor.apply()
+        } else {
+            // No encrypted store: putSecureString falls back to the regular
+            // prefs (already replaced above), so restores keep credentials
+            // working on devices without EncryptedSharedPreferences.
+            root.getAsJsonObject("secure")?.entrySet()?.forEach { (key, value) ->
+                if (value.isJsonPrimitive && value.asJsonPrimitive.isString) {
+                    putSecureString(key, value.asString)
+                    written++
+                }
+            }
+        }
+        return written
     }
 }

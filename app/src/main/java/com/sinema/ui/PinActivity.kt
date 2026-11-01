@@ -35,6 +35,7 @@ class PinActivity : FragmentActivity() {
 
         mode = when {
             intent.getBooleanExtra("setup_mode", false) -> Mode.SETUP
+            intent.getBooleanExtra("decoy_setup", false) -> Mode.SETUP
             !app.prefs.hasPinSet() -> Mode.SETUP
             else -> Mode.VERIFY
         }
@@ -140,11 +141,23 @@ class PinActivity : FragmentActivity() {
             Mode.VERIFY -> {
                 if (app.prefs.verifyPin(currentPin)) {
                     app.pinVerifiedThisSession = true
+                    // The real PIN always ends any decoy session.
+                    app.decoySession = false
                     val resultIntent = Intent()
                     if (intent.getBooleanExtra("verify_for_removal", false)) {
                         resultIntent.putExtra("verify_for_removal", true)
                     }
                     setResult(Activity.RESULT_OK, resultIntent)
+                    finish()
+                } else if (app.prefs.hasDecoyPinSet() && app.prefs.verifyDecoyPin(currentPin)) {
+                    // Decoy unlock: NOT a real verification — deep links, global
+                    // search, and auto-lock keep treating the app as locked.
+                    // The decoy shell takes over instead of the library.
+                    app.pinVerifiedThisSession = false
+                    app.decoySession = true
+                    setResult(Activity.RESULT_CANCELED)
+                    startActivity(Intent(this, DecoyActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK))
                     finish()
                 } else {
                     showError("Incorrect PIN")
@@ -162,7 +175,11 @@ class PinActivity : FragmentActivity() {
             }
             Mode.CONFIRM -> {
                 if (setupPin == currentPin) {
-                    app.prefs.setPinHash(currentPin)
+                    if (intent.getBooleanExtra("decoy_setup", false)) {
+                        app.prefs.setDecoyPinHash(currentPin)
+                    } else {
+                        app.prefs.setPinHash(currentPin)
+                    }
                     setResult(Activity.RESULT_OK)
                     finish()
                 } else {

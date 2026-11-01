@@ -35,6 +35,11 @@ class MainActivity : FragmentActivity() {
     private val ambientCheck = object : Runnable {
         override fun run() {
             val idle = android.os.SystemClock.elapsedRealtime() - lastInteractionMs
+            // Auto-lock: re-ask for the PIN after the configured idle time.
+            // No window-focus gate — an expired lock must fire even under an
+            // open dialog, and time spent in other activities counts as idle
+            // because lastInteractionMs only tracks home interactions.
+            maybeAutoLock(idle)
             if (app.prefs.ambientGallery &&
                 !app.prefs.discreetMode &&
                 lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) &&
@@ -85,9 +90,18 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Returning from any activity (ambient included) buys a fresh idle
-        // window for the ambient watcher.
+        // A successful PIN return must not immediately re-lock off the stale
+        // pre-PIN idle timestamp — only other activities count as idle time.
+        val returningFromPinSuccess = waitingForPin && app.pinVerifiedThisSession
+        if (!returningFromPinSuccess) {
+            maybeAutoLock(android.os.SystemClock.elapsedRealtime() - lastInteractionMs)
+        }
         lastInteractionMs = android.os.SystemClock.elapsedRealtime()
+        // A decoy session must never fall through to the real library.
+        if (app.decoySession && !isFinishing) {
+            startActivity(Intent(this, DecoyActivity::class.java))
+            return
+        }
         if (waitingForPin && app.pinVerifiedThisSession) {
             waitingForPin = false
             supportFragmentManager.beginTransaction()
@@ -108,6 +122,16 @@ class MainActivity : FragmentActivity() {
         lastInteractionMs = android.os.SystemClock.elapsedRealtime()
         ambientHandler.removeCallbacks(ambientCheck)
         ambientHandler.postDelayed(ambientCheck, AMBIENT_CHECK_MS)
+    }
+
+    private fun maybeAutoLock(idleMs: Long) {
+        val lockMs = app.prefs.autoLockMinutes * 60_000L
+        if (!app.prefs.hasPinSet() || !app.pinVerifiedThisSession || app.decoySession) return
+        if (lockMs <= 0 || idleMs < lockMs) return
+        app.pinVerifiedThisSession = false
+        waitingForPin = true
+        startActivity(Intent(this, PinActivity::class.java))
+        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
     }
 
     companion object {
@@ -614,6 +638,7 @@ class MainFragment : RowsSupportFragment() {
                 fun noteError(label: String, e: Exception) {
                     if (e is CancellationException) throw e
                     Log.e("Sinema", "loadContent $label failed", e)
+                    app.noteError("$label: ${e.message ?: "unknown"}")
                     if (firstError == null) firstError = e
                 }
 

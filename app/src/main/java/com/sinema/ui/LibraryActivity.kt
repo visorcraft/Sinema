@@ -36,6 +36,7 @@ class LibraryFragment : VerticalGridSupportFragment() {
         val items = ArrayObjectAdapter(SettingsPresenter())
         shortcuts.forEach(items::add)
         items.add("Untagged Scenes")
+        items.add("Server")
         adapter = items
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
@@ -48,6 +49,7 @@ class LibraryFragment : VerticalGridSupportFragment() {
                 "Markers" -> startActivity(Intent(requireContext(), MarkerBrowserActivity::class.java))
                 "Stats" -> startActivity(Intent(requireContext(), StatsActivity::class.java))
                 "Untagged Scenes" -> startActivity(Intent(requireContext(), UntaggedScenesActivity::class.java))
+                "Server" -> startActivity(Intent(requireContext(), ServerDashboardActivity::class.java))
                 "Saved Filters" -> startActivity(Intent(requireContext(), SavedFiltersActivity::class.java))
             }
         }

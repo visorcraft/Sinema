@@ -77,6 +77,14 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".ui.ServerDashboardActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.DecoyActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ui.AmbientActivity"
             android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />

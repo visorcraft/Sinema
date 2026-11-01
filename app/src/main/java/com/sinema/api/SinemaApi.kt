@@ -197,7 +197,9 @@ class SinemaApi(
         searchTerm: String? = null,
         sceneFilter: Map<String, Any?>? = null,
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
-        fields: String = SCENE_FIELDS
+        fields: String = SCENE_FIELDS,
+        // Alpha jump: anchored path-prefix regex ("^B"); callers pass [A-Z0-9] only.
+        pathPrefixRegex: String? = null
     ): Pair<Int, List<Scene>> {
         val query = """
             query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
@@ -211,8 +213,14 @@ class SinemaApi(
             "page" to page, "per_page" to perPage, "sort" to sort, "direction" to direction
         )
         if (searchTerm != null) filter["q"] = searchTerm
-        val combinedSceneFilter = combineSceneFilters(sceneFilter.orEmpty(), filters.toStashFilter())
-            .takeIf { it.isNotEmpty() }
+        var combinedSceneFilter = combineSceneFilters(sceneFilter.orEmpty(), filters.toStashFilter())
+        pathPrefixRegex?.takeIf { it.isNotBlank() }?.let {
+            combinedSceneFilter = combineSceneFilters(
+                combinedSceneFilter,
+                mapOf("path" to mapOf("value" to it, "modifier" to "MATCHES_REGEX"))
+            )
+        }
+        combinedSceneFilter.takeIf { it.isNotEmpty() }
         val result = graphql(query, mapOf("filter" to filter, "scene_filter" to combinedSceneFilter))
         val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes")
             ?: return Pair(0, emptyList())
@@ -528,7 +536,8 @@ class SinemaApi(
         sort: String,
         direction: String,
         unwatchedOnly: Boolean = false,
-        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
+        pathPrefixRegex: String? = null
     ): Pair<Int, List<Scene>> = findScenesInternal(
         page = page,
         perPage = perPage,
@@ -538,7 +547,8 @@ class SinemaApi(
             put("rating100", mapOf("value" to 1, "modifier" to "GREATER_THAN"))
             if (unwatchedOnly) put("play_count", mapOf("value" to 0, "modifier" to "EQUALS"))
         },
-        filters = filters
+        filters = filters,
+        pathPrefixRegex = pathPrefixRegex
     )
 
     suspend fun findRecentScenesPaged(
@@ -546,13 +556,15 @@ class SinemaApi(
         perPage: Int,
         sort: String = "created_at",
         direction: String = "DESC",
-        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
+        pathPrefixRegex: String? = null
     ): Pair<Int, List<Scene>> = findScenesInternal(
         page = page,
         perPage = perPage,
         sort = sort,
         direction = direction,
-        filters = filters
+        filters = filters,
+        pathPrefixRegex = pathPrefixRegex
     )
 
     suspend fun findRecentlyReleasedPaged(
@@ -560,8 +572,10 @@ class SinemaApi(
         perPage: Int,
         sort: String = "date",
         direction: String = "DESC",
-        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
-    ): Pair<Int, List<Scene>> = findRecentScenesPaged(page, perPage, sort, direction, filters)
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
+        pathPrefixRegex: String? = null
+    ): Pair<Int, List<Scene>> =
+        findRecentScenesPaged(page, perPage, sort, direction, filters, pathPrefixRegex)
 
     /**
      * One random scene from the whole library, for the "Surprise Me" card.
@@ -696,8 +710,7 @@ class SinemaApi(
     }
 
     /** Increment the Stash O counter for a scene (playback menu / detail). */
-    suspend fun sceneIncrementO(sceneId: String) {
-        val query = """
+    suspend fun sceneIncrementO(sceneId: String) {        val query = """
             mutation(${"$"}id: ID!) {
                 sceneIncrementO(id: ${"$"}id)
             }
@@ -783,14 +796,16 @@ class SinemaApi(
         perPage: Int,
         sort: String = "last_played_at",
         direction: String = "DESC",
-        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
+        pathPrefixRegex: String? = null
     ): Pair<Int, List<Scene>> = findScenesInternal(
         page = page,
         perPage = perPage,
         sort = sort,
         direction = direction,
         sceneFilter = mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
-        filters = filters
+        filters = filters,
+        pathPrefixRegex = pathPrefixRegex
     )
 
     suspend fun findRecentlyPlayedPaged(
@@ -798,7 +813,8 @@ class SinemaApi(
         perPage: Int,
         sort: String = "last_played_at",
         direction: String = "DESC",
-        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
+        pathPrefixRegex: String? = null
     ): Pair<Int, List<Scene>> {
         val result = findScenesInternal(
             // Stash's per_page = 0 means "LIMIT 0" (count only), and paging a
@@ -810,7 +826,8 @@ class SinemaApi(
             direction = direction,
             sceneFilter = RECENTLY_PLAYED_SCENE_FILTER,
             filters = filters,
-            fields = SCENE_FIELDS + " last_played_at"
+            fields = SCENE_FIELDS + " last_played_at",
+            pathPrefixRegex = pathPrefixRegex
         )
         if (sort != "last_played_at") return result
         // Stash orders null timestamps unpredictably, so recency paging must
@@ -950,17 +967,37 @@ class SinemaApi(
         searchTerm: String? = null,
         sort: String = "scenes_count",
         direction: String = "DESC"
+    ): Pair<Int, List<EntityItem>> = try {
+        findEntitiesInternal(kind, page, perPage, searchTerm, sort, direction, includeRatings = true)
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        // Older Stash schemas reject entity rating fields entirely; retry
+        // without them so browsing keeps working (favorites stay null).
+        // A genuinely failing server just fails again on the retry.
+        findEntitiesInternal(kind, page, perPage, searchTerm, sort, direction, includeRatings = false)
+    }
+
+    private suspend fun findEntitiesInternal(
+        kind: EntityItem.Kind,
+        page: Int,
+        perPage: Int,
+        searchTerm: String?,
+        sort: String,
+        direction: String,
+        includeRatings: Boolean
     ): Pair<Int, List<EntityItem>> {
         val (queryName, listKey) = when (kind) {
             EntityItem.Kind.TAG -> "findTags" to "tags"
             EntityItem.Kind.PERFORMER -> "findPerformers" to "performers"
             EntityItem.Kind.STUDIO -> "findStudios" to "studios"
         }
+        val ratingField = if (includeRatings) " rating100" else ""
         val query = """
             query(${"$"}filter: FindFilterType) {
                 $queryName(filter: ${"$"}filter) {
                     count
-                    $listKey { id name scene_count image_path }
+                    $listKey { id name scene_count image_path$ratingField }
                 }
             }
         """.trimIndent()
@@ -987,8 +1024,33 @@ class SinemaApi(
         name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
         sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
         imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
-        kind = kind
+        kind = kind,
+        rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt
     )
+
+    /**
+     * Set or clear an entity's rating (favorite = rating > 0). Requires a
+     * Stash whose entity update inputs accept rating100; older servers get
+     * the error surfaced by the caller.
+     */
+    suspend fun entitySetRating(kind: EntityItem.Kind, entityId: String, rating100: Int?) {
+        val mutation = when (kind) {
+            EntityItem.Kind.TAG -> "tagUpdate"
+            EntityItem.Kind.PERFORMER -> "performerUpdate"
+            EntityItem.Kind.STUDIO -> "studioUpdate"
+        }
+        val inputType = when (kind) {
+            EntityItem.Kind.TAG -> "TagUpdateInput!"
+            EntityItem.Kind.PERFORMER -> "PerformerUpdateInput!"
+            EntityItem.Kind.STUDIO -> "StudioUpdateInput!"
+        }
+        val query = """
+            mutation(${"$"}input: $inputType) {
+                $mutation(input: ${"$"}input) { id }
+            }
+        """.trimIndent()
+        graphql(query, mapOf("input" to mapOf("id" to entityId, "rating100" to rating100)), serializeNulls = true)
+    }
 
     /**
      * Fetches header info for one entity (detail header on the entity scenes
@@ -1428,8 +1490,41 @@ class SinemaApi(
             sort = "play_count",
             direction = "DESC",
             sceneFilter = mapOf("play_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
-            fields = SCENE_FIELDS_FULL
+            // last_played_at powers the taste-trends window on the stats screen.
+            fields = SCENE_FIELDS_FULL + " last_played_at"
         ).second
+
+    /** Stash server version string ("unknown" when the query fails). */
+    suspend fun getServerVersion(): String {
+        val query = """query { version { version } }"""
+        return try {
+            graphql(query).getAsJsonObject("data")?.getAsJsonObject("version")
+                ?.get("version")?.takeIf { !it.isJsonNull }?.asString ?: "unknown"
+        } catch (_: Exception) {
+            "unknown"
+        }
+    }
+
+    /**
+     * Running Stash job descriptions (scan/generate/clean…). Job-queue
+     * introspection needs newer servers; callers show a placeholder when
+     * unsupported. Returns null on any failure.
+     */
+    suspend fun getJobQueue(): List<String>? {
+        val query = """query { jobQueue { id status description } }"""
+        return try {
+            val arr = graphql(query).getAsJsonObject("data")?.get("jobQueue")
+                ?.takeIf { !it.isJsonNull }?.asJsonArray ?: return emptyList()
+            arr.mapNotNull { el ->
+                val obj = el.asJsonObject
+                val status = obj.get("status")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                val description = obj.get("description")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                if (description.isBlank()) null else "$status — $description"
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     @VisibleForTesting
     internal fun parseSavedSceneFilter(obj: JsonObject): SavedSceneFilter {
