@@ -198,56 +198,40 @@ class PlaybackActivity : FragmentActivity() {
         super.onPause()
         savePlayback()
         hideSeekPreview()
-        aspectRatioDialog?.dismiss()
+        dismissPlaybackDialogs()
+    }
+
+
+    /** Shared teardown for onPause/onStop: identical dialog/job cleanup. */
+    private fun dismissPlaybackDialogs() {
+        listOf(
+            aspectRatioDialog, chaptersDialog, playerMenuDialog, rateDialog,
+            streamQualityDialog, upNextDialog, playbackErrorDialog
+        ).forEach { dialog ->
+            dialog?.dismiss()
+        }
         aspectRatioDialog = null
-        chaptersDialog?.dismiss()
         chaptersDialog = null
-        playerMenuDialog?.dismiss()
         playerMenuDialog = null
+        rateDialog = null
+        streamQualityDialog = null
+        upNextDialog = null
+        playbackErrorDialog = null
         rateFetchJob?.cancel()
         rateFetchJob = null
-        rateDialog?.dismiss()
-        rateDialog = null
-        streamQualityDialog?.dismiss()
-        streamQualityDialog = null
         resumePromptDialog?.let { dialog ->
             suppressingPromptDismiss = true
             dialog.dismiss()
             suppressingPromptDismiss = false
         }
         resumePromptDialog = null
-        upNextDialog?.dismiss()
-        upNextDialog = null
-        playbackErrorDialog?.dismiss()
-        playbackErrorDialog = null
     }
 
     override fun onStop() {
         handler.removeCallbacks(hideRunnable)
         handler.removeCallbacks(progressRunnable)
         super.onStop()
-        aspectRatioDialog?.dismiss()
-        aspectRatioDialog = null
-        chaptersDialog?.dismiss()
-        chaptersDialog = null
-        playerMenuDialog?.dismiss()
-        playerMenuDialog = null
-        rateFetchJob?.cancel()
-        rateFetchJob = null
-        rateDialog?.dismiss()
-        rateDialog = null
-        streamQualityDialog?.dismiss()
-        streamQualityDialog = null
-        resumePromptDialog?.let { dialog ->
-            suppressingPromptDismiss = true
-            dialog.dismiss()
-            suppressingPromptDismiss = false
-        }
-        resumePromptDialog = null
-        upNextDialog?.dismiss()
-        upNextDialog = null
-        playbackErrorDialog?.dismiss()
-        playbackErrorDialog = null
+        dismissPlaybackDialogs()
         // Keep the in-session position so a restart resumes where the user
         // left off instead of the intent's original resume point. Always
         // update — leaving a stale value would jump backwards after seeks to

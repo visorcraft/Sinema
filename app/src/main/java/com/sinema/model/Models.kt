@@ -39,6 +39,15 @@ data class EntityItem(
 ) {
     val isFavorite: Boolean get() = (rating100 ?: 0) > 0
     enum class Kind(val label: String) { TAG("Tags"), PERFORMER("Performers"), STUDIO("Studios") }
+
+    companion object {
+        /** Intent-extra parsing shared by the entity grid/scenes activities. */
+        fun parseOrTag(raw: String?): Kind = try {
+            raw?.let { Kind.valueOf(it) } ?: Kind.TAG
+        } catch (_: IllegalArgumentException) {
+            Kind.TAG
+        }
+    }
 }
 
 /**

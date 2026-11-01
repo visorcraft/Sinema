@@ -32,7 +32,7 @@ class EntityGridActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)
         if (savedInstanceState == null) {
-            val kind = parseKind(intent.getStringExtra("kind"))
+            val kind = EntityItem.parseOrTag(intent.getStringExtra("kind"))
             val fragment = EntityGridFragment.create(kind)
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_frame, fragment)
@@ -47,12 +47,6 @@ class EntityGridActivity : FragmentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
         if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 
-    private fun parseKind(raw: String?): EntityItem.Kind =
-        try {
-            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
-        } catch (_: IllegalArgumentException) {
-            EntityItem.Kind.TAG
-        }
 }
 
 class EntityGridFragment : SceneGridFragment() {
@@ -62,7 +56,7 @@ class EntityGridFragment : SceneGridFragment() {
         }
     }
 
-    private val kind get() = parseKind(requireArguments().getString("kind"))
+    private val kind get() = EntityItem.parseOrTag(requireArguments().getString("kind"))
     private var entitySort = EntitySortOption.COUNT_DESC
     private var searchQuery = ""
 
@@ -136,10 +130,4 @@ class EntityGridFragment : SceneGridFragment() {
         if (item is EntityItem) startActivity(EntityScenesActivity.intent(requireContext(), item))
     }
 
-    private fun parseKind(raw: String?): EntityItem.Kind =
-        try {
-            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
-        } catch (_: IllegalArgumentException) {
-            EntityItem.Kind.TAG
-        }
 }

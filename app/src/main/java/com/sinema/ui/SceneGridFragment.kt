@@ -161,25 +161,9 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     }
 
     private fun toggleEntityFavorite(entity: com.sinema.model.EntityItem, index: Int) {
-        lifecycleScope.launch {
-            try {
-                val wasFavorite = entity.isFavorite
-                app.api.entitySetRating(entity.kind, entity.id, if (wasFavorite) null else 100)
-                val updated = entity.copy(rating100 = if (wasFavorite) null else 100)
-                if (index < gridAdapter.size() && gridAdapter.get(index) === entity) {
-                    gridAdapter.replace(index, updated)
-                }
-                if (isAdded) {
-                    Toast.makeText(
-                        requireContext(),
-                        if (wasFavorite) getString(R.string.favorite_removed) else getString(R.string.favorite_added),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("Sinema", "Entity favorite toggle failed for ${entity.id}", e)
+        launchSafely(
+            "Entity favorite toggle",
+            onError = { e ->
                 if (isAdded) {
                     Toast.makeText(
                         requireContext(),
@@ -187,6 +171,20 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                         Toast.LENGTH_LONG
                     ).show()
                 }
+            }
+        ) {
+            val wasFavorite = entity.isFavorite
+            app.api.entitySetRating(entity.kind, entity.id, if (wasFavorite) null else 100)
+            val updated = entity.copy(rating100 = if (wasFavorite) null else 100)
+            if (index < gridAdapter.size() && gridAdapter.get(index) === entity) {
+                gridAdapter.replace(index, updated)
+            }
+            if (isAdded) {
+                Toast.makeText(
+                    requireContext(),
+                    if (wasFavorite) getString(R.string.favorite_removed) else getString(R.string.favorite_added),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -394,71 +392,51 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         }
     }
 
-    /** Clears the server resume point so the scene drops off Continue Playing. */    private fun clearResume(scene: Scene, index: Int) {
-        lifecycleScope.launch {
-            try {
-                app.api.clearResumeTime(scene.id)
-                val updated = scene.copy(resumeTime = 0.0)
-                if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
-                    gridAdapter.replace(index, updated)
-                }
-                Toast.makeText(requireContext(), getString(R.string.action_removed_continue), Toast.LENGTH_SHORT).show()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("Sinema", "Remove from Continue Playing failed for ${scene.id}", e)
-                Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
+    /** Clears the server resume point so the scene drops off Continue Playing. */
+    private fun clearResume(scene: Scene, index: Int) {
+        launchSafely("Remove from Continue Playing") {
+            app.api.clearResumeTime(scene.id)
+            val updated = scene.copy(resumeTime = 0.0)
+            if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
+                gridAdapter.replace(index, updated)
             }
+            Toast.makeText(requireContext(), getString(R.string.action_removed_continue), Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun toggleWatched(scene: Scene, index: Int) {
-        lifecycleScope.launch {
-            try {
-                val wasWatched = scene.isWatched
-                if (wasWatched) {
-                    app.api.resetPlayCount(scene.id)
-                } else {
-                    app.api.clearResumeTime(scene.id)
-                    app.api.incrementPlayCount(scene.id)
-                }
-                val updated = scene.copy(
-                    playCount = WatchedToggle.nextPlayCount(scene.playCount, wasWatched),
-                    resumeTime = if (wasWatched) scene.resumeTime else 0.0
-                )
-                if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
-                    gridAdapter.replace(index, updated)
-                }
-                Toast.makeText(requireContext(),
-                    if (wasWatched) getString(R.string.watched_unmarked) else getString(R.string.watched_marked),
-                    Toast.LENGTH_SHORT).show()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("Sinema", "Watched toggle failed for ${scene.id}", e)
-                Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
+        launchSafely("Watched toggle") {
+            val wasWatched = scene.isWatched
+            if (wasWatched) {
+                app.api.resetPlayCount(scene.id)
+            } else {
+                app.api.clearResumeTime(scene.id)
+                app.api.incrementPlayCount(scene.id)
             }
+            val updated = scene.copy(
+                playCount = WatchedToggle.nextPlayCount(scene.playCount, wasWatched),
+                resumeTime = if (wasWatched) scene.resumeTime else 0.0
+            )
+            if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
+                gridAdapter.replace(index, updated)
+            }
+            Toast.makeText(requireContext(),
+                if (wasWatched) getString(R.string.watched_unmarked) else getString(R.string.watched_marked),
+                Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun toggleFavorite(scene: Scene, index: Int) {
-        lifecycleScope.launch {
-            try {
-                val wasFavorite = scene.isFavorite
-                app.api.setSceneRating(scene.id, if (wasFavorite) null else 100)
-                val updated = scene.copy(rating100 = if (wasFavorite) null else 100)
-                if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
-                    gridAdapter.replace(index, updated)
-                }
-                Toast.makeText(requireContext(),
-                    if (wasFavorite) getString(R.string.favorite_removed) else getString(R.string.favorite_added),
-                    Toast.LENGTH_SHORT).show()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("Sinema", "Favorite toggle failed for ${scene.id}", e)
-                Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
+        launchSafely("Favorite toggle") {
+            val wasFavorite = scene.isFavorite
+            app.api.setSceneRating(scene.id, if (wasFavorite) null else 100)
+            val updated = scene.copy(rating100 = if (wasFavorite) null else 100)
+            if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
+                gridAdapter.replace(index, updated)
             }
+            Toast.makeText(requireContext(),
+                if (wasFavorite) getString(R.string.favorite_removed) else getString(R.string.favorite_added),
+                Toast.LENGTH_SHORT).show()
         }
     }
 
