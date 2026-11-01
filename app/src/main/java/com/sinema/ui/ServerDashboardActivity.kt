@@ -31,7 +31,7 @@ class ServerDashboardActivity : FragmentActivity() {
             setBackgroundColor(0xFF1B1B1B.toInt())
         }
         layout.addView(TextView(this).apply {
-            text = "Server"
+            text = getString(com.sinema.R.string.server_title)
             textSize = 28f
             setTextColor(0xFFFFFFFF.toInt())
             setPadding(0, 0, 0, 20)
@@ -47,7 +47,7 @@ class ServerDashboardActivity : FragmentActivity() {
 
     private fun load() {
         content.removeAllViews()
-        addRow("Loading…", "")
+        addRow(getString(com.sinema.R.string.server_loading), "")
         lifecycleScope.launch {
             try {
                 val (version, stats, jobs) = coroutineScope {
@@ -58,22 +58,22 @@ class ServerDashboardActivity : FragmentActivity() {
                 }
                 if (isFinishing || isDestroyed) return@launch
                 content.removeAllViews()
-                addRow("Stash version", version)
-                addRow("Scenes", "${stats.sceneCount}  (${TimeFormat.formatSeconds(stats.scenesDurationSeconds)} total)")
-                addRow("Performers · Tags · Studios",
+                addRow(getString(com.sinema.R.string.server_stash_version), version)
+                addRow(getString(com.sinema.R.string.server_scenes), "${stats.sceneCount}  (${TimeFormat.formatSeconds(stats.scenesDurationSeconds)} total)")
+                addRow(getString(com.sinema.R.string.server_entities),
                     "${stats.performerCount} · ${stats.tagCount} · ${stats.studioCount}")
-                addRow("Plays", "${stats.totalPlayCount}  (${TimeFormat.formatSeconds(stats.totalPlayDurationSeconds)} watched)")
+                addRow(getString(com.sinema.R.string.server_plays), "${stats.totalPlayCount}  (${TimeFormat.formatSeconds(stats.totalPlayDurationSeconds)} watched)")
                 when {
-                    jobs == null -> addRow("Jobs", "Job queue not supported by this server")
-                    jobs.isEmpty() -> addRow("Jobs", "Idle")
+                    jobs == null -> addRow(getString(com.sinema.R.string.server_jobs), getString(com.sinema.R.string.server_jobs_unsupported))
+                    jobs.isEmpty() -> addRow(getString(com.sinema.R.string.server_jobs), getString(com.sinema.R.string.server_jobs_idle))
                     else -> {
-                        addHeader("Running jobs")
+                        addHeader(getString(com.sinema.R.string.server_running_jobs))
                         jobs.take(10).forEach { addRow("•", it) }
                     }
                 }
                 val errors = app.recentErrors.toList().asReversed()
                 if (errors.isNotEmpty()) {
-                    addHeader("Recent errors")
+                    addHeader(getString(com.sinema.R.string.server_recent_errors))
                     errors.take(10).forEach { addRow("•", it) }
                 }
             } catch (e: CancellationException) {

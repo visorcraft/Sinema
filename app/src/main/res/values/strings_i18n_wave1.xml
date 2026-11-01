@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- i18n extraction, wave 1: library/triage/dashboard, grids + menu dialogs,
+     home shortcuts, playback menu + core toasts, card labels.
+     See docs/i18n.md for the remaining extraction waves. -->
+<resources>
+    <!-- Library screen -->
+    <string name="library_title">Library</string>
+    <string name="library_no_shortcuts">Library (no shortcuts enabled)</string>
+    <string name="library_card_finish_watching">⏳ Finish Watching</string>
+    <string name="library_card_finish_watching_sub">Your in-progress scenes</string>
+    <string name="library_card_untagged">🧹 Untagged Scenes</string>
+    <string name="library_card_untagged_sub">Curate the backlog</string>
+    <string name="library_card_server">🖥 Server</string>
+    <string name="library_card_server_sub">Version, jobs, recent errors</string>
+
+    <!-- Finish Watching -->
+    <string name="finish_watching_title">Finish Watching</string>
+    <string name="finish_watching_empty">Nothing in progress — you\'re all caught up</string>
+
+    <!-- Untagged scenes -->
+    <string name="untagged_title">Untagged Scenes</string>
+    <string name="untagged_empty">No untagged scenes — library is curated 🎉</string>
+    <string name="untagged_assign_tags">🏷 Assign tags</string>
+    <string name="untagged_assign_title">Assign tags — %1$s</string>
+    <string name="untagged_no_tags">No tags on this server</string>
+    <string name="untagged_assigned">Assigned %1$d tags</string>
+
+    <!-- Server dashboard -->
+    <string name="server_title">Server</string>
+    <string name="server_loading">Loading…</string>
+    <string name="server_stash_version">Stash version</string>
+    <string name="server_unknown">unknown</string>
+    <string name="server_scenes">Scenes</string>
+    <string name="server_entities">Performers · Tags · Studios</string>
+    <string name="server_plays">Plays</string>
+    <string name="server_jobs">Jobs</string>
+    <string name="server_jobs_unsupported">Job queue not supported by this server</string>
+    <string name="server_jobs_idle">Idle</string>
+    <string name="server_running_jobs">Running jobs</string>
+    <string name="server_recent_errors">Recent errors</string>
+
+    <!-- Grid menu -->
+    <string name="grid_menu_title">Menu</string>
+    <string name="grid_menu_sort">Sort by…</string>
+    <string name="grid_menu_play_all">▶ Play All</string>
+    <string name="grid_menu_shuffle">🔀 Shuffle Play</string>
+    <string name="grid_menu_mark_all_watched">👁 Mark All Watched</string>
+    <string name="grid_menu_rate_all">★ Rate All…</string>
+    <string name="grid_menu_jump_letter">🔤 Jump to letter…</string>
+    <string name="grid_jump_title">Jump to letter</string>
+    <string name="grid_jump_all">All</string>
+    <string name="grid_jump_digits">0-9</string>
+    <string name="grid_cancel">Cancel</string>
+
+    <!-- Scene grid / card actions -->
+    <string name="card_play">▶ Play</string>
+    <string name="card_resume">▶ Resume</string>
+    <string name="card_play_from_here">▶ Play from here</string>
+    <string name="card_remove_continue">✖ Remove from Continue Playing</string>
+    <string name="card_details">ℹ️ Details</string>
+    <string name="card_favorite">❤️ Favorite</string>
+    <string name="card_unfavorite">💔 Unfavorite</string>
+    <string name="action_removed_continue">Removed from Continue Playing</string>
+    <string name="action_failed">Failed: %1$s</string>
+    <string name="bulk_working">%1$s…</string>
+    <string name="bulk_done">%1$s: %2$d scenes%3$s</string>
+    <string name="bulk_failed_suffix">, %1$d failed</string>
+    <string name="rate_all_title">Rate all scenes</string>
+    <string name="rate_all_no_rating">No rating</string>
+    <string name="entity_favorite_unsupported">Server does not support entity ratings: %1$s</string>
+    <string name="entity_no_unwatched">No unwatched scenes loaded</string>
+    <string name="favorite_added">Added to favorites</string>
+    <string name="favorite_removed">Removed from favorites</string>
+    <string name="tags_load_failed">Could not load tags: %1$s</string>
+
+    <!-- Home -->
+    <string name="shortcut_tonight_mix">Tonight\'s Mix</string>
+    <string name="tonight_mix_card_title">🌙 Tonight\'s Mix</string>
+    <string name="tonight_mix_card_sub">~30 min personalized queue</string>
+    <string name="tonight_mix_none_unwatched">No unwatched scenes found</string>
+    <string name="tonight_mix_nothing">Nothing to play</string>
+    <string name="retry_connection">📡 Retry Connection</string>
+    <string name="retry_connection_sub">Server unreachable</string>
+
+    <!-- Playback menu + core toasts -->
+    <string name="playback_menu_title">Playback menu</string>
+    <string name="playback_menu_chapters">Chapters</string>
+    <string name="playback_menu_rate">★ Rate scene</string>
+    <string name="playback_menu_o">🔥 O +1</string>
+    <string name="playback_menu_aspect">Aspect ratio</string>
+    <string name="playback_menu_quality">Stream quality</string>
+    <string name="playback_menu_seek">Seek buttons</string>
+    <string name="endless_off_toast">Endless Mix off</string>
+    <string name="endless_on_toast">Endless Mix on — queue refills itself</string>
+    <string name="endless_nothing">Endless Mix: nothing new to play</string>
+    <string name="up_next_title">Up Next (%1$d)</string>
+    <string name="up_next_empty">Queue empty</string>
+    <string name="up_next_not_in_queue">No longer in queue</string>
+    <string name="up_next_unwatched_emptied">No unwatched scenes ahead — queue emptied</string>
+    <string name="up_next_unwatched_count">%1$d unwatched ahead</string>
+    <string name="up_next_shuffled">Shuffled %1$d upcoming</string>
+    <string name="up_next_cleared">Queue cleared</string>
+    <string name="bulk_mark_all_watched">Mark all watched</string>
+    <string name="bulk_rate_all">Rated all scenes</string>
+    <string name="watched_marked">Marked as watched</string>
+    <string name="watched_unmarked">Marked as unwatched</string>
+    <string name="bulk_in_progress">Still working on the previous bulk edit</string>
+</resources>

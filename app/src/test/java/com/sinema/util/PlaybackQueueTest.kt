@@ -111,6 +111,31 @@ class PlaybackQueueTest {
     }
 
     @Test
+    fun `removeRemaining and moveRemaining edit only the upcoming window`() {
+        PlaybackQueue.start(
+            listOf(item("a"), item("b"), item("c"), item("d"), item("e")),
+            startAt = 0
+        )
+
+        assertTrue(PlaybackQueue.removeRemaining("c"))
+        assertEquals(listOf("b", "d", "e"), PlaybackQueue.remaining().map { it.id })
+        // Current and unknown ids are protected.
+        assertFalse(PlaybackQueue.removeRemaining("a"))
+        assertFalse(PlaybackQueue.removeRemaining("zzz"))
+
+        assertTrue(PlaybackQueue.moveRemaining("e", -2))
+        assertEquals(listOf("e", "b", "d"), PlaybackQueue.remaining().map { it.id })
+        // Clamped move past the top of the remainder is a no-op.
+        assertFalse(PlaybackQueue.moveRemaining("e", -5))
+        assertEquals(listOf("e", "b", "d"), PlaybackQueue.remaining().map { it.id })
+        // Clamped to the bottom edge.
+        assertTrue(PlaybackQueue.moveRemaining("e", +5))
+        assertEquals(listOf("b", "d", "e"), PlaybackQueue.remaining().map { it.id })
+        // The current item can never be moved or removed this way.
+        assertFalse(PlaybackQueue.moveRemaining("a", 1))
+    }
+
+    @Test
     fun `empty queue is inert`() {
         PlaybackQueue.start(emptyList(), startAt = 0)
 

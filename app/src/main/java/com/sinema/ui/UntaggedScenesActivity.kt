@@ -29,8 +29,8 @@ class UntaggedScenesActivity : FragmentActivity() {
 }
 
 class UntaggedScenesFragment : SceneGridFragment() {
-    override val gridTitle = "Untagged Scenes"
-    override val emptyMessage = "No untagged scenes — library is curated 🎉"
+    override val gridTitle get() = getString(R.string.untagged_title)
+    override val emptyMessage get() = getString(R.string.untagged_empty)
     override val paged = true
     override val sortScreenKey get() = "untagged"
     override val canAssignTags = true

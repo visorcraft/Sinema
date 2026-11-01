@@ -66,10 +66,35 @@ object PlaybackQueue {
         return items[targetIndex]
     }
 
+    /**
+     * Remove one upcoming item by id. Returns false when the id is the
+     * current item or unknown.
+     */
+    @Synchronized
+    fun removeRemaining(id: String): Boolean {
+        if (index < 0) return false
+        val pos = items.drop(index + 1).indexOfFirst { it.id == id }
+        if (pos < 0) return false
+        items = items.toMutableList().apply { removeAt(index + 1 + pos) }
+        return true
+    }
+
+    /** Move one upcoming item by [delta] (-1 up / +1 down) within the remainder. */
+    @Synchronized
+    fun moveRemaining(id: String, delta: Int): Boolean {
+        if (index < 0 || delta == 0) return false
+        val from = items.drop(index + 1).indexOfFirst { it.id == id }
+        if (from < 0) return false
+        val absFrom = index + 1 + from
+        val absTo = (absFrom + delta).coerceIn(index + 1, items.size - 1)
+        if (absTo == absFrom) return false
+        items = items.toMutableList().apply { add(absTo, removeAt(absFrom)) }
+        return true
+    }
+
     /** Randomize everything after the current item. Seedable for tests. */
     @Synchronized
-    fun shuffleRemaining(random: kotlin.random.Random = kotlin.random.Random.Default): Boolean {
-        if (index < 0 || index + 1 >= items.size - 1) return false
+    fun shuffleRemaining(random: kotlin.random.Random = kotlin.random.Random.Default): Boolean {        if (index < 0 || index + 1 >= items.size - 1) return false
         val head = items.take(index + 1)
         val tail = items.drop(index + 1).shuffled(random)
         items = head + tail

@@ -27,7 +27,7 @@ class LibraryActivity : FragmentActivity() {
 class LibraryFragment : VerticalGridSupportFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = "Library"
+        title = getString(com.sinema.R.string.library_title)
         badgeDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.sinema_logo)
         val presenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
         presenter.numberOfColumns = 3
@@ -35,8 +35,9 @@ class LibraryFragment : VerticalGridSupportFragment() {
         val shortcuts = SinemaApp.instance.prefs.homeLayout.visibleLibraryShortcuts().map { it.label }
         val items = ArrayObjectAdapter(SettingsPresenter())
         shortcuts.forEach(items::add)
-        items.add("Untagged Scenes")
-        items.add("Server")
+        items.add(getString(R.string.library_card_finish_watching))
+        items.add(getString(R.string.library_card_untagged))
+        items.add(getString(R.string.library_card_server))
         adapter = items
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
@@ -48,11 +49,15 @@ class LibraryFragment : VerticalGridSupportFragment() {
                 "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))
                 "Markers" -> startActivity(Intent(requireContext(), MarkerBrowserActivity::class.java))
                 "Stats" -> startActivity(Intent(requireContext(), StatsActivity::class.java))
-                "Untagged Scenes" -> startActivity(Intent(requireContext(), UntaggedScenesActivity::class.java))
-                "Server" -> startActivity(Intent(requireContext(), ServerDashboardActivity::class.java))
+                getString(R.string.library_card_untagged) ->
+                    startActivity(Intent(requireContext(), UntaggedScenesActivity::class.java))
+                getString(R.string.library_card_finish_watching) ->
+                    startActivity(Intent(requireContext(), FinishWatchingActivity::class.java))
+                getString(R.string.library_card_server) ->
+                    startActivity(Intent(requireContext(), ServerDashboardActivity::class.java))
                 "Saved Filters" -> startActivity(Intent(requireContext(), SavedFiltersActivity::class.java))
             }
         }
-        if (shortcuts.isEmpty()) title = "Library (no shortcuts enabled)"
+        if (shortcuts.isEmpty()) title = getString(R.string.library_no_shortcuts)
     }
 }

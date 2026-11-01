@@ -234,7 +234,7 @@ class MainFragment : RowsSupportFragment() {
                         "Surprise Me" -> playRandomScene()
                         "Favorites" -> startActivity(Intent(requireContext(), FavoritesActivity::class.java))
                         "Library" -> startActivity(Intent(requireContext(), LibraryActivity::class.java))
-                        "Tonight's Mix" -> playTonightMix()
+                        getString(com.sinema.R.string.shortcut_tonight_mix) -> playTonightMix()
                         "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
                         "Groups" -> startActivity(GroupGridActivity.intent(requireContext()))
                         "Galleries" -> startActivity(GalleryGridActivity.intent(requireContext()))
@@ -282,7 +282,7 @@ class MainFragment : RowsSupportFragment() {
     /** Shortcut row contents: personalization order + fixed session cards. */
     private fun addShortcutItems(shortcutsAdapter: ArrayObjectAdapter) {
         layoutSnapshot.visibleShortcuts().map { it.label }.forEach(shortcutsAdapter::add)
-        shortcutsAdapter.add("Tonight's Mix")
+        shortcutsAdapter.add(getString(com.sinema.R.string.shortcut_tonight_mix))
         if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
     }
 

@@ -2,16 +2,10 @@ package com.sinema.ui
 
 import android.app.AlertDialog
 import android.content.Context
+import com.sinema.R
 import com.sinema.model.SortOption
 
 object GridMenuDialog {
-    private const val SORT = "Sort by…"
-    private const val PLAY_ALL = "▶ Play All"
-    private const val SHUFFLE = "🔀 Shuffle Play"
-    private const val MARK_ALL_WATCHED = "👁 Mark All Watched"
-    private const val RATE_ALL = "★ Rate All…"
-    private const val JUMP_TO_LETTER = "🔤 Jump to letter…"
-
     fun show(
         context: Context,
         current: SortOption,
@@ -23,28 +17,23 @@ object GridMenuDialog {
         onRateAll: (() -> Unit)? = null,
         onJumpToLetter: (() -> Unit)? = null
     ) {
-        val items = buildList {
-            add(SORT)
+        // Pair each label with its action up front so the localized label is
+        // never used as an identity key.
+        val entries = buildList {
+            add(context.getString(R.string.grid_menu_sort) to Runnable { SortDialog.show(context, current, onSort) })
             if (canPlayAll) {
-                add(PLAY_ALL)
-                add(SHUFFLE)
+                add(context.getString(R.string.grid_menu_play_all) to Runnable(onPlayAll))
+                add(context.getString(R.string.grid_menu_shuffle) to Runnable(onShuffle))
             }
-            onMarkAllWatched?.let { add(MARK_ALL_WATCHED) }
-            onRateAll?.let { add(RATE_ALL) }
-            onJumpToLetter?.let { add(JUMP_TO_LETTER) }
+            onMarkAllWatched?.let { add(context.getString(R.string.grid_menu_mark_all_watched) to Runnable(it)) }
+            onRateAll?.let { add(context.getString(R.string.grid_menu_rate_all) to Runnable(it)) }
+            onJumpToLetter?.let { add(context.getString(R.string.grid_menu_jump_letter) to Runnable(it)) }
         }
         AlertDialog.Builder(context)
-            .setTitle("Menu")
-            .setItems(items.toTypedArray()) { dialog, which ->
+            .setTitle(context.getString(R.string.grid_menu_title))
+            .setItems(entries.map { it.first }.toTypedArray()) { dialog, which ->
                 dialog.dismiss()
-                when (items[which]) {
-                    SORT -> SortDialog.show(context, current, onSort)
-                    PLAY_ALL -> onPlayAll()
-                    SHUFFLE -> onShuffle()
-                    MARK_ALL_WATCHED -> onMarkAllWatched?.invoke()
-                    RATE_ALL -> onRateAll?.invoke()
-                    JUMP_TO_LETTER -> onJumpToLetter?.invoke()
-                }
+                entries[which].second.run()
             }
             .show()
     }

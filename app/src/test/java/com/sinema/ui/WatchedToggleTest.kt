@@ -36,4 +36,10 @@ class WatchedToggleTest {
     fun `button label offers watched when scene is unwatched`() {
         assertEquals("👁️ Mark Watched", WatchedToggle.buttonLabel(watched = false))
     }
+
+    @Test
+    fun `short labels fit the narrow detail action pills`() {
+        assertEquals("👁 Unwatched", WatchedToggle.shortButtonLabel(watched = true))
+        assertEquals("👁 Watched", WatchedToggle.shortButtonLabel(watched = false))
+    }
 }

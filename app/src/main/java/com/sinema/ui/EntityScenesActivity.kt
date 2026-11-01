@@ -80,11 +80,52 @@ class EntityScenesActivity : FragmentActivity() {
                     image.visibility = View.INVISIBLE
                 }
                 bindHeaderTagChips(info.tags)
+                bindHeaderActions(kind, info)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("Sinema", "Entity header load failed for $kind $id", e)
             }
+        }
+    }
+
+    private fun bindHeaderActions(kind: EntityItem.Kind, info: com.sinema.model.EntityHeader) {
+        val actions = findViewById<View>(R.id.entity_header_actions) ?: return
+        actions.visibility = View.VISIBLE
+        val favoriteButton = findViewById<Button>(R.id.entity_header_favorite)
+        fun favoriteLabel(): String =
+            if (info.isFavorite) "♥ Favorited ✓" else "♡ Favorite"
+        favoriteButton.text = favoriteLabel()
+        favoriteButton.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    SinemaApp.instance.api.entitySetRating(
+                        kind, info.id, if (info.isFavorite) null else 100
+                    )
+                    // Reflect locally: EntityHeader is immutable here, so
+                    // rebuild the label from the toggled copy.
+                    val toggled = info.copy(rating100 = if (info.isFavorite) null else 100)
+                    bindHeaderActions(kind, toggled)
+                    android.widget.Toast.makeText(
+                        this@EntityScenesActivity,
+                        if (info.isFavorite) "Removed from favorites" else "Added to favorites",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("Sinema", "Entity favorite toggle failed for ${info.id}", e)
+                    android.widget.Toast.makeText(
+                        this@EntityScenesActivity,
+                        "Server does not support entity ratings: ${e.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+        findViewById<Button>(R.id.entity_header_play_unwatched).setOnClickListener {
+            (supportFragmentManager.findFragmentById(R.id.main_frame) as? EntityScenesFragment)
+                ?.playUnwatchedFromGrid()
         }
     }
 
@@ -170,4 +211,16 @@ class EntityScenesFragment : SceneGridFragment() {
             direction = sort.direction,
             filters = sceneFilter
         )
+
+    /** Header action: shuffle-play the unwatched scenes currently loaded. */
+    fun playUnwatchedFromGrid() {
+        val unwatched = (0 until gridAdapter.size())
+            .mapNotNull { gridAdapter.get(it) as? com.sinema.model.Scene }
+            .filter { !it.isWatched }
+        if (unwatched.isEmpty()) {
+            android.widget.Toast.makeText(requireContext(), "No unwatched scenes loaded", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        com.sinema.util.SceneIntents.playAll(requireContext(), unwatched, shuffle = true)
+    }
 }

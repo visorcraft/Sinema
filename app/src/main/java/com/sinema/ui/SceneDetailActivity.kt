@@ -34,6 +34,7 @@ class SceneDetailActivity : FragmentActivity() {
     private lateinit var btnResume: Button
     private lateinit var btnPlay: Button
     private lateinit var btnMarkWatched: Button
+    private lateinit var btnFavorite: Button
     private lateinit var btnOCount: Button
     private var btnFolder: Button? = null
     private lateinit var metaView: TextView
@@ -70,6 +71,7 @@ class SceneDetailActivity : FragmentActivity() {
         btnResume = findViewById(R.id.btn_resume)
         btnPlay = findViewById(R.id.btn_play)
         btnMarkWatched = findViewById(R.id.btn_mark_watched)
+        btnFavorite = findViewById(R.id.btn_favorite)
         btnOCount = findViewById(R.id.btn_o_count)
         btnFolder = findViewById(R.id.btn_folder)
         metaView = findViewById(R.id.detail_meta)
@@ -88,12 +90,17 @@ class SceneDetailActivity : FragmentActivity() {
             btnTechnical.text = if (show) "Hide technical details" else "Technical details"
         }
 
-        // Load screenshot
-        val url = app.api.getScreenshotUrl(scene.id)
-        Glide.with(this)
-            .load(GlideAuth.url(app.api, url))
-            .centerCrop()
-            .into(screenshot)
+        // Load screenshot — suppressed in discreet mode; the scrimmed hero
+        // keeps the layout while showing no explicit artwork.
+        if (SinemaApp.instance.prefs.discreetMode) {
+            screenshot.visibility = View.INVISIBLE
+        } else {
+            val url = app.api.getScreenshotUrl(scene.id)
+            Glide.with(this)
+                .load(GlideAuth.url(app.api, url))
+                .centerCrop()
+                .into(screenshot)
+        }
 
         // Initial resume button state — hidden until loadDetails responds
         btnResume.visibility = View.GONE
@@ -141,6 +148,45 @@ class SceneDetailActivity : FragmentActivity() {
             }
         }
 
+        // One-tap favorite: same rule as grids and cards — a rating marks a
+        // favorite, so unfavoriting clears the rating (★★★★★ by default).
+        bindFavoriteButton()
+        btnFavorite.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val wasFavorite = scene.isFavorite
+                    if (wasFavorite) {
+                        app.api.setSceneRating(scene.id, null)
+                        detailState.applyRating(0)
+                        bindStars()
+                        bindMeta(scene)
+                        bindFavoriteButton()
+                        Toast.makeText(this@SceneDetailActivity,
+                            "Rating cleared — removed from favorites", Toast.LENGTH_SHORT).show()
+                    } else {
+                        app.api.setSceneRating(scene.id, 100)
+                        detailState.applyRating(5)
+                        bindStars()
+                        bindMeta(scene)
+                        bindFavoriteButton()
+                        Toast.makeText(this@SceneDetailActivity,
+                            "Added to favorites (★★★★★)", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("Sinema", "Favorite toggle failed for ${scene.id}", e)
+                    Toast.makeText(this@SceneDetailActivity,
+                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        // Synopsis: tap to expand/collapse long text.
+        detailsView.setOnClickListener {
+            detailsView.maxLines = if (detailsView.maxLines == 3) Int.MAX_VALUE else 3
+        }
+
         // O counter: one tap = one O, mirrors Stash's sceneIncrementO
         btnOCount.setOnClickListener {
             lifecycleScope.launch {
@@ -173,6 +219,20 @@ class SceneDetailActivity : FragmentActivity() {
 
         // Initial focus
         btnPlay.requestFocus()
+
+        // The full-bleed hero lives above the scroll viewport once the user
+        // scrolls down; D-pad Up from the first action row returns to it.
+        val scrollView = findViewById<android.widget.ScrollView>(R.id.detail_scroll)
+        val topRowKeyUp = { _: View, keyCode: Int, event: android.view.KeyEvent ->
+            if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP
+            ) {
+                scrollView.smoothScrollTo(0, 0)
+                true
+            } else false
+        }
+        btnPlay.setOnKeyListener(topRowKeyUp)
+        btnResume.setOnKeyListener(topRowKeyUp)
     }
 
     override fun onResume() {
@@ -191,9 +251,12 @@ class SceneDetailActivity : FragmentActivity() {
                 bindSceneText(scene)
                 bindWatchedButton()
                 bindStars()
+                bindFavoriteButton()
                 bindResume(details)
                 bindMeta(details.scene)
                 bindChips(details.scene)
+                bindChapterStrip()
+                bindGalleryStrip(details.scene.galleries)
                 if (relatedSceneId != details.scene.id) {
                     relatedSceneId = details.scene.id
                     loadRelatedScenes(details.scene)
@@ -207,7 +270,12 @@ class SceneDetailActivity : FragmentActivity() {
     }
 
     private fun bindWatchedButton() {
-        btnMarkWatched.text = WatchedToggle.buttonLabel(scene.isWatched)
+        // Short label: the pill row is narrow on 1080p panels.
+        btnMarkWatched.text = WatchedToggle.shortButtonLabel(scene.isWatched)
+    }
+
+    private fun bindFavoriteButton() {
+        btnFavorite.text = if (scene.isFavorite) "♥ Favorited" else "♡ Favorite"
     }
 
     /** Render ☆/★ states for the 1-5 star picker from the current rating. */
@@ -224,6 +292,7 @@ class SceneDetailActivity : FragmentActivity() {
                 app.api.setSceneRating(scene.id, StarRating.toRating100(stars))
                 detailState.applyRating(stars)
                 bindStars()
+                bindFavoriteButton()
                 bindMeta(scene)
                 Toast.makeText(
                     this@SceneDetailActivity,
@@ -254,7 +323,7 @@ class SceneDetailActivity : FragmentActivity() {
         if (details.resumeTime > 5.0) {
             val resumeMs = (details.resumeTime * 1000).toLong()
             btnResume.visibility = View.VISIBLE
-            btnResume.text = "▶ Resume from ${formatMs(resumeMs)}"
+            btnResume.text = "▶ Resume ${formatMs(resumeMs)}"
             btnResume.setOnClickListener { launchPlayback(resumeMs) }
         } else {
             btnResume.visibility = View.GONE
@@ -338,7 +407,7 @@ class SceneDetailActivity : FragmentActivity() {
         val chip = Button(this).apply {
             text = label
             isFocusable = true
-            setBackgroundResource(R.drawable.action_button_background)
+            setBackgroundResource(R.drawable.bg_pill)
             setTextColor(android.graphics.Color.WHITE)
             textSize = 13f
             minWidth = 0
@@ -362,6 +431,91 @@ class SceneDetailActivity : FragmentActivity() {
             SceneIntents.putMarkers(this, markers)
         }
         startActivity(intent)
+    }
+
+    /** Chapters strip: marker frame thumbnails, click jumps into playback. */
+    private fun bindChapterStrip() {
+        val row = findViewById<LinearLayout>(R.id.chapters_row)
+        val scroll = findViewById<View>(R.id.chapters_scroll)
+        val label = findViewById<TextView>(R.id.chapters_label)
+        row.removeAllViews()
+        if (markers.isEmpty()) {
+            scroll.visibility = View.GONE
+            label.visibility = View.GONE
+            return
+        }
+        label.visibility = View.VISIBLE
+        scroll.visibility = View.VISIBLE
+        val density = resources.displayMetrics.density
+        for (marker in markers) {
+            val card = LayoutInflater.from(this).inflate(R.layout.item_chapter_card, row, false)
+            val title = card.findViewById<TextView>(R.id.chapter_card_title)
+            title.text = marker.title.ifBlank { marker.primaryTag }
+            card.findViewById<TextView>(R.id.chapter_card_time).text =
+                com.sinema.util.TimeFormat.formatSeconds(marker.seconds)
+            val image = card.findViewById<ImageView>(R.id.chapter_card_image)
+            if (SinemaApp.instance.prefs.discreetMode) {
+                image.visibility = View.INVISIBLE
+            } else {
+                Glide.with(this)
+                    .load(GlideAuth.url(app.api, app.api.getMarkerScreenshotUrl(scene.id, marker.seconds)))
+                    .centerCrop()
+                    .into(image)
+            }
+            card.isFocusable = true
+            card.setOnClickListener { launchPlayback((marker.seconds * 1000).toLong()) }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.marginEnd = (12 * density).toInt()
+            card.layoutParams = params
+            row.addView(card)
+        }
+    }
+
+    /** Galleries strip: chips opening the gallery image viewer. */
+    private fun bindGalleryStrip(galleries: List<com.sinema.model.GalleryRef>) {
+        val row = findViewById<LinearLayout>(R.id.galleries_row)
+        val scroll = findViewById<View>(R.id.galleries_scroll)
+        val label = findViewById<TextView>(R.id.galleries_label)
+        row.removeAllViews()
+        if (galleries.isEmpty()) {
+            scroll.visibility = View.GONE
+            label.visibility = View.GONE
+            return
+        }
+        label.visibility = View.VISIBLE
+        scroll.visibility = View.VISIBLE
+        val density = resources.displayMetrics.density
+        for (gallery in galleries) {
+            val chip = Button(this).apply {
+                text = "🖼 ${gallery.title.ifBlank { "Gallery" }}"
+                isFocusable = true
+                setBackgroundResource(R.drawable.action_button_background)
+                setTextColor(android.graphics.Color.WHITE)
+                textSize = 13f
+                minWidth = 0
+                minimumWidth = 0
+                val hPad = (16 * density).toInt()
+                val vPad = (8 * density).toInt()
+                setPadding(hPad, vPad, hPad, vPad)
+                setOnClickListener {
+                    startActivity(
+                        GalleryImagesActivity.intent(
+                            this@SceneDetailActivity,
+                            com.sinema.model.GalleryItem(
+                                id = gallery.id, title = gallery.title, imageCount = 0
+                            )
+                        )
+                    )
+                }
+            }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.marginEnd = (8 * density).toInt()
+            row.addView(chip, params)
+        }
     }
 
     private fun loadRelatedScenes(source: Scene) {
@@ -400,10 +554,14 @@ class SceneDetailActivity : FragmentActivity() {
                     content.text = s.formatDuration()
 
                     val url = app.api.getScreenshotUrl(s.id)
-                    Glide.with(this@SceneDetailActivity)
-                        .load(GlideAuth.url(app.api, url))
-                        .centerCrop()
-                        .into(img)
+                    if (SinemaApp.instance.prefs.discreetMode) {
+                        img.visibility = View.INVISIBLE
+                    } else {
+                        Glide.with(this@SceneDetailActivity)
+                            .load(GlideAuth.url(app.api, url))
+                            .centerCrop()
+                            .into(img)
+                    }
 
                     card.isFocusable = true
                     card.setOnClickListener {

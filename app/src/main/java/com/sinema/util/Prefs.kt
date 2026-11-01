@@ -93,6 +93,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("ambient_gallery", false)
         set(value) = prefs.edit().putBoolean("ambient_gallery", value).apply()
 
+    /** Endless Mix: auto-extend an exhausted queue with fresh candidates. */
+    var endlessMix: Boolean
+        get() = prefs.getBoolean("endless_mix", false)
+        set(value) = prefs.edit().putBoolean("endless_mix", value).apply()
+
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
         get() = ProfileCodec.fromJson(getSecureString("server_profiles"))

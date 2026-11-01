@@ -323,10 +323,49 @@ class SettingsPresenter : Presenter() {
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
-        val title = viewHolder.view.findViewById<TextView>(R.id.card_title)
-        val content = viewHolder.view.findViewById<TextView>(R.id.card_content)
-        val image = viewHolder.view.findViewById<ImageView>(R.id.card_image)
+        val title = viewHolder.view.findViewById<TextView>(com.sinema.R.id.card_title)
+        val content = viewHolder.view.findViewById<TextView>(com.sinema.R.id.card_content)
+        val image = viewHolder.view.findViewById<ImageView>(com.sinema.R.id.card_image)
+        val ctx = viewHolder.view.context
+        // Fixed cards added with localized labels (Library/Home entries) must
+        // match by resource, never by literal string identity.
+        fun res(id: Int) = ctx.getString(id)
         when (item as? String) {
+            res(com.sinema.R.string.shortcut_tonight_mix) -> {
+                title.text = res(com.sinema.R.string.tonight_mix_card_title)
+                content.text = res(com.sinema.R.string.tonight_mix_card_sub)
+                image.setImageResource(android.R.drawable.ic_menu_day)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            res(com.sinema.R.string.library_card_finish_watching) -> {
+                title.text = res(com.sinema.R.string.library_card_finish_watching)
+                content.text = res(com.sinema.R.string.library_card_finish_watching_sub)
+                image.setImageResource(android.R.drawable.ic_media_ff)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            res(com.sinema.R.string.library_card_untagged) -> {
+                title.text = res(com.sinema.R.string.library_card_untagged)
+                content.text = res(com.sinema.R.string.library_card_untagged_sub)
+                image.setImageResource(android.R.drawable.ic_menu_edit)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            res(com.sinema.R.string.library_card_server) -> {
+                title.text = res(com.sinema.R.string.library_card_server)
+                content.text = res(com.sinema.R.string.library_card_server_sub)
+                image.setImageResource(android.R.drawable.ic_menu_info_details)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Retry Connection" -> {
+                title.text = res(com.sinema.R.string.retry_connection)
+                content.text = res(com.sinema.R.string.retry_connection_sub)
+                image.setImageResource(android.R.drawable.ic_menu_rotate)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
             "Search" -> {
                 title.text = "🔍 Search"
                 content.text = "Find scenes"
@@ -345,34 +384,6 @@ class SettingsPresenter : Presenter() {
                 title.text = "🔄 Refresh"
                 content.text = "Reload content"
                 image.setImageResource(android.R.drawable.ic_popup_sync)
-                image.scaleType = ImageView.ScaleType.CENTER
-                image.setBackgroundColor(0xFF444444.toInt())
-            }
-            "Retry Connection" -> {
-                title.text = "📡 Retry Connection"
-                content.text = "Server unreachable"
-                image.setImageResource(android.R.drawable.ic_menu_rotate)
-                image.scaleType = ImageView.ScaleType.CENTER
-                image.setBackgroundColor(0xFF444444.toInt())
-            }
-            "Tonight's Mix" -> {
-                title.text = "🌙 Tonight's Mix"
-                content.text = "~30 min personalized queue"
-                image.setImageResource(android.R.drawable.ic_menu_day)
-                image.scaleType = ImageView.ScaleType.CENTER
-                image.setBackgroundColor(0xFF444444.toInt())
-            }
-            "Untagged Scenes" -> {
-                title.text = "🧹 Untagged Scenes"
-                content.text = "Curate the backlog"
-                image.setImageResource(android.R.drawable.ic_menu_edit)
-                image.scaleType = ImageView.ScaleType.CENTER
-                image.setBackgroundColor(0xFF444444.toInt())
-            }
-            "Server" -> {
-                title.text = "🖥 Server"
-                content.text = "Version, jobs, recent errors"
-                image.setImageResource(android.R.drawable.ic_menu_info_details)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }

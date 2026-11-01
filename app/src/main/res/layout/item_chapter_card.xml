@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/card_focus_border"
+    android:focusable="true"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <ImageView
+        android:id="@+id/chapter_card_image"
+        android:layout_width="160dp"
+        android:layout_height="90dp"
+        android:background="#333333"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/chapter_card_title"
+        android:layout_width="160dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:paddingTop="4dp"
+        android:textColor="@android:color/white"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/chapter_card_time"
+        android:layout_width="160dp"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:textColor="#AAAAAA"
+        android:textSize="12sp" />
+</LinearLayout>

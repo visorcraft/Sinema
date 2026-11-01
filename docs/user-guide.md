@@ -77,6 +77,10 @@ The `🌙 Tonight's Mix` card on the shortcut row builds a ~30-minute queue from
 
 Enable `Ambient Gallery` in `Settings` → `Home` and leave the home screen idle for five minutes: a slow Ken Burns slideshow of your top-rated scenes takes over with a clock in the corner. Any key or touch exits. It never starts while a PIN is unverified or while Discreet Mode is on, and it respects Block Screenshots.
 
+### Finish Watching
+
+`Library` → `⏳ Finish Watching` lists every partially-watched scene with its progress bar. Long-press for mark-watched / remove-from-continue; the grid menu offers bulk actions and Play All. Scenes within 30 seconds of the end are treated as finished and hidden.
+
 ### Untagged scenes
 
 `Library` → `🧹 Untagged Scenes` lists scenes with no tags and no performers — the curation backlog. Long-press a card and choose `🏷 Assign tags` to apply existing tags (multi-select); the scene leaves the grid once tagged. Requires a Stash version that supports null filters (≥ 0.26); older servers show an error.
@@ -234,7 +238,7 @@ Entity grids show:
 
 Use Search to filter the current entity type by name. Sort offers scene count, Name A-Z, and Name Z-A. Sinema loads 100 entities at a time and appends more as you scroll near the end.
 
-Selecting an entity opens its scenes. The entity screen starts with a detail header — entity image, name, scene count, and for performers their tag chips (selecting a tag chip opens that tag's scenes). Entity scene grids load incrementally and provide Sort and Filter controls. Play All is available through the Menu key.
+Selecting an entity opens its scenes with a detail header — entity image, name, scene count, and for performers their tag chips (selecting a tag chip opens that tag's scenes). The header also carries a Favorite toggle and `▶ Play unwatched`, which shuffle-queues the unwatched scenes currently loaded. Entity scene grids load incrementally and provide Sort and Filter controls. Play All is available through the Menu key.
 
 Scene detail screens also show metadata chips:
 
@@ -315,7 +319,7 @@ For the two most-used filters there are quick toggles next to Filter on the same
 
 ## Rating scenes
 
-Rate a scene 1–5 stars on its detail screen, or press Menu during playback and choose `★ Rate scene`. Stars map to Stash's `rating100` (stars × 20), so ratings are shared with other Stash clients. A scene with any rating counts as a favorite; clearing the rating clears the favorite. Scene cards show their star count next to the duration.
+Rate a scene 1–5 stars on its detail screen, or press Menu during playback and choose `★ Rate scene`. Stars map to Stash's `rating100` (stars × 20), so ratings are shared with other Stash clients. A scene with any rating counts as a favorite; clearing the rating clears the favorite. The detail screen also has a one-tap `♡ Favorite` button (sets ★★★★★) — tapping `♥ Favorited ✓` clears the rating and removes the favorite. Scene cards show their star count next to the duration.
 
 ## Play All
 

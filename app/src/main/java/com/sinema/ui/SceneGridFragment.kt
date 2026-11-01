@@ -149,7 +149,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     /** Long-press actions for an entity card: favorite toggle. */
     private fun showEntityActions(entity: com.sinema.model.EntityItem) {
         val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === entity } ?: return
-        val favoriteLabel = if (entity.isFavorite) "💔 Unfavorite" else "❤️ Favorite"
+        val favoriteLabel = if (entity.isFavorite) getString(R.string.card_unfavorite) else getString(R.string.card_favorite)
         android.app.AlertDialog.Builder(requireContext())
             .setTitle(entity.name)
             .setItems(arrayOf(favoriteLabel)) { dialog, _ ->
@@ -172,7 +172,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 if (isAdded) {
                     Toast.makeText(
                         requireContext(),
-                        if (wasFavorite) "Removed from favorites" else "Added to favorites",
+                        if (wasFavorite) getString(R.string.favorite_removed) else getString(R.string.favorite_added),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -183,7 +183,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 if (isAdded) {
                     Toast.makeText(
                         requireContext(),
-                        "Server does not support entity ratings: ${e.message}",
+                        getString(R.string.entity_favorite_unsupported, e.message ?: ""),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -193,17 +193,29 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     /** Alpha jump: filter the grid to scenes whose path starts with a letter. */
     private fun showAlphaJumpDialog() {
-        val letters = listOf("All") + ('A'..'Z').map { it.toString() } + listOf("0-9")
-        val current = alphaPrefix?.takeIf { it.isNotBlank() } ?: "All"
+        val allLabel = getString(R.string.grid_jump_all)
+        val digitsLabel = getString(R.string.grid_jump_digits)
+        val letters = listOf(allLabel) + ('A'..'Z').map { it.toString() } + listOf(digitsLabel)
+        // Canonical tokens, independent of localization: null | A..Z | "0-9".
+        fun tokenAt(which: Int): String? = when (which) {
+            0 -> null
+            letters.size - 1 -> "0-9"
+            else -> letters[which]
+        }
+        val currentIndex = when (alphaPrefix) {
+            null -> 0
+            "0-9" -> letters.size - 1
+            else -> letters.indexOf(alphaPrefix).takeIf { it > 0 } ?: 0
+        }
         android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Jump to letter")
-            .setSingleChoiceItems(letters.toTypedArray(), letters.indexOf(current)) { dialog, which ->
+            .setTitle(getString(R.string.grid_jump_title))
+            .setSingleChoiceItems(letters.toTypedArray(), currentIndex) { dialog, which ->
                 dialog.dismiss()
-                alphaPrefix = if (which == 0) null else letters[which]
+                alphaPrefix = tokenAt(which)
                 updateTitle()
                 reload()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.grid_cancel, null)
             .show()
     }
 
@@ -212,7 +224,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         (0 until gridAdapter.size()).mapNotNull { gridAdapter.get(it) as? Scene }
 
     private fun markAllWatched() {
-        bulkEdit("Mark all watched") { scene ->
+        bulkEdit(getString(R.string.bulk_mark_all_watched)) { scene ->
             if (!scene.isWatched) {
                 app.api.clearResumeTime(scene.id)
                 app.api.incrementPlayCount(scene.id)
@@ -221,13 +233,13 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     }
 
     private fun showRateAllDialog() {
-        val options = (0..5).map { if (it == 0) "No rating" else "★".repeat(it) }
+        val options = (0..5).map { if (it == 0) getString(R.string.rate_all_no_rating) else "★".repeat(it) }
         android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Rate all scenes")
+            .setTitle(getString(R.string.rate_all_title))
             .setSingleChoiceItems(options.toTypedArray(), -1) { dialog, which ->
                 dialog.dismiss()
                 val rating100 = if (which == 0) null else which * 20
-                bulkEdit("Rated all scenes") { scene ->
+                bulkEdit(getString(R.string.bulk_rate_all)) { scene ->
                     app.api.setSceneRating(scene.id, rating100)
                 }
             }
@@ -243,10 +255,10 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         // One bulk job at a time: concurrent loops over stale snapshots would
         // double-apply play counts and ratings.
         if (bulkJob?.isActive == true) {
-            Toast.makeText(requireContext(), "Still working on the previous bulk edit", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.bulk_in_progress), Toast.LENGTH_SHORT).show()
             return
         }
-        Toast.makeText(requireContext(), "$label…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(requireContext(), getString(R.string.bulk_working, label), Toast.LENGTH_SHORT).show()
         bulkJob = lifecycleScope.launch {
             var ok = 0
             var failed = 0
@@ -265,8 +277,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             // the grid, so a retried bulk edit never re-applies to scenes
             // that already succeeded.
             if (isAdded) {
-                val suffix = if (failed > 0) ", $failed failed" else ""
-                Toast.makeText(requireContext(), "$label: $ok scenes$suffix", Toast.LENGTH_LONG).show()
+                val suffix = if (failed > 0) getString(R.string.bulk_failed_suffix, failed) else ""
+                Toast.makeText(requireContext(), getString(R.string.bulk_done, label, ok, suffix), Toast.LENGTH_LONG).show()
                 reload()?.join()
             }
         }
@@ -280,7 +292,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         }
         val scene = item as? Scene ?: return
         val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === scene } ?: return
-        val playLabel = if (scene.resumeTime > 0.0) "▶ Resume" else "▶ Play"
+        val playLabel = if (scene.resumeTime > 0.0) getString(R.string.card_resume) else getString(R.string.card_play)
         val actions = buildList {
             add(playLabel to Runnable {
                 startActivity(
@@ -291,23 +303,23 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     )
                 )
             })
-            add("▶ Play from here" to Runnable {
+            add(getString(R.string.card_play_from_here) to Runnable {
                 val rest = (index until gridAdapter.size())
                     .mapNotNull { gridAdapter.get(it) as? Scene }
                 SceneIntents.playAll(requireContext(), rest, startAt = 0)
             })
             if (scene.resumeTime > 0.0) {
-                add("✖ Remove from Continue Playing" to Runnable { clearResume(scene, index) })
+                add(getString(R.string.card_remove_continue) to Runnable { clearResume(scene, index) })
             }
             if (canAssignTags) {
-                add("🏷 Assign tags" to Runnable { showAssignTagsDialog(scene) })
+                add(getString(R.string.untagged_assign_tags) to Runnable { showAssignTagsDialog(scene) })
             }
             add(WatchedToggle.buttonLabel(scene.isWatched) to Runnable { toggleWatched(scene, index) })
             add(
-                (if (scene.isFavorite) "💔 Unfavorite" else "❤️ Favorite") to
+                (if (scene.isFavorite) getString(R.string.card_unfavorite) else getString(R.string.card_favorite)) to
                     Runnable { toggleFavorite(scene, index) }
             )
-            add("ℹ️ Details" to Runnable {
+            add(getString(R.string.card_details) to Runnable {
                 startActivity(SceneIntents.detail(requireContext(), scene))
             })
         }
@@ -336,12 +348,12 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 }
                 if (!isAdded) return@launch
                 if (tags.isEmpty()) {
-                    Toast.makeText(requireContext(), "No tags on this server", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.untagged_no_tags), Toast.LENGTH_SHORT).show()
                     return@launch
                 }
                 val checked = BooleanArray(tags.size)
                 android.app.AlertDialog.Builder(requireContext())
-                    .setTitle("Assign tags — ${scene.displayTitle}")
+                    .setTitle(getString(R.string.untagged_assign_title, scene.displayTitle))
                     .setMultiChoiceItems(tags.map { it.name }.toTypedArray(), checked) { _, which, value ->
                         checked[which] = value
                     }
@@ -355,7 +367,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                                 if (isAdded) {
                                     Toast.makeText(
                                         requireContext(),
-                                        "Assigned ${selected.size} tags", Toast.LENGTH_SHORT
+                                        getString(R.string.untagged_assigned, selected.size), Toast.LENGTH_SHORT
                                     ).show()
                                     reload()
                                 }
@@ -364,7 +376,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                             } catch (e: Exception) {
                                 Log.e("Sinema", "Tag assign failed for ${scene.id}", e)
                                 if (isAdded) {
-                                    Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
@@ -376,7 +388,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             } catch (e: Exception) {
                 Log.e("Sinema", "Tag list load failed", e)
                 if (isAdded) {
-                    Toast.makeText(requireContext(), "Could not load tags: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), getString(R.string.tags_load_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -390,12 +402,12 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 if (index < gridAdapter.size() && gridAdapter.get(index) === scene) {
                     gridAdapter.replace(index, updated)
                 }
-                Toast.makeText(requireContext(), "Removed from Continue Playing", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.action_removed_continue), Toast.LENGTH_SHORT).show()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e("Sinema", "Remove from Continue Playing failed for ${scene.id}", e)
-                Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -418,13 +430,13 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     gridAdapter.replace(index, updated)
                 }
                 Toast.makeText(requireContext(),
-                    if (wasWatched) "Marked as unwatched" else "Marked as watched",
+                    if (wasWatched) getString(R.string.watched_unmarked) else getString(R.string.watched_marked),
                     Toast.LENGTH_SHORT).show()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e("Sinema", "Watched toggle failed for ${scene.id}", e)
-                Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -439,13 +451,13 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     gridAdapter.replace(index, updated)
                 }
                 Toast.makeText(requireContext(),
-                    if (wasFavorite) "Removed from favorites" else "Added to favorites",
+                    if (wasFavorite) getString(R.string.favorite_removed) else getString(R.string.favorite_added),
                     Toast.LENGTH_SHORT).show()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e("Sinema", "Favorite toggle failed for ${scene.id}", e)
-                Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
             }
         }
     }

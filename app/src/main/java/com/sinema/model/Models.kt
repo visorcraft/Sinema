@@ -51,8 +51,11 @@ data class EntityHeader(
     val kind: EntityItem.Kind,
     val sceneCount: Int = 0,
     val imagePath: String? = null,
-    val tags: List<TagRef> = emptyList()
-)
+    val tags: List<TagRef> = emptyList(),
+    val rating100: Int? = null
+) {
+    val isFavorite: Boolean get() = (rating100 ?: 0) > 0
+}
 
 data class GroupItem(
     val id: String,
@@ -84,6 +87,9 @@ data class GalleryItem(
 ) {
     val displayTitle: String get() = title.ifBlank { "Gallery $id" }
 }
+
+/** Minimal gallery reference for a scene's detail strip. */
+data class GalleryRef(val id: String, val title: String)
 
 /**
  * A scene saved filter stored server-side in Stash. [sceneFilter] is the raw
@@ -226,7 +232,9 @@ data class Scene(
     val oCounter: Int = 0,
     // ISO-8601 timestamp populated only when the query asked for `last_played_at`
     // (currently just the Recently Played row). Null if unscored.
-    val lastPlayedAt: String? = null
+    val lastPlayedAt: String? = null,
+    // Galleries containing this scene (detail screen; needs the full query).
+    val galleries: List<GalleryRef> = emptyList()
 ) {
     val isWatched: Boolean get() = playCount > 0
     val isFavorite: Boolean get() = (rating100 ?: 0) > 0

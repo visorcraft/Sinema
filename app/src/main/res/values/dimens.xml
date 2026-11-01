@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Detail artwork: scales with screen width so the side column is never
+         squeezed (sw540 = 1080p TVs get 260dp; larger panels step up). -->
+    <dimen name="detail_art_width">260dp</dimen>
+    <dimen name="detail_art_height">146dp</dimen>
+    <dimen name="detail_hero_height">300dp</dimen>
+</resources>

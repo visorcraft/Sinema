@@ -7,4 +7,8 @@ object WatchedToggle {
 
     fun buttonLabel(watched: Boolean): String =
         if (watched) "❌ Mark Unwatched" else "👁️ Mark Watched"
+
+    /** Compact variant for the detail screen's narrow action pills. */
+    fun shortButtonLabel(watched: Boolean): String =
+        if (watched) "👁 Unwatched" else "👁 Watched"
 }

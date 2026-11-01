@@ -952,7 +952,12 @@ class SinemaApi(
             tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
             performers = (obj.get("performers") as? JsonArray)?.let(::parsePerformerRefs) ?: emptyList(),
             captions = (obj.get("captions") as? JsonArray)?.let(::parseCaptionRefs) ?: emptyList(),
-            lastPlayedAt = obj.get("last_played_at")?.takeIf { !it.isJsonNull }?.asString
+            lastPlayedAt = obj.get("last_played_at")?.takeIf { !it.isJsonNull }?.asString,
+            galleries = (obj.get("galleries") as? JsonArray)?.mapNotNull { g ->
+                val go = g.asJsonObject
+                val gid = go.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+                com.sinema.model.GalleryRef(gid, go.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "")
+            } ?: emptyList()
         )
     }
 
@@ -1055,19 +1060,35 @@ class SinemaApi(
     /**
      * Fetches header info for one entity (detail header on the entity scenes
      * screen). Performers include their tag list; tags and studios do not.
+     * Ratings are best-effort: older schemas that reject entity rating fields
+     * get one retry without them (favorite state stays null).
      * @throws IOException on transport or GraphQL errors, like every method here.
      */
-    suspend fun findEntityHeader(kind: EntityItem.Kind, entityId: String): EntityHeader? {
+    suspend fun findEntityHeader(kind: EntityItem.Kind, entityId: String): EntityHeader? =
+        try {
+            findEntityHeaderInternal(kind, entityId, includeRating = true)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            findEntityHeaderInternal(kind, entityId, includeRating = false)
+        }
+
+    private suspend fun findEntityHeaderInternal(
+        kind: EntityItem.Kind,
+        entityId: String,
+        includeRating: Boolean
+    ): EntityHeader? {
         val queryName = when (kind) {
             EntityItem.Kind.TAG -> "findTag"
             EntityItem.Kind.PERFORMER -> "findPerformer"
             EntityItem.Kind.STUDIO -> "findStudio"
         }
         val tagsField = if (kind == EntityItem.Kind.PERFORMER) " tags { id name }" else ""
+        val ratingField = if (includeRating) " rating100" else ""
         val query = """
             query(${"$"}id: ID!) {
                 $queryName(id: ${"$"}id) {
-                    id name scene_count image_path$tagsField
+                    id name scene_count image_path$tagsField$ratingField
                 }
             }
         """.trimIndent()
@@ -1085,7 +1106,8 @@ class SinemaApi(
         kind = kind,
         sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
         imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
-        tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList()
+        tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
+        rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt
     )
 
     suspend fun findGroups(
@@ -1494,6 +1516,26 @@ class SinemaApi(
             fields = SCENE_FIELDS_FULL + " last_played_at"
         ).second
 
+    /**
+     * Scenes with saved progress ("Finish Watching" triage). Near-end scenes
+     * (within 30s of the end) are filtered client-side by the caller.
+     */
+    suspend fun findPartiallyWatched(
+        page: Int,
+        perPage: Int,
+        sort: String = "resume_time",
+        direction: String = "DESC",
+        filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions()
+    ): Pair<Int, List<Scene>> =
+        findScenesInternal(
+            page = page,
+            perPage = perPage,
+            sort = sort,
+            direction = direction,
+            sceneFilter = mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
+            filters = filters
+        )
+
     /** Stash server version string ("unknown" when the query fails). */
     suspend fun getServerVersion(): String {
         val query = """query { version { version } }"""
@@ -1654,6 +1696,7 @@ class SinemaApi(
                 findScene(id: ${"$"}id) {
                     $SCENE_FIELDS_FULL
                     resume_time
+                    galleries { id title }
                     scene_markers { id title seconds primary_tag { id name } }
                 }
             }

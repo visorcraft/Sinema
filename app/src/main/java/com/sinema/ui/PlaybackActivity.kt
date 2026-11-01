@@ -29,8 +29,10 @@ import com.sinema.model.StarRating
 import com.bumptech.glide.Glide
 import com.sinema.util.GlideAuth
 import com.sinema.util.PlaybackQueue
+import com.sinema.util.QueuePlanning
 import com.sinema.util.SceneIntents
 import com.sinema.util.TimeFormat
+import com.sinema.util.TonightMix
 import kotlinx.coroutines.launch
 
 private const val VIDEO_OUTPUT_TIMEOUT_MS = 5_000L
@@ -57,6 +59,9 @@ class PlaybackActivity : FragmentActivity() {
     private var streamQualityDialog: android.app.AlertDialog? = null
     private var resumePromptDialog: android.app.AlertDialog? = null
     private var upNextDialog: android.app.AlertDialog? = null
+    /** Scenes already played in the current Endless Mix session. */
+    private val endlessPlayedIds = mutableSetOf<String>()
+    private var endlessJob: kotlinx.coroutines.Job? = null
     private var playbackErrorDialog: android.app.AlertDialog? = null
     /** True once the user picked Resume/Start-over or started playback manually. */
     private var resumePromptResolved = false
@@ -741,6 +746,10 @@ class PlaybackActivity : FragmentActivity() {
                         val wasActive = PlaybackQueue.isActive
                         val next = PlaybackQueue.next()
                         if (next == null) {
+                            if (wasActive && SinemaApp.instance.prefs.endlessMix) {
+                                extendEndlessMix()
+                                return
+                            }
                             if (wasActive) finish()
                             return
                         }
@@ -854,38 +863,46 @@ class PlaybackActivity : FragmentActivity() {
     private fun showPlayerMenu() {
         if (playerMenuDialog?.isShowing == true) return
         val incognito = SinemaApp.instance.prefs.incognitoMode
-        val items = buildList {
-            if (markers.isNotEmpty()) add("Chapters")
-            add("★ Rate scene")
-            add("🔥 O +1")
-            add(if (incognito) "🕶 Incognito: ON" else "🕶 Incognito: OFF")
-            add("Aspect ratio")
-            add("Stream quality")
-            add("Seek buttons")
+        // Label→action pairs: localized labels are never identity keys.
+        val entries = buildList {
+            if (markers.isNotEmpty()) {
+                add(getString(R.string.playback_menu_chapters) to Runnable { showChapters() })
+            }
+            add(getString(R.string.playback_menu_rate) to Runnable { showRateDialog() })
+            add(getString(R.string.playback_menu_o) to Runnable { incrementOCount() })
+            add(
+                (if (incognito) "🕶 Incognito: ON" else "🕶 Incognito: OFF") to Runnable {
+                    SinemaApp.instance.prefs.incognitoMode = !incognito
+                    if (incognito) {
+                        Toast.makeText(this@PlaybackActivity, "Incognito off", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Viewing from here on stays unrecorded for this scene
+                        // even if incognito is disabled before exit.
+                        incognitoLatchSceneId = sceneId
+                        Toast.makeText(this@PlaybackActivity, "Incognito on — watch history paused", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+            add(
+                (if (SinemaApp.instance.prefs.endlessMix) "♾ Endless Mix: ON" else "♾ Endless Mix: OFF") to Runnable {
+                    val enable = !SinemaApp.instance.prefs.endlessMix
+                    SinemaApp.instance.prefs.endlessMix = enable
+                    Toast.makeText(
+                        this@PlaybackActivity,
+                        getString(if (enable) R.string.endless_on_toast else R.string.endless_off_toast),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            )
+            add(getString(R.string.playback_menu_aspect) to Runnable { showAspectRatioDialog() })
+            add(getString(R.string.playback_menu_quality) to Runnable { showStreamQualityDialog() })
+            add(getString(R.string.playback_menu_seek) to Runnable { cycleSeekPreset() })
         }
         playerMenuDialog = android.app.AlertDialog.Builder(this)
-            .setTitle("Playback menu")
-            .setItems(items.toTypedArray()) { dialog, which ->
+            .setTitle(getString(R.string.playback_menu_title))
+            .setItems(entries.map { it.first }.toTypedArray()) { dialog, which ->
                 dialog.dismiss()
-                when (items[which]) {
-                    "Chapters" -> showChapters()
-                    "★ Rate scene" -> showRateDialog()
-                    "🔥 O +1" -> incrementOCount()
-                    "🕶 Incognito: ON" -> {
-                        SinemaApp.instance.prefs.incognitoMode = false
-                        Toast.makeText(this, "Incognito off", Toast.LENGTH_SHORT).show()
-                    }
-                    "🕶 Incognito: OFF" -> {
-                        SinemaApp.instance.prefs.incognitoMode = true
-                        // Viewing from here on must stay unrecorded for this
-                        // scene even if incognito is disabled before exit.
-                        incognitoLatchSceneId = sceneId
-                        Toast.makeText(this, "Incognito on — watch history paused", Toast.LENGTH_SHORT).show()
-                    }
-                    "Aspect ratio" -> showAspectRatioDialog()
-                    "Stream quality" -> showStreamQualityDialog()
-                    "Seek buttons" -> cycleSeekPreset()
-                }
+                entries[which].second.run()
             }
             .setOnDismissListener {
                 if (playerMenuDialog === it) playerMenuDialog = null
@@ -1023,6 +1040,7 @@ class PlaybackActivity : FragmentActivity() {
             }
             if (isFinishing || isDestroyed) return@launch
             hideSeekPreview()
+            endlessPlayedIds.add(nextId)
             incognitoLatchSceneId = if (SinemaApp.instance.prefs.incognitoMode) nextId else null
             sceneTitle = nextTitle
             sceneId = nextId
@@ -1043,6 +1061,55 @@ class PlaybackActivity : FragmentActivity() {
             // the already-swapped sceneId.
             if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
                 initPlayer()
+            }
+        }
+    }
+
+    /**
+     * Endless Mix: an exhausted queue refills itself with fresh unwatched
+     * favorites (falling back to unwatched recent scenes), skipping anything
+     * already played this session. Stops cleanly when nothing is left.
+     */
+    private fun extendEndlessMix() {
+        if (endlessJob?.isActive == true) return
+        val app = SinemaApp.instance
+        // lifecycleScope: extending requires this activity alive to continue
+        // playback — closing it cancels the fetch instead of mutating the
+        // shared queue from a dead session.
+        endlessJob = lifecycleScope.launch {
+            try {
+                endlessPlayedIds.add(sceneId)
+                var candidates = app.api.findFavoriteScenesPaged(
+                    page = 1, perPage = 100, sort = "random", direction = "DESC", unwatchedOnly = true
+                ).second.filter { it.id !in endlessPlayedIds }
+                if (candidates.isEmpty()) {
+                    candidates = app.api.findRecentScenesPaged(page = 1, perPage = 100)
+                        .second.filter { !it.isWatched && it.id !in endlessPlayedIds }
+                }
+                if (candidates.isEmpty()) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                        if (!isFinishing) {
+                            Toast.makeText(applicationContext, getString(R.string.endless_nothing), Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                    }
+                    return@launch
+                }
+                val batch = TonightMix.select(candidates)
+                if (batch.isEmpty()) return@launch
+                val next = batch.first()
+                PlaybackQueue.start(QueuePlanning.toQueueItems(batch), startAt = 0)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    if (isFinishing || isDestroyed) return@withContext
+                    playSceneNow(next.id, next.title)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("Sinema", "Endless Mix extension failed", e)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    if (!isFinishing) finish()
+                }
             }
         }
     }
@@ -1081,61 +1148,39 @@ class PlaybackActivity : FragmentActivity() {
         if (upNextDialog?.isShowing == true) return
         val remaining = PlaybackQueue.remaining()
         if (remaining.isEmpty()) {
-            Toast.makeText(this, "Queue empty", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.up_next_empty), Toast.LENGTH_SHORT).show()
             return
         }
-        val current = PlaybackQueue.current()
-        // Dimmed "now playing" row above the selectable remainder; disabled
-        // so D-pad skips straight to the first playable item.
-        val display = listOfNotNull(current) + remaining
-        val hasCurrentRow = current != null
-        val labels = display.map { item ->
-            val prefix = if (hasCurrentRow && item.id == current!!.id) "▶ " else ""
-            prefix + "${com.sinema.util.TimeFormat.formatSeconds(item.durationSec)}  ${item.title}"
+        val adapter = UpNextAdapter(this) { target ->
+            // Resolve by stable id through the live queue.
+            if (PlaybackQueue.current()?.id == target.id) return@UpNextAdapter
+            PlaybackQueue.jumpToItem(target.id)?.let {
+                upNextDialog?.dismiss()
+                playSceneNow(it.id, it.title, saveCurrent = true)
+            } ?: Toast.makeText(this, getString(R.string.up_next_not_in_queue), Toast.LENGTH_SHORT).show()
         }
-        val adapter = object : android.widget.ArrayAdapter<String>(
-            this, android.R.layout.simple_list_item_1, labels
-        ) {
-            override fun areAllItemsEnabled() = false
-            override fun isEnabled(position: Int) = !(hasCurrentRow && position == 0)
-            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
-                val row = super.getView(position, convertView, parent)
-                row.alpha = if (hasCurrentRow && position == 0) 0.5f else 1f
-                return row
-            }
-        }
+        adapter.refresh()
         upNextDialog = android.app.AlertDialog.Builder(this)
-            .setTitle("Up Next (${remaining.size})")
-            .setAdapter(adapter) { dialog, which ->
-                dialog.dismiss()
-                if (hasCurrentRow && which == 0) return@setAdapter
-                val offset = if (hasCurrentRow) which - 1 else which
-                // Resolve by stable id: the queue may have advanced since
-                // this snapshot was built.
-                val targetId = remaining.getOrNull(offset)?.id ?: return@setAdapter
-                if (PlaybackQueue.current()?.id == targetId) return@setAdapter
-                PlaybackQueue.jumpToItem(targetId)?.let {
-                    playSceneNow(it.id, it.title, saveCurrent = true)
-                } ?: Toast.makeText(this, "No longer in queue", Toast.LENGTH_SHORT).show()
-            }
+            .setTitle(getString(R.string.up_next_title, remaining.size))
+            .setAdapter(adapter, null)
             .setNegativeButton("Unwatched only") { _, _ ->
                 PlaybackQueue.filterRemainingUnwatched()
                 val after = PlaybackQueue.remainingCount()
                 if (after == 0) {
-                    Toast.makeText(this, "No unwatched scenes ahead — queue emptied", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.up_next_unwatched_emptied), Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this, "$after unwatched ahead", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.up_next_unwatched_count, after), Toast.LENGTH_SHORT).show()
                 }
                 updatePlaybackText()
             }
             .setNeutralButton("Shuffle") { _, _ ->
                 if (PlaybackQueue.shuffleRemaining()) {
-                    Toast.makeText(this, "Shuffled ${PlaybackQueue.remainingCount()} upcoming", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.up_next_shuffled, PlaybackQueue.remainingCount()), Toast.LENGTH_SHORT).show()
                 }
             }
             .setPositiveButton("Exit queue") { _, _ ->
                 PlaybackQueue.clear()
-                Toast.makeText(this, "Queue cleared", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.up_next_cleared), Toast.LENGTH_SHORT).show()
                 updatePlaybackText()
             }
             .setOnDismissListener { playerView.requestFocus() }
