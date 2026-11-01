@@ -348,10 +348,6 @@ class MainFragment : RowsSupportFragment() {
         loadContent(force = true)
     }
 
-    fun forceReload() {
-        loadContent()
-    }
-
     /**
      * "Surprise Me" — pick one random scene from the whole library and
      * jump straight into playback (no queue). In-flight guard keeps a

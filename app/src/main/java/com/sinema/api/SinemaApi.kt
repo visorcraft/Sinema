@@ -332,8 +332,6 @@ class SinemaApi(
         }
     }
 
-    suspend fun findAllScenes(page: Int = 1, perPage: Int = 100): Pair<Int, List<Scene>> =
-        findScenesInternal(page = page, perPage = perPage)
 
     suspend fun findScenesByPath(
         pathPrefix: String, page: Int = 1, perPage: Int = 100,

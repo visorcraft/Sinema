@@ -149,33 +149,10 @@ class Prefs(context: Context) {
     val isConfigured: Boolean
         get() = apiKey.isNotBlank() || sessionCookie.isNotBlank()
 
-    fun getFavorites(): MutableSet<String> {
-        val json = prefs.getString("favorites", "[]") ?: "[]"
-        val type = object : TypeToken<MutableSet<String>>() {}.type
-        return gson.fromJson(json, type) ?: mutableSetOf()
-    }
 
-    fun setFavorite(sceneId: String, fav: Boolean) {
-        val favs = getFavorites()
-        if (fav) favs.add(sceneId) else favs.remove(sceneId)
-        prefs.edit().putString("favorites", gson.toJson(favs)).apply()
-    }
 
-    fun isFavorite(sceneId: String): Boolean = getFavorites().contains(sceneId)
 
-    fun getRecentlyWatched(): List<String> {
-        val json = prefs.getString("recently_watched", "[]") ?: "[]"
-        val type = object : TypeToken<List<String>>() {}.type
-        return gson.fromJson(json, type) ?: emptyList()
-    }
 
-    fun addRecentlyWatched(sceneId: String) {
-        val list = getRecentlyWatched().toMutableList()
-        list.remove(sceneId)
-        list.add(0, sceneId)
-        val trimmed = list.take(50)
-        prefs.edit().putString("recently_watched", gson.toJson(trimmed)).apply()
-    }
 
     fun getResumePosition(sceneId: String): Long {
         return prefs.getLong("resume_$sceneId", 0L)
@@ -230,11 +207,6 @@ class Prefs(context: Context) {
         prefs.edit().remove("recent_searches").apply()
     }
 
-    fun getAllResumePositions(): Map<String, Long> {
-        return prefs.all.filter { it.key.startsWith("resume_") && it.value is Long && (it.value as Long) > 0 }
-            .map { it.key.removePrefix("resume_") to (it.value as Long) }
-            .toMap()
-    }
 
     fun hasPinSet(): Boolean {
         return prefs.getString("pin_hash", null) != null
