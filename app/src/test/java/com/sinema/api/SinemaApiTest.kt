@@ -5,6 +5,31 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SinemaApiTest {
+    /** Standard fake GraphQL server: fixed response, captures last request body. */
+    private fun withGraphqlServer(
+        response: String,
+        block: (api: SinemaApi, requestBody: () -> String) -> Unit
+    ) {
+        val captured = java.util.concurrent.atomic.AtomicReference("")
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            captured.set(exchange.requestBody.bufferedReader().readText())
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            block(SinemaApi("http://127.0.0.1:${server.address.port}", "k")) { captured.get() }
+        } finally {
+            server.stop(0)
+        }
+    }
+
 
     @Test
     fun `apikey mode sends ApiKey header`() {
@@ -227,27 +252,12 @@ class SinemaApiTest {
 
     @Test
     fun `findSavedSceneFilters requests scene mode and parses list`() {
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findSavedFilters":[
+        withGraphqlServer("""{"data":{"findSavedFilters":[
                 {"id":"3","name":"Rated HD",
                  "find_filter":{"sort":"rating","direction":"DESC"},
                  "object_filter":{"rating100":{"value":40,"modifier":"GREATER_THAN"}}},
                 {"id":"4","name":"Tagged"}
-            ]}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            ]}}""") { api, requestBody ->
             val filters = kotlinx.coroutines.runBlocking { api.findSavedSceneFilters() }
             assertEquals(2, filters.size)
             assertEquals("Rated HD", filters[0].name)
@@ -255,11 +265,9 @@ class SinemaApiTest {
             assertEquals(40.0, (filters[0].sceneFilter?.get("rating100") as Map<*, *>)["value"])
             assertEquals(null, filters[1].sceneFilter)
             org.junit.Assert.assertTrue(
-                "Expected SCENES mode in query: ${requestBody.get()}",
-                requestBody.get().contains("findSavedFilters(mode: SCENES)")
+                "Expected SCENES mode in query: ${requestBody()}",
+                requestBody().contains("findSavedFilters(mode: SCENES)")
             )
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -281,65 +289,33 @@ class SinemaApiTest {
 
     @Test
     fun `findRandomScene requests one random scene and parses it`() {
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findScenes":{"count":9,"scenes":[
+        withGraphqlServer("""{"data":{"findScenes":{"count":9,"scenes":[
                 {"id":"9","title":"r","play_count":1,"rating100":null,"resume_time":10.0,
                  "files":[{"path":"/data/r.mp4","size":10,"duration":100.0,"width":1920,"height":1080}]}
-            ]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            ]}}}""") { api, requestBody ->
             val scene = kotlinx.coroutines.runBlocking { api.findRandomScene() }
             org.junit.Assert.assertNotNull(scene)
             assertEquals("9", scene!!.id)
             assertEquals("/data/r.mp4", scene.path)
             assertEquals(10.0, scene.resumeTime, 0.0)
             org.junit.Assert.assertTrue(
-                "Expected random sort in request body: ${requestBody.get()}",
-                requestBody.get().contains("\"sort\":\"random\"")
+                "Expected random sort in request body: ${requestBody()}",
+                requestBody().contains("\"sort\":\"random\"")
             )
             org.junit.Assert.assertTrue(
-                "Expected per_page 1 in request body: ${requestBody.get()}",
-                requestBody.get().contains("\"per_page\":1")
+                "Expected per_page 1 in request body: ${requestBody()}",
+                requestBody().contains("\"per_page\":1")
             )
-        } finally {
-            server.stop(0)
         }
     }
 
     @Test
     fun `findEntityHeader requests performer with tags and parses response`() {
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findPerformer":{
+        withGraphqlServer("""{"data":{"findPerformer":{
                 "id":"7","name":"Performer Name","scene_count":12,
                 "image_path":"http://127.0.0.1/performer/7/image",
                 "tags":[{"id":"1","name":"blonde"},{"id":"2","name":"new"}]
-            }}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            }}}""") { api, requestBody ->
             val header = kotlinx.coroutines.runBlocking {
                 api.findEntityHeader(com.sinema.model.EntityItem.Kind.PERFORMER, "7")
             }
@@ -347,12 +323,10 @@ class SinemaApiTest {
             assertEquals("Performer Name", header!!.name)
             assertEquals(12, header.sceneCount)
             assertEquals(listOf("blonde", "new"), header.tags.map { it.name })
-            val body = requestBody.get()
+            val body = requestBody()
             org.junit.Assert.assertTrue("Expected findPerformer query: $body", body.contains("findPerformer"))
             org.junit.Assert.assertTrue("Expected tags selection for performer: $body", body.contains("tags { id name }"))
             org.junit.Assert.assertTrue("Expected id variable: $body", body.contains("\"id\":\"7\""))
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -360,34 +334,17 @@ class SinemaApiTest {
     fun `searchScenesForSuggestions bounds itself to the suggestion client`() {
         // Request-shape contract: q term + per_page + no scene_filter, and a
         // parseable scene list straight from the bounded suggestions client.
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findScenes":{"count":1,"scenes":[
+        withGraphqlServer("""{"data":{"findScenes":{"count":1,"scenes":[
                 {"id":"5","title":"match","play_count":0,"rating100":null,"resume_time":0.0,
                  "files":[{"path":"/data/m.mp4","size":9,"duration":10.0,"width":1,"height":2}]}
-            ]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            ]}}}""") { api, requestBody ->
             val scenes = kotlinx.coroutines.runBlocking { api.searchScenesForSuggestions("mat", perPage = 8) }
             assertEquals(1, scenes.size)
             assertEquals("match", scenes[0].title)
-            val body = requestBody.get()
+            val body = requestBody()
             org.junit.Assert.assertTrue(body.contains("\"q\":\"mat\""))
             org.junit.Assert.assertTrue(body.contains("\"per_page\":8"))
             org.junit.Assert.assertFalse("Suggestions must not send scene_filter", body.contains("scene_filter"))
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -431,29 +388,14 @@ class SinemaApiTest {
 
     @Test
     fun `findSceneMarkers sends tag filter and parses list`() {
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findSceneMarkers":{"count":2,"scene_markers":[
+        withGraphqlServer("""{"data":{"findSceneMarkers":{"count":2,"scene_markers":[
                 {"id":"m1","title":"Intro","seconds":10.0,
                  "primary_tag":{"id":"9","name":"t1"},
                  "scene":{"id":"7","title":"S","files":[{"path":"/a.mp4","size":1,"duration":60.0,"width":1,"height":2}]}},
                 {"id":"m2","title":"","seconds":20.0,
                  "primary_tag":{"id":"9","name":"t1"},
                  "scene":{"id":"8","title":"S2","files":[]}}
-            ]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            ]}}}""") { api, requestBody ->
             val (count, markers) = kotlinx.coroutines.runBlocking {
                 api.findSceneMarkers(page = 1, perPage = 50, sort = "created_at", direction = "DESC", tagId = "9")
             }
@@ -464,7 +406,7 @@ class SinemaApiTest {
             // Exact wire contract: hierarchical tags criterion under the
             // marker_filter variable (maps to $marker_filter in the query),
             // page/sort in the find filter.
-            val body = com.google.gson.JsonParser.parseString(requestBody.get()).asJsonObject
+            val body = com.google.gson.JsonParser.parseString(requestBody()).asJsonObject
             val variables = body.getAsJsonObject("variables")
             assertEquals(1, variables.get("filter").asJsonObject.get("page").asInt)
             assertEquals("created_at", variables.get("filter").asJsonObject.get("sort").asString)
@@ -483,7 +425,7 @@ class SinemaApiTest {
             assertEquals(
                 "q must be absent for a blank search",
                 false,
-                com.google.gson.JsonParser.parseString(requestBody.get()).asJsonObject
+                com.google.gson.JsonParser.parseString(requestBody()).asJsonObject
                     .getAsJsonObject("variables").getAsJsonObject("filter").has("q")
             )
             kotlinx.coroutines.runBlocking {
@@ -491,42 +433,25 @@ class SinemaApiTest {
             }
             assertEquals(
                 "intro",
-                com.google.gson.JsonParser.parseString(requestBody.get()).asJsonObject
+                com.google.gson.JsonParser.parseString(requestBody()).asJsonObject
                     .getAsJsonObject("variables").getAsJsonObject("filter").get("q").asString
             )
-        } finally {
-            server.stop(0)
         }
     }
 
     @Test
     fun `findTopPlayedScenes requests play count sort and full fields`() {
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findScenes":{"count":1,"scenes":[
+        withGraphqlServer("""{"data":{"findScenes":{"count":1,"scenes":[
                 {"id":"5","title":"top","play_count":9,"rating100":null,"resume_time":0.0,
                  "date":"2020-01-01","details":null,"o_counter":0,
                  "studio":{"id":"2","name":"St"},"tags":[],"performers":[],"captions":[],
                  "files":[{"path":"/data/t.mp4","size":9,"duration":10.0,"width":1920,"height":1080}]}
-            ]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            ]}}}""") { api, requestBody ->
             val scenes = kotlinx.coroutines.runBlocking { api.findTopPlayedScenes() }
             assertEquals(1, scenes.size)
             assertEquals("top", scenes[0].title)
             assertEquals("St", scenes[0].studio?.name)
-            val variables = com.google.gson.JsonParser.parseString(requestBody.get())
+            val variables = com.google.gson.JsonParser.parseString(requestBody())
                 .asJsonObject.getAsJsonObject("variables")
             assertEquals("play_count", variables.get("filter").asJsonObject.get("sort").asString)
             assertEquals("DESC", variables.get("filter").asJsonObject.get("direction").asString)
@@ -535,11 +460,9 @@ class SinemaApiTest {
             assertEquals("GREATER_THAN", playCount.get("modifier").asString)
             assertEquals(0, playCount.get("value").asInt)
             org.junit.Assert.assertTrue(
-                "Expected full metadata fields in query: ${requestBody.get()}",
-                requestBody.get().contains("performers") && requestBody.get().contains("o_counter")
+                "Expected full metadata fields in query: ${requestBody()}",
+                requestBody().contains("performers") && requestBody().contains("o_counter")
             )
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -614,29 +537,12 @@ class SinemaApiTest {
 
     @Test
     fun `unfavorite sends explicit null rating`() {
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"sceneUpdate":{"id":"42","rating100":100}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+        withGraphqlServer("""{"data":{"sceneUpdate":{"id":"42","rating100":100}}}""") { api, requestBody ->
             kotlinx.coroutines.runBlocking { api.setSceneRating("42", null) }
             org.junit.Assert.assertTrue(
-                "Expected rating100:null in mutation body: ${requestBody.get()}",
-                requestBody.get().contains("\"rating100\":null")
+                "Expected rating100:null in mutation body: ${requestBody()}",
+                requestBody().contains("\"rating100\":null")
             )
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -693,22 +599,7 @@ class SinemaApiTest {
 
     @Test
     fun `scene search combines watched and favorite filters`() {
-        val requestBody = java.util.concurrent.atomic.AtomicReference("")
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody.set(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+        withGraphqlServer("""{"data":{"findScenes":{"count":0,"scenes":[]}}}""") { api, requestBody ->
             kotlinx.coroutines.runBlocking {
                 api.searchScenes(
                     "space",
@@ -718,12 +609,10 @@ class SinemaApiTest {
                     )
                 )
             }
-            val body = requestBody.get()
+            val body = requestBody()
             org.junit.Assert.assertTrue(body, body.contains("\"q\":\"space\""))
             org.junit.Assert.assertTrue(body, body.contains("\"play_count\":{\"value\":0,\"modifier\":\"EQUALS\"}"))
             org.junit.Assert.assertTrue(body, body.contains("\"rating100\":{\"value\":0,\"modifier\":\"GREATER_THAN\"}"))
-        } finally {
-            server.stop(0)
         }
     }
 
