@@ -83,6 +83,7 @@ Open `Markers` from the main screen to browse every scene marker ("chapter") on 
 - Cards show the marker's title (or its primary tag when untitled), the scene, the timestamp, and the scene screenshot at that moment.
 - Selecting a marker jumps straight into playback at the marker's timestamp.
 - Press Menu (or the Filter button) to filter markers by tag, and choose a sort order: Recently added, Title A–Z, or Random. The sort choice is remembered.
+- The Search button searches marker and scene titles; `Clear` removes the search. Tag filter and search combine.
 
 ## Stats
 
@@ -254,6 +255,8 @@ Scene grids (search results, favorites, folder views, and entity scene views) pr
 - Captions: any, with, or without.
 
 Filters combine with each other and with the current sort, and are saved per screen. The Filter button label always shows the active filter summary.
+
+For the two most-used filters there are quick toggles next to Filter on the same control bar: a watch button cycling All scenes → Unwatched → Watched, and a Favorites on/off button. They change the same saved filter state as the Filter dialog. While a minimum-star filter is active the Favorites button shows on (stars imply favorites); switching it off clears the whole rating filter, stars included.
 
 ## Rating scenes
 

@@ -26,6 +26,9 @@ import com.sinema.model.GroupItem
 import com.sinema.model.Scene
 import com.sinema.model.SceneFilterOptions
 import com.sinema.model.SortOption
+import com.sinema.model.cycled
+import com.sinema.model.effectiveFavorites
+import com.sinema.model.toggledQuickFavorites
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -66,6 +69,24 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
 
     override val canFilter = true
     override val filterLabel get() = sceneFilter.summary
+
+    // Quick watch/favorites toggles, shared semantics with SceneGridFragment.
+    override val canQuickFilter = true
+    override val quickWatchLabel: String get() = sceneFilter.watch.label
+    override val quickFavoritesLabel: String
+        get() = if (sceneFilter.effectiveFavorites()) "♥ Favorites ✓" else "♡ Favorites"
+
+    override fun toggleQuickWatch() {
+        sceneFilter = sceneFilter.copy(watch = sceneFilter.watch.cycled())
+        app.prefs.setSceneFilterFor("search", sceneFilter)
+        if (currentQuery.length >= 2) search(currentQuery)
+    }
+
+    override fun toggleQuickFavorites() {
+        sceneFilter = sceneFilter.toggledQuickFavorites()
+        app.prefs.setSceneFilterFor("search", sceneFilter)
+        if (currentQuery.length >= 2) search(currentQuery)
+    }
 
     private val micPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()

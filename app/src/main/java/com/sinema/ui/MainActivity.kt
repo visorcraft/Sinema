@@ -173,7 +173,7 @@ class MainFragment : RowsSupportFragment() {
                             requireActivity().finishAffinity()
                         }
                         "Refresh" -> {
-                            loadContent()
+                            loadContent(force = true)
                             Toast.makeText(requireContext(), "Refreshing...", Toast.LENGTH_SHORT).show()
                         }
                         "About" -> {
@@ -247,7 +247,7 @@ class MainFragment : RowsSupportFragment() {
             return
         }
         reconcileHomeRows()
-        loadContent()
+        loadContent(force = true)
     }
 
     fun forceReload() {
@@ -287,6 +287,7 @@ class MainFragment : RowsSupportFragment() {
                                 val itemIndex: Int, val itemKey: String?)
 
     private var pausedFocus = RowFocus(-1, null, -1, null)
+    private var lastLoadElapsedMs = 0L
 
     override fun onPause() {
         super.onPause()
@@ -436,8 +437,11 @@ class MainFragment : RowsSupportFragment() {
     private fun <T> applyResult(state: HomeRowState<T>, result: RowResult<List<T>>): HomeRowState<T> =
         result.error?.let(state::failed) ?: state.loaded(result.value.orEmpty())
 
-    private fun loadContent() {
+    private fun loadContent(force: Boolean = false) {
         if (isLoading) return
+        // Quick round-trips (settings, detail screens) within the TTL keep
+        // the current rows; explicit Refresh and layout changes force.
+        if (!shouldReloadHome(lastLoadElapsedMs, android.os.SystemClock.elapsedRealtime(), force)) return
         isLoading = true
         val live = captureFocus()
         val focus = if (live.rowIndex >= 0) live else pausedFocus
@@ -637,6 +641,9 @@ class MainFragment : RowsSupportFragment() {
                 }
             } finally {
                 isLoading = false
+                // Stamp even failures: a dead server should not be re-hit on
+                // every resume either.
+                lastLoadElapsedMs = android.os.SystemClock.elapsedRealtime()
             }
 
             // Restore focus to the same logical row/item after reconciliation.
@@ -701,6 +708,17 @@ class MainFragment : RowsSupportFragment() {
 
 internal fun shouldLoadHomeRow(rowVisible: Boolean, channelsEnabled: Boolean, feedsLauncher: Boolean): Boolean =
     rowVisible || (channelsEnabled && feedsLauncher)
+
+/** Reload the home dashboard at most this often on resume (Refresh forces). */
+internal const val HOME_RELOAD_TTL_MS = 15_000L
+
+/**
+ * Gate for the onResume dashboard reload: skip when the last load is fresher
+ * than [HOME_RELOAD_TTL_MS]. Uses elapsedRealtime deltas so wall-clock
+ * changes cannot affect it. `lastLoadElapsedMs <= 0` means "never loaded".
+ */
+internal fun shouldReloadHome(lastLoadElapsedMs: Long, nowElapsedMs: Long, force: Boolean = false): Boolean =
+    force || lastLoadElapsedMs <= 0L || nowElapsedMs - lastLoadElapsedMs >= HOME_RELOAD_TTL_MS
 
 /**
  * TV channel sync must only run on a successfully loaded row: both syncs

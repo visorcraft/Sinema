@@ -27,6 +27,28 @@ enum class PresenceFilter(val label: String) {
     WITHOUT("Without")
 }
 
+/** Quick-toggle cycle for the grid watch filter: All → Unwatched → Watched. */
+fun WatchFilter.cycled(): WatchFilter = when (this) {
+    WatchFilter.ALL -> WatchFilter.UNWATCHED
+    WatchFilter.UNWATCHED -> WatchFilter.WATCHED
+    WatchFilter.WATCHED -> WatchFilter.ALL
+}
+
+/**
+ * Favorites as the user experiences it: `minStars > 0` implies every result
+ * is a favorite (the rating100 criterion is shared and minStars wins).
+ */
+fun SceneFilterOptions.effectiveFavorites(): Boolean = favoritesOnly || minStars > 0
+
+/**
+ * Quick Favorites toggle. Off clears the whole rating criterion — including
+ * a minimum-star filter — so the button never claims "off" while the query
+ * still filters by rating.
+ */
+fun SceneFilterOptions.toggledQuickFavorites(): SceneFilterOptions =
+    if (effectiveFavorites()) copy(favoritesOnly = false, minStars = 0)
+    else copy(favoritesOnly = true)
+
 data class SceneFilterOptions(
     val watch: WatchFilter = WatchFilter.ALL,
     val favoritesOnly: Boolean = false,

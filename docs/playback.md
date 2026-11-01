@@ -40,7 +40,7 @@ Common controls:
 - Back: leave playback and save progress.
 - Rewind/forward buttons: quick-seek using the selected preset. Choose `Seek` in the action row or `Seek buttons` in the playback menu to cycle through −10s/+30s, −30s/+60s, and −60s/+60s. The choice is remembered.
 - Timeline: focus the seek bar and use D-pad Left/Right to scrub (Left uses the preset's rewind amount, Right its forward amount). Marker positions appear as ticks.
-- Marker jumps: previous/next marker buttons flank play/pause; the action-row marker button also jumps to the next marker. Media keys Previous/Next do the same.
+- Marker jumps: previous/next marker buttons flank play/pause; the action-row marker button also jumps to the next marker. Media keys Previous/Next do the same. The chapters dialog (Menu → Chapters) shows each marker's frame thumbnail and timestamp.
 - O counter: Menu → `🔥 O +1` records an O in Stash for the scene playing.
 - Resume prompt: opening a scene with saved progress ≥ 10 seconds asks whether to resume at that position or start over. Back leaves playback paused with controls shown.
 - Scrub preview: while actively scrubbing, Sinema shows a timestamp and an authenticated Stash frame near that position. Requests are throttled to five-second buckets; the image is hidden if the server cannot provide it.

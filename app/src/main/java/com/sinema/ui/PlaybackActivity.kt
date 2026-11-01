@@ -704,11 +704,11 @@ class PlaybackActivity : FragmentActivity() {
     private fun showChapters() {
         if (markers.isEmpty()) return
         if (chaptersDialog?.isShowing == true) return
-        val labels = markers.map { "${TimeFormat.formatSeconds(it.second)}  ${it.first}" }
+        val scene = sceneId
         chaptersDialog = android.app.AlertDialog.Builder(this)
             .setTitle("Chapters")
-            .setItems(labels.toTypedArray()) { _, which ->
-                player?.seekTo((markers[which].second * 1000).toLong())
+            .setAdapter(ChapterListAdapter(this, SinemaApp.instance.api, scene, markers)) { _, which ->
+                markers.getOrNull(which)?.let { player?.seekTo((it.second * 1000).toLong()) }
             }
             .setOnDismissListener { playerView.requestFocus() }
             .show()
@@ -841,9 +841,12 @@ class PlaybackActivity : FragmentActivity() {
         // Manual Up Next jumps leave without onPause, so progress for the
         // current scene must be saved here (auto-advance saves at STATE_ENDED).
         if (saveCurrent) savePlayback()
-        // Any switch invalidates an open Up Next dialog's snapshot.
+        // Any switch invalidates an open Up Next dialog's snapshot and the
+        // chapters list (it belongs to the outgoing scene).
         upNextDialog?.dismiss()
         upNextDialog = null
+        chaptersDialog?.dismiss()
+        chaptersDialog = null
         // Serialize switches: a superseded jump must not interleave metadata
         // or sceneId updates with a newer one.
         sceneSwitchJob?.cancel()

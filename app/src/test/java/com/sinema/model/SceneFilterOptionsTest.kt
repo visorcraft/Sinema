@@ -1,6 +1,8 @@
 package com.sinema.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SceneFilterOptionsTest {
@@ -8,6 +10,36 @@ class SceneFilterOptionsTest {
     fun `default filter adds no criteria`() {
         assertEquals(emptyMap<String, Any?>(), SceneFilterOptions().toStashFilter())
         assertEquals("All scenes", SceneFilterOptions().summary)
+    }
+
+    @Test
+    fun `quick watch toggle cycles all unwatched watched`() {
+        assertEquals(WatchFilter.UNWATCHED, WatchFilter.ALL.cycled())
+        assertEquals(WatchFilter.WATCHED, WatchFilter.UNWATCHED.cycled())
+        assertEquals(WatchFilter.ALL, WatchFilter.WATCHED.cycled())
+    }
+
+    @Test
+    fun `quick favorites uses effective state including min stars`() {
+        // minStars implies favorites (rating100 criterion is shared).
+        assertTrue(SceneFilterOptions(minStars = 3).effectiveFavorites())
+        assertTrue(SceneFilterOptions(favoritesOnly = true).effectiveFavorites())
+        assertFalse(SceneFilterOptions().effectiveFavorites())
+
+        // Turning "on" just sets favoritesOnly…
+        assertEquals(
+            SceneFilterOptions(favoritesOnly = true),
+            SceneFilterOptions(minStars = 0).copy(favoritesOnly = false).toggledQuickFavorites()
+        )
+        // …turning "off" clears the whole rating criterion, stars included.
+        assertEquals(
+            SceneFilterOptions(favoritesOnly = false, minStars = 0),
+            SceneFilterOptions(minStars = 3).toggledQuickFavorites()
+        )
+        assertEquals(
+            SceneFilterOptions(favoritesOnly = false, minStars = 0),
+            SceneFilterOptions(favoritesOnly = true, minStars = 4).toggledQuickFavorites()
+        )
     }
 
     @Test

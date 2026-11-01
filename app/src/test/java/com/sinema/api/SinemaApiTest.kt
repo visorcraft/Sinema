@@ -474,6 +474,26 @@ class SinemaApiTest {
             assertEquals(0, tags.get("depth").asInt)
             assertEquals(1, tags.getAsJsonArray("value").size())
             assertEquals("9", tags.getAsJsonArray("value")[0].asString)
+
+            // Text search rides on FindFilterType.q; blank queries stay off
+            // the wire entirely.
+            kotlinx.coroutines.runBlocking {
+                api.findSceneMarkers(searchQuery = "  ")
+            }
+            assertEquals(
+                "q must be absent for a blank search",
+                false,
+                com.google.gson.JsonParser.parseString(requestBody.get()).asJsonObject
+                    .getAsJsonObject("variables").getAsJsonObject("filter").has("q")
+            )
+            kotlinx.coroutines.runBlocking {
+                api.findSceneMarkers(searchQuery = "intro")
+            }
+            assertEquals(
+                "intro",
+                com.google.gson.JsonParser.parseString(requestBody.get()).asJsonObject
+                    .getAsJsonObject("variables").getAsJsonObject("filter").get("q").asString
+            )
         } finally {
             server.stop(0)
         }

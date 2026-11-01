@@ -29,4 +29,17 @@ class HomeQueryTest {
         // Defensive: a result with neither value nor error must not wipe channels.
         assertFalse(shouldSyncTvChannelRow(RowResult<Any>()))
     }
+
+    @Test
+    fun `home reloads only after the ttl or when forced`() {
+        // Never loaded
+        assertTrue(shouldReloadHome(lastLoadElapsedMs = 0, nowElapsedMs = 500))
+        // Fresh load within TTL: skip
+        assertFalse(shouldReloadHome(lastLoadElapsedMs = 10_000, nowElapsedMs = 20_000))
+        // TTL boundary and beyond: reload
+        assertTrue(shouldReloadHome(lastLoadElapsedMs = 10_000, nowElapsedMs = 10_000 + HOME_RELOAD_TTL_MS))
+        assertTrue(shouldReloadHome(lastLoadElapsedMs = 10_000, nowElapsedMs = 10_000 + HOME_RELOAD_TTL_MS + 1))
+        // Force always wins, even mid-TTL
+        assertTrue(shouldReloadHome(lastLoadElapsedMs = 10_000, nowElapsedMs = 10_001, force = true))
+    }
 }

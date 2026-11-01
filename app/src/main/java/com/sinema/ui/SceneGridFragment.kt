@@ -19,6 +19,9 @@ import com.sinema.SinemaApp
 import com.sinema.model.Scene
 import com.sinema.model.SceneFilterOptions
 import com.sinema.model.SortOption
+import com.sinema.model.cycled
+import com.sinema.model.effectiveFavorites
+import com.sinema.model.toggledQuickFavorites
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -57,6 +60,23 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     private var pagingGrid: VerticalGridView? = null
 
     override val filterLabel: String get() = sceneFilter.summary
+
+    override val canQuickFilter: Boolean get() = canFilter
+    override val quickWatchLabel: String get() = sceneFilter.watch.label
+    override val quickFavoritesLabel: String
+        get() = if (sceneFilter.effectiveFavorites()) "♥ Favorites ✓" else "♡ Favorites"
+
+    override fun toggleQuickWatch() {
+        sceneFilter = sceneFilter.copy(watch = sceneFilter.watch.cycled())
+        filterScreenKey?.let { app.prefs.setSceneFilterFor(it, sceneFilter) }
+        reload()
+    }
+
+    override fun toggleQuickFavorites() {
+        sceneFilter = sceneFilter.toggledQuickFavorites()
+        filterScreenKey?.let { app.prefs.setSceneFilterFor(it, sceneFilter) }
+        reload()
+    }
 
     override fun showSortDialog() {
         val key = sortScreenKey ?: return

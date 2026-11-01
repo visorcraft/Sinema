@@ -1140,7 +1140,8 @@ class SinemaApi(
         perPage: Int = 100,
         sort: String = "created_at",
         direction: String = "DESC",
-        tagId: String? = null
+        tagId: String? = null,
+        searchQuery: String? = null
     ): Pair<Int, List<SceneMarkerItem>> {
         val query = """
             query(${"$"}filter: FindFilterType, ${"$"}marker_filter: SceneMarkerFilterType) {
@@ -1157,11 +1158,14 @@ class SinemaApi(
         val markerFilter = tagId?.takeIf { it.isNotBlank() }?.let {
             mapOf("tags" to mapOf("value" to listOf(it), "modifier" to "INCLUDES", "depth" to 0))
         }
+        val findFilter = mutableMapOf<String, Any?>(
+            "page" to page, "per_page" to perPage,
+            "sort" to sort, "direction" to direction
+        )
+        // FindFilterType.q searches marker titles (and their scene titles).
+        searchQuery?.takeIf { it.isNotBlank() }?.let { findFilter["q"] = it }
         val variables = mapOf(
-            "filter" to mapOf(
-                "page" to page, "per_page" to perPage,
-                "sort" to sort, "direction" to direction
-            ),
+            "filter" to findFilter,
             "marker_filter" to markerFilter
         )
         val result = graphql(query, variables)

@@ -50,18 +50,27 @@ class MarkerBrowserFragment : SceneGridFragment() {
     override val paged = true
     override val canFilter = true
 
+    // canFilter here means the *tag* filter; the quick watch/favorites
+    // toggles drive SceneFilterOptions, which marker queries never apply —
+    // they would reload the identical list.
+    override val canQuickFilter = false
+
     private var sortOption: MarkerSortOption = MarkerSortOption.CREATED_DESC
     private var tagId: String? = null
     private var tagName: String? = null
+    private var searchQuery: String = ""
 
     override val filterLabel: String
         get() = tagName ?: "All tags"
+
+    override val canSearch = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         sortOption = MarkerSortOption.fromName(app.prefs.sortFor("marker_browser"))
         savedInstanceState?.let { state ->
             tagId = state.getString("marker_tag_id")
             tagName = state.getString("marker_tag_name")
+            searchQuery = state.getString("marker_search").orEmpty()
         }
         super.onCreate(savedInstanceState)
     }
@@ -70,6 +79,7 @@ class MarkerBrowserFragment : SceneGridFragment() {
         super.onSaveInstanceState(outState)
         outState.putString("marker_tag_id", tagId)
         outState.putString("marker_tag_name", tagName)
+        outState.putString("marker_search", searchQuery)
     }
 
     override fun createCardPresenter(): Presenter = MarkerCardPresenter(app.api)
@@ -82,8 +92,33 @@ class MarkerBrowserFragment : SceneGridFragment() {
             perPage = perPage,
             sort = sortOption.apiSort(randomSeed),
             direction = sortOption.direction,
-            tagId = tagId
+            tagId = tagId,
+            searchQuery = searchQuery
         )
+
+    /** Text search across marker titles (FindFilterType.q). */
+    override fun showSearchDialog() {
+        val input = android.widget.EditText(requireContext()).apply {
+            setText(searchQuery)
+            setSelection(text.length)
+            hint = "Marker or scene title"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            isFocusable = true
+        }
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("Search markers")
+            .setView(input)
+            .setPositiveButton("Search") { _, _ ->
+                searchQuery = input.text.toString().trim()
+                reload()
+            }
+            .setNeutralButton("Clear") { _, _ ->
+                searchQuery = ""
+                reload()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
     /** Markers use their own sort fields, so the shared SortDialog is bypassed. */
     override fun showSortDialog() {
