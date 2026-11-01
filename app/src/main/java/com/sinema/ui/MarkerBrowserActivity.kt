@@ -122,19 +122,14 @@ class MarkerBrowserFragment : SceneGridFragment() {
 
     /** Markers use their own sort fields, so the shared SortDialog is bypassed. */
     override fun showSortDialog() {
-        val options = MarkerSortOption.entries
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Sort markers by")
-            .setSingleChoiceItems(
-                options.map { it.label }.toTypedArray(),
-                options.indexOf(sortOption)
-            ) { dialog, which ->
-                dialog.dismiss()
-                sortOption = options[which]
-                app.prefs.setSortFor("marker_browser", sortOption.name)
-                reload()
-            }
-            .show()
+        Dialogs.showChoiceDialog(
+            requireContext(), "Sort markers by", MarkerSortOption.entries, sortOption,
+            label = { it.label }
+        ) { chosen ->
+            sortOption = chosen
+            app.prefs.setSortFor("marker_browser", chosen.name)
+            reload()
+        }
     }
 
     override fun showGridMenu() {

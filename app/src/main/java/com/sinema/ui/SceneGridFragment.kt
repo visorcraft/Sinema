@@ -62,7 +62,10 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open fun createCardPresenter(): Presenter =
         CardPresenter(app.api, onItemLongClick = ::showCardActions)
     protected var sort: SortOption = SortOption.PATH_ASC
-    protected var sceneFilter = SceneFilterOptions()
+    /** Backed by [filterController]; safe default before onCreate init. */
+    protected var sceneFilter: SceneFilterOptions
+        get() = if (::filterController.isInitialized) filterController.value else SceneFilterOptions()
+        private set(_) { /* mutations go through SceneFilterController */ }
     protected var randomSeed: Int = 0
     private var loadJob: Job? = null
     private var loadGeneration = 0
@@ -70,24 +73,16 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     private lateinit var pageState: GridPageState
     private var pagingGrid: VerticalGridView? = null
 
-    override val filterLabel: String get() = sceneFilter.summary
+    override val filterLabel: String get() = filterController.value.summary
 
     override val canQuickFilter: Boolean get() = canFilter
-    override val quickWatchLabel: String get() = sceneFilter.watch.label
-    override val quickFavoritesLabel: String
-        get() = if (sceneFilter.effectiveFavorites()) "♥ Favorites ✓" else "♡ Favorites"
+    override val quickWatchLabel: String get() = filterController.watchLabel
+    override val quickFavoritesLabel: String get() = filterController.favoritesLabel
 
-    override fun toggleQuickWatch() {
-        sceneFilter = sceneFilter.copy(watch = sceneFilter.watch.cycled())
-        filterScreenKey?.let { app.prefs.setSceneFilterFor(it, sceneFilter) }
-        reload()
-    }
+    override fun toggleQuickWatch() = filterController.toggleWatch()
+    override fun toggleQuickFavorites() = filterController.toggleFavorites()
 
-    override fun toggleQuickFavorites() {
-        sceneFilter = sceneFilter.toggledQuickFavorites()
-        filterScreenKey?.let { app.prefs.setSceneFilterFor(it, sceneFilter) }
-        reload()
-    }
+    private lateinit var filterController: SceneFilterController
 
     override fun showSortDialog() {
         val key = sortScreenKey ?: return
@@ -102,13 +97,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     override fun showFilterDialog() {
         FilterDialog.show(
             requireContext(),
-            sceneFilter,
-            onChosen = { chosen ->
-                sceneFilter = chosen
-                filterScreenKey?.let { app.prefs.setSceneFilterFor(it, chosen) }
-                activity?.refreshGridControls()
-                reload()
-            },
+            filterController.value,
+            onChosen = { chosen -> filterController.apply(chosen) },
             onSave = { chosen ->
                 SavedFilterActions.promptSave(
                     requireActivity(), chosen, sort.apiSort(randomSeed), sort.direction
@@ -486,7 +476,15 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         randomSeed = savedInstanceState?.getInt("random_seed")
             ?: (0..99_999_999).random()
         sortScreenKey?.let { sort = SortOption.fromName(app.prefs.sortFor(it), defaultSort) }
-        if (canFilter) filterScreenKey?.let { sceneFilter = app.prefs.sceneFilterFor(it) }
+        if (canFilter) filterScreenKey?.let { key ->
+            filterController = SceneFilterController(
+                prefs = app.prefs,
+                screenKey = key,
+                initial = app.prefs.sceneFilterFor(key),
+                refreshControls = { activity?.refreshGridControls() },
+                reload = { reload() }
+            )
+        }
         updateTitle()
         // No badgeDrawable here: it overlays the first grid row on screens
         // with their own headers (entity scenes, folders). The title text

@@ -83,35 +83,25 @@ class EntityGridFragment : SceneGridFragment() {
     }
 
     override fun showSortDialog() {
-        val options = EntitySortOption.entries
-        AlertDialog.Builder(requireContext())
-            .setTitle("Sort by")
-            .setSingleChoiceItems(options.map { it.label }.toTypedArray(), options.indexOf(entitySort)) { dialog, which ->
-                dialog.dismiss()
-                entitySort = options[which]
-                app.prefs.setSortFor("entity_${kind.name}", entitySort.name)
-                reload()
-            }
-            .show()
+        Dialogs.showChoiceDialog(
+            requireContext(), "Sort by", EntitySortOption.entries, entitySort,
+            label = { it.label }
+        ) { chosen ->
+            entitySort = chosen
+            app.prefs.setSortFor("entity_${kind.name}", chosen.name)
+            reload()
+        }
     }
 
     override fun showSearchDialog() {
-        val input = EditText(requireContext()).apply {
-            setText(searchQuery)
-            setSelection(text.length)
-            hint = "Name"
-            inputType = InputType.TYPE_CLASS_TEXT
-            isFocusable = true
+        Dialogs.showTextSearchDialog(
+            requireContext(),
+            title = "Search ${kind.label.lowercase()}",
+            initialQuery = searchQuery
+        ) { query ->
+            searchQuery = query
+            reload()
         }
-        AlertDialog.Builder(requireContext())
-            .setTitle("Search ${kind.label.lowercase()}")
-            .setView(input)
-            .setPositiveButton("Search") { _, _ ->
-                searchQuery = input.text.toString().trim()
-                reload()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second

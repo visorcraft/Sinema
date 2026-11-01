@@ -64,29 +64,38 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private var searchJob: Job? = null
 
     private var sort: SortOption = SortOption.PATH_ASC
-    private var sceneFilter = SceneFilterOptions()
     private val randomSeed: Int = (0..99_999_999).random()
     private var currentQuery: String = ""
 
     override val canFilter = true
-    override val filterLabel get() = sceneFilter.summary
+    override val filterLabel get() = filterController.value.summary
 
     // Quick watch/favorites toggles, shared semantics with SceneGridFragment.
     override val canQuickFilter = true
-    override val quickWatchLabel: String get() = sceneFilter.watch.label
-    override val quickFavoritesLabel: String
-        get() = if (sceneFilter.effectiveFavorites()) "♥ Favorites ✓" else "♡ Favorites"
+    override val quickWatchLabel: String get() = filterController.watchLabel
+    override val quickFavoritesLabel: String get() = filterController.favoritesLabel
 
-    override fun toggleQuickWatch() {
-        sceneFilter = sceneFilter.copy(watch = sceneFilter.watch.cycled())
-        app.prefs.setSceneFilterFor("search", sceneFilter)
+    private val filterController = SceneFilterController(
+        prefs = app.prefs,
+        screenKey = "search",
+        initial = app.prefs.sceneFilterFor("search"),
+        refreshControls = { activity?.refreshGridControls() },
+        reload = { }
+    )
+    private val sceneFilter get() = filterController.value
+
+    private fun runSearch() {
         if (currentQuery.length >= 2) search(currentQuery)
     }
 
+    override fun toggleQuickWatch() {
+        filterController.toggleWatch()
+        runSearch()
+    }
+
     override fun toggleQuickFavorites() {
-        sceneFilter = sceneFilter.toggledQuickFavorites()
-        app.prefs.setSceneFilterFor("search", sceneFilter)
-        if (currentQuery.length >= 2) search(currentQuery)
+        filterController.toggleFavorites()
+        runSearch()
     }
 
     private val micPermissionLauncher = registerForActivityResult(
@@ -121,12 +130,10 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     override fun showFilterDialog() {
         FilterDialog.show(
             requireContext(),
-            sceneFilter,
+            filterController.value,
             onChosen = { chosen ->
-                sceneFilter = chosen
-                app.prefs.setSceneFilterFor("search", chosen)
-                activity?.refreshGridControls()
-                if (currentQuery.length >= 2) search(currentQuery)
+                filterController.apply(chosen)
+                runSearch()
             },
             onSave = { chosen ->
                 SavedFilterActions.promptSave(
@@ -169,9 +176,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sort = SortOption.fromName(app.prefs.sortFor("search"))
-        sceneFilter = app.prefs.sceneFilterFor("search")
         val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
-        lrp.shadowEnabled = false
         rowsAdapter = ArrayObjectAdapter(lrp)
         setSearchResultProvider(this)
         setSpeechRecognitionCallback {

@@ -54,41 +54,33 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
     private var currentPath = "/data"
 
     private var sort: SortOption = SortOption.PATH_ASC
-    private var sceneFilter = SceneFilterOptions()
     private val randomSeed: Int = (0..99_999_999).random()
     private var loadJob: Job? = null
 
     override val canFilter = true
-    override val filterLabel get() = sceneFilter.summary
+    override val filterLabel get() = filterController.value.summary
 
     // Quick watch/favorites toggles, shared semantics with SceneGridFragment.
     override val canQuickFilter = true
-    override val quickWatchLabel: String get() = sceneFilter.watch.label
-    override val quickFavoritesLabel: String
-        get() = if (sceneFilter.effectiveFavorites()) "♥ Favorites ✓" else "♡ Favorites"
+    override val quickWatchLabel: String get() = filterController.watchLabel
+    override val quickFavoritesLabel: String get() = filterController.favoritesLabel
+    override fun toggleQuickWatch() = filterController.toggleWatch()
+    override fun toggleQuickFavorites() = filterController.toggleFavorites()
 
-    override fun toggleQuickWatch() {
-        sceneFilter = sceneFilter.copy(watch = sceneFilter.watch.cycled())
-        app.prefs.setSceneFilterFor("folder", sceneFilter)
-        loadFolder()
-    }
-
-    override fun toggleQuickFavorites() {
-        sceneFilter = sceneFilter.toggledQuickFavorites()
-        app.prefs.setSceneFilterFor("folder", sceneFilter)
-        loadFolder()
-    }
+    private val filterController = SceneFilterController(
+        prefs = app.prefs,
+        screenKey = "folder",
+        initial = app.prefs.sceneFilterFor("folder"),
+        refreshControls = { activity?.refreshGridControls() },
+        reload = { loadFolder() }
+    )
+    private val sceneFilter get() = filterController.value
 
     override fun showFilterDialog() {
         FilterDialog.show(
             requireContext(),
-            sceneFilter,
-            onChosen = { chosen ->
-                sceneFilter = chosen
-                app.prefs.setSceneFilterFor("folder", chosen)
-                activity?.refreshGridControls()
-                loadFolder()
-            },
+            filterController.value,
+            onChosen = { chosen -> filterController.apply(chosen) },
             onSave = { chosen ->
                 SavedFilterActions.promptSave(
                     requireActivity(), chosen, sort.apiSort(randomSeed), sort.direction
@@ -144,7 +136,6 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         super.onCreate(savedInstanceState)
         currentPath = arguments?.getString("path") ?: "/data"
         sort = SortOption.fromName(app.prefs.sortFor("folder"))
-        sceneFilter = app.prefs.sceneFilterFor("folder")
         updateTitle()
         badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
 

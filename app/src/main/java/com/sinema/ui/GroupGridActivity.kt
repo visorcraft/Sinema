@@ -69,35 +69,23 @@ class GroupGridFragment : SceneGridFragment() {
     }
 
     override fun showSortDialog() {
-        val options = GroupSortOption.entries
-        AlertDialog.Builder(requireContext())
-            .setTitle("Sort by")
-            .setSingleChoiceItems(options.map { it.label }.toTypedArray(), options.indexOf(groupSort)) { dialog, which ->
-                dialog.dismiss()
-                groupSort = options[which]
-                app.prefs.setSortFor("group_grid", groupSort.name)
-                reload()
-            }
-            .show()
+        Dialogs.showChoiceDialog(
+            requireContext(), "Sort by", GroupSortOption.entries, groupSort,
+            label = { it.label }
+        ) { chosen ->
+            groupSort = chosen
+            app.prefs.setSortFor("group_grid", chosen.name)
+            reload()
+        }
     }
 
     override fun showSearchDialog() {
-        val input = EditText(requireContext()).apply {
-            setText(searchQuery)
-            setSelection(text.length)
-            hint = "Name"
-            inputType = InputType.TYPE_CLASS_TEXT
-            isFocusable = true
+        Dialogs.showTextSearchDialog(
+            requireContext(), title = "Search groups", initialQuery = searchQuery
+        ) { query ->
+            searchQuery = query
+            reload()
         }
-        AlertDialog.Builder(requireContext())
-            .setTitle("Search groups")
-            .setView(input)
-            .setPositiveButton("Search") { _, _ ->
-                searchQuery = input.text.toString().trim()
-                reload()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
