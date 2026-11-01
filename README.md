@@ -101,7 +101,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **Tags / Performers / Studios** — metadata browsing and filtering
 - **Groups / Movies** — collections, ordered scenes, and legacy Stash 0.24 compatibility
 - **Galleries / Images** — covers, metadata, image grids, full-screen viewing, and slideshows
-- **Captions** — subtitle tracks (SRT/VTT)
+- **Captions** — subtitle tracks (SRT/VTT and supported ASS/SSA)
 - **Scene Markers** — chapters for navigation
 - **Ratings** — favorites (rating100 > 0 = ❤️)
 - **Playback tracking** — resume position, play count, watch history (all server-side)
@@ -110,35 +110,52 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 ## Features
 
-- **🏠 Personalized Home** — Reorder/hide shortcuts and rows, group secondary destinations under Library, choose card sizes, pin optional rows and a saved filter, and open full grids with View All.
-- **🎞️ Groups & Collections** — Browse Stash Groups with artwork and detailed headers, play their scenes in order, shuffle, or resume progression. Legacy Movies on Stash 0.24 are supported automatically.
-- **🖼️ Galleries & Slideshows** — Browse Stash Galleries with covers and metadata, zoom and pan images, choose fit/fill, shuffle, and adjust slideshow speed.
-- **✨ Related Discovery** — More Like This recommendations ranked from shared performers, studio, and tags, plus optional personalized and unwatched-favorite-performer home rows.
-- **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with scene counts and images.
-- **📁 Folder Browser** — Navigate your library by directory structure.
-- **🔍 Unified Search** — Find scenes, tags, performers, and studios together; voice search via the remote microphone where available.
-- **🎛️ Grid Controls** — D-pad-reachable sorting and removable filter chips for watched state, favorites, rating, resolution, markers, captions, duration, release date, codec, and included/excluded performers, studios, or tags.
-- **⭐ Star Ratings** — Rate scenes 1–5 stars on the detail screen or from the player menu; any rating marks the scene as a favorite. Cards show their star count.
-- **👤 Entity Detail Headers** — Tags, performers, and studios open with a detail header: image, scene count, and — for performers — their tag chips.
-- **🎲 Surprise Me** — One press on the home screen jumps straight into a random scene.
-- **▶️ Resume Playback** — Pause anywhere, pick up where you left off (persisted to Stash). Scene cards show a thin progress bar for partially watched scenes.
-- **🎬 Scene Detail** — Friendly titles, synopsis, metadata chips, and collapsible technical details for filenames, paths, and file information.
-- **📝 Subtitles, Tracks & Aspect Ratio** — Select subtitles and audio tracks, adjust playback speed, and choose Auto, 16:9, 4:3, or 9:16 display ratios.
-- **🎮 Remote-First Player** — Marker-aware timeline, configurable quick seek, remaining time, timestamped scrub previews, and D-pad playback actions.
-- **📑 Scene Markers as Chapters** — Jump between markers via chapters dialog or media keys.
-- **▶️ Play All & Autoplay** — Queue all scenes in a folder or entity grid; auto-advances when one ends.
-- **❤️ Favorites** — One-tap favorite/unfavorite via star rating, synced with Stash ratings. Folders with favorited content show a heart overlay.
-- **📺 Android TV Channels** — Optional "Watch Next" (Continue Watching) and "Recently Added" rows on the launcher home screen (opt-in, privacy-first).
-- **🔎 Global Search** — Optional participation in the Android TV system search dialog (Settings toggle, off by default). Scene suggestions deep-link straight to scene details.
-- **⭐ Saved Filters** — Create, rename, and delete server-side Stash filters from Sinema, or pin one as a Home row.
-- **📑 Marker Browser** — Every scene marker in one grid with tag filtering; select one to jump straight into playback at that timestamp.
-- **📊 Stats** — Total watch time, plays, and most-watched scenes, performers, tags, and studios.
-- **🎛️ Stream Quality** — Force direct playback or pick a transcode tier (480p/720p/1080p) from the player menu for slow servers and weak networks.
+### Home, search, and discovery
+
+- **🏠 Personalized Home** — Continue Playing hero and rows for recently played, recently added, favorites, Unwatched Favorites, Recently Released, Groups, and optional discovery feeds. Reorder or hide shortcuts and rows, choose card sizes, group secondary destinations under Library, pin a saved filter, and open full grids with View All.
+- **🌙 Tonight's Mix** — Build a roughly 30-minute, freshly shuffled queue from unwatched favorites, with recent unwatched scenes as a fallback.
+- **✨ Related Discovery** — More Like This recommendations ranked from shared performers, studio, and tags, plus Because You Watched and Unwatched from Favorite Performers rows.
+- **🔍 Unified Search** — Find scenes, tags, performers, studios, and Groups together, with voice search where available, recent searches, sorting, and scene filters.
+- **🎲 Surprise Me** — Jump straight into a random scene from the home screen.
+- **⭐ Saved Filters** — Create filters from scene grids, run server-side Stash saved filters, rename or delete them, and pin one as a Home row.
+
+### Library and curation
+
+- **🎞️ Groups & Collections** — Browse Stash Groups with artwork and metadata, play scenes in order, shuffle, or resume progression. Legacy Movies on Stash 0.24 are supported automatically.
+- **🖼️ Galleries** — Browse Stash Galleries with covers, image counts, search, sorting, metadata, and paged image grids.
+- **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with images, scene counts, detail headers, and performer tag chips.
+- **📁 Folder Browser** — Navigate directories, subfolders, videos, and pictures, with folder counts, artwork, and favorite indicators.
+- **🎛️ Advanced Grid Controls** — D-pad-reachable sorting, quick watched/favorite toggles, and removable filter chips for rating, resolution, markers, captions, duration, release date, codec, and included/excluded performers, studios, or tags.
+- **🎬 Rich Scene Details & Card Actions** — Friendly titles, synopsis, metadata chips, collapsible technical details, resume/play, Play from here, watched and favorite toggles, and Continue Playing removal.
+- **⭐ Ratings, Favorites & O Counter** — Rate 1–5 stars from details or playback, clear ratings, see favorite/progress overlays, and record or display Stash O counts.
+- **🧹 Curation Tools** — Find untagged scenes and assign existing tags; bulk-mark loaded scenes watched or apply a rating from grid menus. Untagged filtering requires Stash 0.26 or newer.
+- **📑 Marker Browser** — Browse every scene marker with thumbnail previews, title search, tag filtering, and sorting; select one to play from its timestamp.
+- **📊 Library Stats** — Total watch time, plays, library totals, and most-watched scenes, performers, tags, and studios.
+
+### Playback and images
+
+- **▶️ Resume & Watch Progress** — Resume positions, play counts, and watch history sync with Stash. Scene cards show watched checkmarks and partial-playback progress bars.
+- **🎮 Remote-First Player** — Marker-aware timeline, configurable quick seek, remaining time, frame previews while scrubbing, playback speed, looping, and D-pad/media-key controls.
+- **📑 Chapters with Thumbnails** — Jump between scene markers using a chapter dialog, timeline ticks, player buttons, or media keys.
+- **⏭️ Queues & Up Next** — Play All, Shuffle Play, and Play from here with automatic advance. Inspect upcoming scenes, jump to an item, shuffle the remainder, keep only unwatched scenes, or exit the queue.
+- **🎛️ Stream Quality & Compatibility** — Auto direct playback with compatible transcoding fallbacks, direct-only mode, and forced 480p/720p/1080p transcodes, including aligned-HLS handling for affected Allwinner devices.
+- **🛟 Playback Recovery** — After a terminal stream failure, retry at the preserved position, try temporary 720p transcoding or direct playback for the current scene, or leave playback without losing the queue during retries.
+- **📝 Subtitles & Audio Tracks** — Select SRT, VTT, or supported ASS/SSA captions and available audio tracks using the same authentication as video streams.
+- **📐 Aspect Ratio** — Choose Auto, 16:9, 4:3, or 9:16 without cropping; playback defaults are also available under categorized Settings.
+- **🔎 Full-Screen Image Viewer** — Fit/fill, zoom and pan, shuffle, adjustable slideshows, captions, and D-pad/media-key navigation for folder images and Galleries.
+
+### Privacy and Android TV integration
+
+- **🕶️ Privacy Modes** — Discreet Mode uses neutral titles and hides overlays and artwork until a card is focused, Incognito pauses watch-history and search-history writes, and Block Screenshots protects app screens and recents thumbnails.
+- **🔒 PIN Lock** — Optional local four-digit PIN with a Log Out action that locks the app until re-entry.
+- **🌌 Ambient Gallery** — Optional idle slideshow of top-rated scenes with a clock, disabled while Discreet Mode or an unverified PIN is active.
+- **🖥️ Multi-Server Profiles & Auth** — Add, rename, remove, and switch Stash servers with API-key or session-cookie authentication; server and playback options are organized into categorized Settings.
 - **🔐 Self-Signed HTTPS** — Per-server opt-in to trust self-signed certificates for self-hosted TLS setups.
-- **🖥️ Multi-Server Profiles** — Switch between multiple Stash servers from Settings.
-- **🔒 PIN Lock** — Optional 4-digit PIN to keep things private. Log Out locks the app until PIN is re-entered.
-- **🎮 D-pad Native** — Built for TV remotes, no touchscreen needed.
-- **🌙 Dark Theme** — Easy on the eyes for late-night viewing.
+- **📺 Android TV Channels** — Optional Watch Next and Recently Added launcher rows with deep links back into Sinema; off by default.
+- **🔎 Global Search** — Optional Android TV system-search suggestions for scenes, with signature-level provider protection and PIN-aware deep links; off by default.
+- **🔗 Deep Links** — Open scene details or resume playback through Sinema scene/play links and launcher integrations.
+- **⬆️ In-App Updates** — Automatic once-per-session checks plus manual update checks and APK installation from GitHub releases.
+- **🎮 D-pad Native & Dark Theme** — A couch-friendly, overscan-aware interface designed for TV remotes, with no touchscreen required.
 
 ---
 
