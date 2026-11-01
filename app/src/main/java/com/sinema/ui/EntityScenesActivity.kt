@@ -147,23 +147,11 @@ class EntityScenesActivity : FragmentActivity() {
         val scroll = findViewById<View>(R.id.entity_header_tags_scroll)
         val density = resources.displayMetrics.density
         for (tag in tags) {
-            val chip = Button(this).apply {
-                text = "#${tag.name}"
-                isFocusable = true
-                setBackgroundResource(R.drawable.action_button_background)
-                setTextColor(android.graphics.Color.WHITE)
-                textSize = 13f
-                minWidth = 0
-                minimumWidth = 0
-                val hPad = (16 * density).toInt()
-                val vPad = (8 * density).toInt()
-                setPadding(hPad, vPad, hPad, vPad)
-                setOnClickListener {
-                    startActivity(EntityScenesActivity.intent(
-                        this@EntityScenesActivity,
-                        EntityItem(tag.id, tag.name, 0, null, EntityItem.Kind.TAG)
-                    ))
-                }
+            val chip = tvChip("#${tag.name}") {
+                startActivity(EntityScenesActivity.intent(
+                    this@EntityScenesActivity,
+                    EntityItem(tag.id, tag.name, 0, null, EntityItem.Kind.TAG)
+                ))
             }
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,

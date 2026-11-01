@@ -14,9 +14,9 @@ object Dialogs {
         current: T,
         label: (T) -> String,
         onChosen: (T) -> Unit
-    ) {
+    ): AlertDialog {
         val index = options.indexOf(current).coerceAtLeast(0)
-        AlertDialog.Builder(context)
+        return AlertDialog.Builder(context)
             .setTitle(title)
             .setSingleChoiceItems(options.map(label).toTypedArray(), index) { dialog, which ->
                 dialog.dismiss()
@@ -31,6 +31,7 @@ object Dialogs {
         title: String,
         initialQuery: String,
         hint: String = "Name",
+        onClear: (() -> Unit)? = null,
         onSearch: (String) -> Unit
     ) {
         val input = EditText(context).apply {
@@ -40,11 +41,14 @@ object Dialogs {
             inputType = InputType.TYPE_CLASS_TEXT
             isFocusable = true
         }
-        AlertDialog.Builder(context)
+        val builder = AlertDialog.Builder(context)
             .setTitle(title)
             .setView(input)
             .setPositiveButton("Search") { _, _ -> onSearch(input.text.toString().trim()) }
             .setNegativeButton("Cancel", null)
-            .show()
+        if (onClear != null) {
+            builder.setNeutralButton("Clear") { _, _ -> onClear() }
+        }
+        builder.show()
     }
 }

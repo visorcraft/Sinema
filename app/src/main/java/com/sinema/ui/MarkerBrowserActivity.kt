@@ -98,26 +98,19 @@ class MarkerBrowserFragment : SceneGridFragment() {
 
     /** Text search across marker titles (FindFilterType.q). */
     override fun showSearchDialog() {
-        val input = android.widget.EditText(requireContext()).apply {
-            setText(searchQuery)
-            setSelection(text.length)
-            hint = "Marker or scene title"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-            isFocusable = true
-        }
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Search markers")
-            .setView(input)
-            .setPositiveButton("Search") { _, _ ->
-                searchQuery = input.text.toString().trim()
-                reload()
-            }
-            .setNeutralButton("Clear") { _, _ ->
+        Dialogs.showTextSearchDialog(
+            requireContext(),
+            title = "Search markers",
+            initialQuery = searchQuery,
+            hint = "Marker or scene title",
+            onClear = {
                 searchQuery = ""
                 reload()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        ) { query ->
+            searchQuery = query
+            reload()
+        }
     }
 
     /** Markers use their own sort fields, so the shared SortDialog is bypassed. */

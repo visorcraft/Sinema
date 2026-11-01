@@ -123,11 +123,12 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 - **🎞️ Groups & Collections** — Browse Stash Groups with artwork and metadata, play scenes in order, shuffle, or resume progression. Legacy Movies on Stash 0.24 are supported automatically.
 - **🖼️ Galleries** — Browse Stash Galleries with covers, image counts, search, sorting, metadata, and paged image grids.
-- **🏷️ Metadata Browsing & Favorites** — Search, sort, and incrementally browse Tags, Performers, and Studios with images, scene counts, detail headers, and performer tag chips. Long-press an entity card to favorite or unfavorite it.
+- **🏷️ Metadata Browsing & Favorites** — Search, sort, and incrementally browse Tags, Performers, and Studios with images, scene counts, detail headers, and performer tag chips. Favorite entities from cards or detail headers, or shuffle-play their loaded unwatched scenes.
 - **📁 Folder Browser** — Navigate directories, subfolders, videos, and pictures, with folder counts, artwork, and favorite indicators.
 - **🎛️ Advanced Grid Controls** — D-pad-reachable sorting, quick watched/favorite toggles, removable filter chips for rating, resolution, markers, captions, duration, release date, codec, and included/excluded performers, studios, or tags, plus A–Z/0–9 path-prefix jumping in View All grids.
-- **🎬 Rich Scene Details & Card Actions** — Friendly titles, synopsis, metadata chips, collapsible technical details, resume/play, Play from here, watched and favorite toggles, and Continue Playing removal.
+- **🎬 Cinematic Scene Details & Card Actions** — Full-width artwork, expandable synopsis, metadata chips, chapter thumbnails, linked Galleries, collapsible technical details, resume/play, one-tap favorite and watched toggles, Play from here, and Continue Playing removal.
 - **⭐ Ratings, Favorites & O Counter** — Rate 1–5 stars from details or playback, clear ratings, see favorite/progress overlays, and record or display Stash O counts.
+- **⏳ Finish Watching** — Triage partially watched scenes with progress bars, mark them watched or clear their resume points, and use bulk actions or Play All; scenes within 30 seconds of the end are treated as finished.
 - **🧹 Curation Tools** — Find untagged scenes and assign existing tags; bulk-mark loaded scenes watched or apply a rating from grid menus. Untagged filtering requires Stash 0.26 or newer.
 - **📑 Marker Browser** — Browse every scene marker with thumbnail previews, title search, tag filtering, and sorting; select one to play from its timestamp.
 - **📊 Library Stats & Taste Insights** — Total watch time, plays, library totals, and most-watched scenes, performers, tags, and studios, plus a 14-day viewing summary and recent tag, performer, and studio trends from the top-played snapshot.
@@ -138,7 +139,8 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **▶️ Resume & Watch Progress** — Resume positions, play counts, and watch history sync with Stash. Scene cards show watched checkmarks and partial-playback progress bars.
 - **🎮 Remote-First Player** — Marker-aware timeline, configurable quick seek, remaining time, frame previews while scrubbing, playback speed, looping, and D-pad/media-key controls.
 - **📑 Chapters with Thumbnails** — Jump between scene markers using a chapter dialog, timeline ticks, player buttons, or media keys.
-- **⏭️ Queues & Up Next** — Play All, Shuffle Play, and Play from here with automatic advance. Inspect upcoming scenes, jump to an item, shuffle the remainder, keep only unwatched scenes, or exit the queue.
+- **⏭️ Editable Queues & Up Next** — Play All, Shuffle Play, and Play from here with automatic advance. Jump to an upcoming scene, reorder or remove items, shuffle the remainder, keep only unwatched scenes, or exit the queue.
+- **♾️ Endless Mix** — Automatically refill an exhausted queue with fresh unwatched favorites, falling back to recent unwatched scenes and avoiding repeats from the same session.
 - **🎛️ Stream Quality & Compatibility** — Auto direct playback with compatible transcoding fallbacks, direct-only mode, and forced 480p/720p/1080p transcodes, including aligned-HLS handling for affected Allwinner devices.
 - **🛟 Playback Recovery** — After a terminal stream failure, retry at the preserved position, try temporary 720p transcoding or direct playback for the current scene, or leave playback without losing the queue during retries.
 - **📝 Subtitles & Audio Tracks** — Select SRT, VTT, or supported ASS/SSA captions and available audio tracks using the same authentication as video streams.

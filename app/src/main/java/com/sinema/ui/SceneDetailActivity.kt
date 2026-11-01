@@ -22,6 +22,7 @@ import com.sinema.model.Scene
 import com.sinema.model.SceneDetails
 import com.sinema.model.StarRating
 import com.sinema.util.GlideAuth
+import com.sinema.util.loadAuth
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -102,10 +103,7 @@ class SceneDetailActivity : FragmentActivity() {
             screenshot.visibility = View.INVISIBLE
         } else {
             val url = app.api.getScreenshotUrl(scene.id)
-            Glide.with(this)
-                .load(GlideAuth.url(app.api, url))
-                .centerCrop()
-                .into(screenshot)
+            screenshot.loadAuth(app.api, url)
         }
 
         // Initial resume button state — hidden until loadDetails responds
@@ -410,19 +408,7 @@ class SceneDetailActivity : FragmentActivity() {
 
     private fun addChip(row: LinearLayout, label: String, onClick: () -> Unit) {
         val density = resources.displayMetrics.density
-        val chip = Button(this).apply {
-            text = label
-            isFocusable = true
-            setBackgroundResource(R.drawable.bg_pill)
-            setTextColor(android.graphics.Color.WHITE)
-            textSize = 13f
-            minWidth = 0
-            minimumWidth = 0
-            val hPad = (16 * density).toInt()
-            val vPad = (8 * density).toInt()
-            setPadding(hPad, vPad, hPad, vPad)
-            setOnClickListener { onClick() }
-        }
+        val chip = tvChip(label, onClick)
         val params = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -494,27 +480,15 @@ class SceneDetailActivity : FragmentActivity() {
         scroll.visibility = View.VISIBLE
         val density = resources.displayMetrics.density
         for (gallery in galleries) {
-            val chip = Button(this).apply {
-                text = "🖼 ${gallery.title.ifBlank { "Gallery" }}"
-                isFocusable = true
-                setBackgroundResource(R.drawable.action_button_background)
-                setTextColor(android.graphics.Color.WHITE)
-                textSize = 13f
-                minWidth = 0
-                minimumWidth = 0
-                val hPad = (16 * density).toInt()
-                val vPad = (8 * density).toInt()
-                setPadding(hPad, vPad, hPad, vPad)
-                setOnClickListener {
-                    startActivity(
-                        GalleryImagesActivity.intent(
-                            this@SceneDetailActivity,
-                            com.sinema.model.GalleryItem(
-                                id = gallery.id, title = gallery.title, imageCount = 0
-                            )
+            val chip = tvChip("🖼 ${gallery.title.ifBlank { "Gallery" }}") {
+                startActivity(
+                    GalleryImagesActivity.intent(
+                        this@SceneDetailActivity,
+                        com.sinema.model.GalleryItem(
+                            id = gallery.id, title = gallery.title, imageCount = 0
                         )
                     )
-                }
+                )
             }
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT

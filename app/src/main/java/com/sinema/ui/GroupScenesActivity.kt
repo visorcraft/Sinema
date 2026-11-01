@@ -17,6 +17,7 @@ import com.sinema.SinemaApp
 import com.sinema.model.GroupItem
 import com.sinema.model.Scene
 import com.sinema.util.GlideAuth
+import com.sinema.util.loadAuth
 import com.sinema.util.SceneIntents
 import java.io.IOException
 
@@ -95,10 +96,7 @@ class GroupScenesActivity : FragmentActivity() {
         if (imagePath.isNullOrBlank()) {
             image.visibility = View.INVISIBLE
         } else {
-            Glide.with(this)
-                .load(GlideAuth.url(SinemaApp.instance.api, imagePath))
-                .centerCrop()
-                .into(image)
+            image.loadAuth(SinemaApp.instance.api, imagePath)
         }
     }
 }
