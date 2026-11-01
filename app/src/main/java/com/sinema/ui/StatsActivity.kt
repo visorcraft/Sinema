@@ -48,22 +48,12 @@ class StatsActivity : FragmentActivity() {
 
 class StatsFragment : RowsSupportFragment() {
     private val app get() = SinemaApp.instance
-    private var boundDiscreetGeneration = CardPresenter.discreetGeneration
+    private val discreetRebind = DiscreetRebind()
 
     override fun onResume() {
         super.onResume()
-        // Discreet toggle while away: rebind visible scene cards, no refetch.
-        if (boundDiscreetGeneration != CardPresenter.discreetGeneration) {
-            boundDiscreetGeneration = CardPresenter.discreetGeneration
-            (adapter as? ArrayObjectAdapter)?.let { rows ->
-                (0 until rows.size()).forEach { i ->
-                    (rows.get(i) as? ListRow)?.adapter?.let { rowAdapter ->
-                        if (rowAdapter is ArrayObjectAdapter && rowAdapter.size() > 0) {
-                            rowAdapter.notifyItemRangeChanged(0, rowAdapter.size())
-                        }
-                    }
-                }
-            }
+        discreetRebind.onResume {
+            (adapter as? ArrayObjectAdapter)?.rebindCardsRecursively()
         }
     }
 

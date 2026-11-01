@@ -437,7 +437,6 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     private var pausedFocusIndex = -1
     private var pausedFocusKey: String? = null
-    private var boundDiscreetGeneration = CardPresenter.discreetGeneration
 
     private val gridView get() = view?.let { findGridView(it as? ViewGroup) }
 
@@ -450,13 +449,12 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             gridAdapter.get(idx)?.let(FocusRestore::keyOf) else null
     }
 
+    private val discreetRebind = DiscreetRebind()
+
     override fun onResume() {
         super.onResume()
         // Discreet toggle while away: rebind visible cards without a reload.
-        if (boundDiscreetGeneration != CardPresenter.discreetGeneration) {
-            boundDiscreetGeneration = CardPresenter.discreetGeneration
-            if (gridAdapter.size() > 0) gridAdapter.notifyItemRangeChanged(0, gridAdapter.size())
-        }
+        discreetRebind.onResume { gridAdapter.rebindCardsRecursively() }
     }
 
     private fun updateTitle() {

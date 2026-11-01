@@ -153,24 +153,11 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         activity?.refreshGridControls()
     }
 
+    private val discreetRebind = DiscreetRebind()
+
     override fun onResume() {
         super.onResume()
-        rebindIfDiscreetChanged()
-    }
-
-    private var boundDiscreetGeneration = CardPresenter.discreetGeneration
-
-    /** Discreet toggle while away: rebind visible scene cards, no refetch. */
-    private fun rebindIfDiscreetChanged() {
-        if (boundDiscreetGeneration == CardPresenter.discreetGeneration) return
-        boundDiscreetGeneration = CardPresenter.discreetGeneration
-        (0 until rowsAdapter.size()).forEach { i ->
-            (rowsAdapter.get(i) as? ListRow)?.adapter?.let { rowAdapter ->
-                if (rowAdapter is ArrayObjectAdapter && rowAdapter.size() > 0) {
-                    rowAdapter.notifyItemRangeChanged(0, rowAdapter.size())
-                }
-            }
-        }
+        discreetRebind.onResume { rowsAdapter.rebindCardsRecursively() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

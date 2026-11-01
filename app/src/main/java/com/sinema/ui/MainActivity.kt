@@ -303,14 +303,11 @@ class MainFragment : RowsSupportFragment() {
 
     override fun onResume() {
         super.onResume()
-        // Discreet toggle while away: rebind visible cards without a reload,
+        // Discreet toggle while away: rebind visible cards without a reload
         // and re-evaluate hero visibility even when the reload TTL would
         // skip loadContent().
-        if (boundDiscreetGeneration != CardPresenter.discreetGeneration) {
-            boundDiscreetGeneration = CardPresenter.discreetGeneration
-            rebindAllCards()
-            reconcileHomeRows()
-        }
+        val rebinded = discreetRebind.onResume { rebindAllCards() }
+        if (rebinded) reconcileHomeRows()
         if (layoutSnapshot != app.prefs.homeLayout) {
             applyHomeLayout()
             return
@@ -318,11 +315,12 @@ class MainFragment : RowsSupportFragment() {
         loadContent()
     }
 
+    private val discreetRebind = DiscreetRebind()
+
     private fun rebindAllCards() {
-        (heroRow?.adapter as? ArrayObjectAdapter)?.let { it.notifyItemRangeChanged(0, it.size()) }
+        (heroRow?.adapter as? ArrayObjectAdapter)?.rebindCardsRecursively()
         contentRows.values.forEach { row ->
-            (row.adapter as? ArrayObjectAdapter)
-                ?.let { it.notifyItemRangeChanged(0, it.size()) }
+            (row.adapter as? ArrayObjectAdapter)?.rebindCardsRecursively()
         }
     }
 
@@ -388,7 +386,6 @@ class MainFragment : RowsSupportFragment() {
 
     private var pausedFocus = RowFocus(-1, null, -1, null)
     private var lastLoadElapsedMs = 0L
-    private var boundDiscreetGeneration = CardPresenter.discreetGeneration
     private var tonightMixJob: Job? = null
 
     override fun onPause() {

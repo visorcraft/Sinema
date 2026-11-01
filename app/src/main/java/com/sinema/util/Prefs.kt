@@ -11,6 +11,16 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 
 class Prefs(context: Context) {
+
+    /** Standard boolean pref as a property delegate. */
+    private fun bool(key: String, default: Boolean) =
+        object : kotlin.properties.ReadWriteProperty<Any?, Boolean> {
+            override fun getValue(thisRef: Any?, property: kotlin.reflect.KProperty<*>) =
+                prefs.getBoolean(key, default)
+            override fun setValue(thisRef: Any?, property: kotlin.reflect.KProperty<*>, value: Boolean) {
+                prefs.edit().putBoolean(key, value).apply()
+            }
+        }
     private val appContext = context.applicationContext
     private val prefs: SharedPreferences = appContext.getSharedPreferences("sinema", Context.MODE_PRIVATE)
     private val securePrefs: SharedPreferences? = createSecurePrefs(appContext)
@@ -42,9 +52,7 @@ class Prefs(context: Context) {
         get() = prefs.getString("auth_mode", "apikey") ?: "apikey"
         set(value) = prefs.edit().putString("auth_mode", value).apply()
 
-    var channelsEnabled: Boolean
-        get() = prefs.getBoolean("channels_enabled", false)
-        set(value) = prefs.edit().putBoolean("channels_enabled", value).apply()
+    var channelsEnabled: Boolean by bool("channels_enabled", false)
 
     var setupAllowSelfSigned: Boolean
         get() = prefs.getBoolean("setup_allow_self_signed", false)
@@ -55,13 +63,9 @@ class Prefs(context: Context) {
      * the search components disabled; Settings flips them (and this flag)
      * together. Default false — privacy-first.
      */
-    var globalSearchEnabled: Boolean
-        get() = prefs.getBoolean("global_search_enabled", false)
-        set(value) = prefs.edit().putBoolean("global_search_enabled", value).apply()
+    var globalSearchEnabled: Boolean by bool("global_search_enabled", false)
 
-    var loopEnabled: Boolean
-        get() = prefs.getBoolean("loop_enabled", false)
-        set(value) = prefs.edit().putBoolean("loop_enabled", value).apply()
+    var loopEnabled: Boolean by bool("loop_enabled", false)
 
     var playbackAspectRatio: String
         get() = prefs.getString("playback_aspect_ratio", "") ?: ""
@@ -77,26 +81,16 @@ class Prefs(context: Context) {
 
     // Privacy: neutral card labels until focused, no watch-history writes,
     // and FLAG_SECURE (blocks screenshots + recents thumbnails).
-    var discreetMode: Boolean
-        get() = prefs.getBoolean("discreet_mode", false)
-        set(value) = prefs.edit().putBoolean("discreet_mode", value).apply()
+    var discreetMode: Boolean by bool("discreet_mode", false)
 
-    var incognitoMode: Boolean
-        get() = prefs.getBoolean("incognito_mode", false)
-        set(value) = prefs.edit().putBoolean("incognito_mode", value).apply()
+    var incognitoMode: Boolean by bool("incognito_mode", false)
 
-    var blockScreenshots: Boolean
-        get() = prefs.getBoolean("block_screenshots", false)
-        set(value) = prefs.edit().putBoolean("block_screenshots", value).apply()
+    var blockScreenshots: Boolean by bool("block_screenshots", false)
 
-    var ambientGallery: Boolean
-        get() = prefs.getBoolean("ambient_gallery", false)
-        set(value) = prefs.edit().putBoolean("ambient_gallery", value).apply()
+    var ambientGallery: Boolean by bool("ambient_gallery", false)
 
     /** Endless Mix: auto-extend an exhausted queue with fresh candidates. */
-    var endlessMix: Boolean
-        get() = prefs.getBoolean("endless_mix", false)
-        set(value) = prefs.edit().putBoolean("endless_mix", value).apply()
+    var endlessMix: Boolean by bool("endless_mix", false)
 
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>

@@ -115,12 +115,8 @@ class HomeOrderActivity : FragmentActivity() {
         fun button(tag: String, text: String, action: () -> Unit) = Button(this).apply {
             this.text = text
             this.tag = tag
-            isFocusable = true
-            setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFF333333.toInt())
-            setOnFocusChangeListener { _, focused ->
-                setBackgroundColor(if (focused) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
+            setTextColor(android.graphics.Color.WHITE)
+            bindFocusBackground()
             setOnClickListener { action() }
         }
         val up = button("up:${item.name}", "Move Up") { move(item, -1) }

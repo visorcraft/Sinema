@@ -98,16 +98,7 @@ class HomeSettingsActivity : FragmentActivity() {
     }
 
     private fun addButton(parent: LinearLayout, label: String, action: () -> Unit): Button {
-        val button = Button(this).apply {
-            text = label
-            isFocusable = true
-            setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFF333333.toInt())
-            setOnFocusChangeListener { _, focused ->
-                setBackgroundColor(if (focused) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener { action() }
-        }
+        val button = tvButton(label) { action() }
         parent.addView(button, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
