@@ -156,6 +156,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.sinema" android:host="app" android:pathPrefix="/scene/" />
+                <!-- Watch Next resumes playback directly instead of opening details. -->
+                <data android:scheme="com.sinema" android:host="app" android:pathPrefix="/play/" />
             </intent-filter>
         </activity>
 

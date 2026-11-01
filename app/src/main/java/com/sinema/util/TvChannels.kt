@@ -41,7 +41,8 @@ object TvChannels {
             }
 
             continuePairs.take(MAX_WATCH_NEXT).forEach { (scene, resumeSec) ->
-                val intentUri = Uri.parse("com.sinema://app/scene/${scene.id}")
+                // /play/ resumes playback directly — the point of Watch Next.
+                val intentUri = Uri.parse("com.sinema://app/play/${scene.id}")
                 val builder = WatchNextProgram.Builder()
                     .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
                     .setType(TvContractCompat.PreviewProgramColumns.TYPE_MOVIE)

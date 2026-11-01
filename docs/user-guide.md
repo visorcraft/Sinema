@@ -63,6 +63,7 @@ Open `Search` from the main screen.
 - Sinema searches after at least two characters.
 - Results are grouped into Scenes, Tags, Performers, Studios, and Groups with their Stash result counts.
 - Select a scene to open its details, an entity to browse its scenes, or a Group to open its ordered scenes.
+- With an empty query, the last ten searches that produced results appear as a `Recent searches` row — select one to run it again, or `Clear` to remove them all.
 - Use the on-screen Sort button to choose a scene sort order.
 - Use Filter to show all, watched, or unwatched scenes and optionally limit scene results to favorites. Filters do not change entity results.
 
@@ -302,9 +303,10 @@ Sinema can open a scene detail screen from a deep link:
 
 ```text
 com.sinema://app/scene/<scene_id>
+com.sinema://app/play/<scene_id>
 ```
 
-Launcher channels use this link shape. External tools can use it too, as long as they know the Stash scene ID.
+Launcher channels use these link shapes. External tools can use them too, as long as they know the Stash scene ID. `/scene/` opens the detail screen; `/play/` (used by Watch Next) resumes playback directly at the saved position without a prompt.
 
 Deep-link behavior:
 

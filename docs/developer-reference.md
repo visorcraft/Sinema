@@ -127,6 +127,10 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 `playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for native scrubbing plus marker ticks. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`); `previewBucketMs` throttles authenticated timestamp screenshot requests to five-second buckets. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
 
+### Deep links and Watch Next
+
+`DeepLinks` routes `com.sinema://app/scene/<id>` to the detail screen and `com.sinema://app/play/<id>` (published by `TvChannels.syncWatchNext`) straight to playback. The `/play/` route sets `SceneIntents.playbackAutoResume`; `PlaybackActivity.resolveAutoResume()` fetches the full scene once (resume_time, dimensions, captions, markers) and resumes silently — the resume prompt never appears on this path. When the initial dashboard load fails with no content to show, `shouldShowServerErrorRow` drives a persistent `Retry Connection` row at the top of home.
+
 ### Playback queue
 
 `PlaybackQueue` (util) keeps queued items with id/title/duration/play_count and exposes `next`, `jumpToItem`, `remaining`, seeded `shuffleRemaining`, and `filterRemainingUnwatched` (the dialog's Unwatched-only button); the controller's `Up Next · N` chip opens a jump/shuffle/filter/exit dialog, and the resume prompt (`shouldPromptResume`, 10 s threshold) asks before seeking into saved progress. `QueuePlanning` is the pure planning step (start-at, shuffle, 500 cap) behind `SceneIntents.playAll`; grid long-press actions live in `SceneGridFragment.showCardActions`. O-counter increments (`SinemaApi.sceneIncrementO`) run on the app scope from the playback menu so they survive an immediate exit.

@@ -30,6 +30,7 @@ import com.sinema.model.cycled
 import com.sinema.model.effectiveFavorites
 import com.sinema.model.toggledQuickFavorites
 import com.sinema.util.SceneIntents
+import com.sinema.util.RecentSearches
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -173,6 +174,13 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
                 is Scene -> startActivity(SceneIntents.detail(requireContext(), item))
                 is EntityItem -> startActivity(EntityScenesActivity.intent(requireContext(), item))
                 is GroupItem -> startActivity(GroupScenesActivity.intent(requireContext(), item))
+                is String -> when (item) {
+                    RecentSearches.CLEAR_ACTION -> {
+                        app.prefs.clearRecentSearches()
+                        renderRecentSearches()
+                    }
+                    else -> setSearchQuery(item, true)
+                }
             }
         }
     }
@@ -204,6 +212,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         searchJob?.cancel()
         if (query.length < 2) {
             rowsAdapter.clear()
+            renderRecentSearches()
             return
         }
         searchJob = lifecycleScope.launch {
@@ -232,6 +241,8 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
                     }
                     SearchResults(scenes.await(), tags.await(), performers.await(), studios.await(), groups.await())
                 }
+                // Only queries that produced a result render become recents.
+                app.prefs.recordRecentSearch(query)
                 renderResults(results)
             } catch (e: CancellationException) {
                 throw e
@@ -257,6 +268,17 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         addGroupRow(results.groups)
     }
 
+    /** Empty-query home: re-runnable recent searches plus a clear action. */
+    private fun renderRecentSearches() {
+        rowsAdapter.clear()
+        val recents = app.prefs.recentSearches
+        if (recents.isEmpty()) return
+        val listAdapter = ArrayObjectAdapter(RecentSearchPresenter())
+        recents.forEach { listAdapter.add(it) }
+        listAdapter.add(RecentSearches.CLEAR_ACTION)
+        rowsAdapter.add(ListRow(HeaderItem("Recent searches"), listAdapter))
+    }
+
     private fun addEntityRow(label: String, result: Pair<Int, List<EntityItem>>) {
         val (count, items) = result
         if (items.isEmpty()) return
@@ -280,4 +302,34 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         val studios: Pair<Int, List<EntityItem>>,
         val groups: Pair<Int, List<GroupItem>>
     )
+}
+
+/** Card for one recent search query (or the clear-all action). */
+class RecentSearchPresenter : androidx.leanback.widget.Presenter() {
+    override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
+        val view = android.view.LayoutInflater.from(parent.context)
+            .inflate(com.sinema.R.layout.view_card, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
+        val query = item as? String ?: return
+        val view = viewHolder.view
+        val image = view.findViewById<android.widget.ImageView>(com.sinema.R.id.card_image)
+        view.findViewById<android.widget.TextView>(com.sinema.R.id.card_title).text =
+            if (query == RecentSearches.CLEAR_ACTION) "Clear" else "🔍 $query"
+        view.findViewById<android.widget.TextView>(com.sinema.R.id.card_content).text =
+            if (query == RecentSearches.CLEAR_ACTION) "Remove all recent searches" else "Run this search again"
+        view.findViewById<android.view.View>(com.sinema.R.id.card_heart).visibility = android.view.View.GONE
+        view.findViewById<android.view.View>(com.sinema.R.id.card_checkmark).visibility = android.view.View.GONE
+        view.findViewById<android.view.View>(com.sinema.R.id.card_progress).visibility = android.view.View.GONE
+        image.setImageResource(
+            if (query == RecentSearches.CLEAR_ACTION) android.R.drawable.ic_menu_close_clear_cancel
+            else android.R.drawable.ic_menu_search
+        )
+        image.scaleType = android.widget.ImageView.ScaleType.CENTER
+        image.setBackgroundColor(0xFF444444.toInt())
+    }
+
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) {}
 }

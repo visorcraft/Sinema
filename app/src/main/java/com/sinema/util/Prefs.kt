@@ -198,6 +198,21 @@ class Prefs(context: Context) {
         }.normalized()
         set(value) = prefs.edit().putString("home_layout", gson.toJson(value.normalized())).apply()
 
+    // Stored newline-joined: queries never contain newlines (keyboard input).
+    var recentSearches: List<String>
+        get() = prefs.getString("recent_searches", null)
+            ?.split('\n')?.filter { it.isNotBlank() } ?: emptyList()
+        private set(value) = prefs.edit()
+            .putString("recent_searches", value.joinToString("\n")).apply()
+
+    fun recordRecentSearch(query: String) {
+        recentSearches = com.sinema.util.RecentSearches.updated(recentSearches, query)
+    }
+
+    fun clearRecentSearches() {
+        prefs.edit().remove("recent_searches").apply()
+    }
+
     fun getAllResumePositions(): Map<String, Long> {
         return prefs.all.filter { it.key.startsWith("resume_") && it.value is Long && (it.value as Long) > 0 }
             .map { it.key.removePrefix("resume_") to (it.value as Long) }

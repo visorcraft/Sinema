@@ -87,6 +87,8 @@ class MainFragment : RowsSupportFragment() {
     private lateinit var layoutSnapshot: HomeLayoutSettings
     private val contentRows = mutableMapOf<Long, ListRow>()
     private var heroRow: ListRow? = null
+    private var serverErrorRow: ListRow? = null
+    private var serverErrorActive = false
     private lateinit var shortcutsRow: ListRow
     private lateinit var settingsRow: ListRow
 
@@ -171,6 +173,9 @@ class MainFragment : RowsSupportFragment() {
                         "Log Out" -> {
                             app.pinVerifiedThisSession = false
                             requireActivity().finishAffinity()
+                        }
+                        "Retry Connection" -> {
+                            loadContent(force = true)
                         }
                         "Refresh" -> {
                             loadContent(force = true)
@@ -388,6 +393,19 @@ class MainFragment : RowsSupportFragment() {
     }
 
     private fun reconcileHomeRows() {
+        // Persistent retry affordance while the dashboard has no content at
+        // all; disappears as soon as any row renders data.
+        if (serverErrorActive) {
+            if (serverErrorRow == null) {
+                serverErrorRow = ListRow(
+                    HeaderItem(ERROR_ROW_ID, ""),
+                    ArrayObjectAdapter(SettingsPresenter()).apply { add("Retry Connection") }
+                )
+            }
+        } else {
+            serverErrorRow?.let(rowsAdapter::remove)
+            serverErrorRow = null
+        }
         val heroItem = continueState.items.orEmpty().firstOrNull()?.let { (scene, resumeSeconds) ->
             HeroItem(scene, (resumeSeconds * 1000).toLong())
         }.takeIf {
@@ -416,6 +434,7 @@ class MainFragment : RowsSupportFragment() {
         reconcileContentRow(HomeContentRow.UNWATCHED_PERFORMERS, unwatchedPerformersState, unwatchedPerformersState.items)
 
         val orderedRows = buildList {
+            serverErrorRow?.let(::add)
             heroRow?.let(::add)
             add(shortcutsRow)
             layoutSnapshot.orderedRows().forEach { rowType ->
@@ -436,6 +455,12 @@ class MainFragment : RowsSupportFragment() {
 
     private fun <T> applyResult(state: HomeRowState<T>, result: RowResult<List<T>>): HomeRowState<T> =
         result.error?.let(state::failed) ?: state.loaded(result.value.orEmpty())
+
+    private fun anyContentLoaded(): Boolean = listOf(
+        continueState, recentlyPlayedState, recentlyAddedState, favoritesState,
+        unwatchedFavoritesState, recentlyReleasedState, savedFilterState,
+        groupsState, discoveryState, unwatchedPerformersState
+    ).any { !it.items.isNullOrEmpty() }
 
     private fun loadContent(force: Boolean = false) {
         if (isLoading) return
@@ -576,6 +601,7 @@ class MainFragment : RowsSupportFragment() {
                 rows.groups.error?.let { noteError("Groups", it) }
                 rows.discovery.error?.let { noteError("Because You Watched", it) }
                 rows.unwatchedPerformers.error?.let { noteError("Unwatched from Favorite Performers", it) }
+                serverErrorActive = shouldShowServerErrorRow(firstError != null, anyContentLoaded())
                 reconcileHomeRows()
 
                 val continuePairs = rows.continuePlaying.value.orEmpty()
@@ -628,6 +654,7 @@ class MainFragment : RowsSupportFragment() {
                 if (groupsState.loading) groupsState = groupsState.failed(e)
                 if (discoveryState.loading) discoveryState = discoveryState.failed(e)
                 if (unwatchedPerformersState.loading) unwatchedPerformersState = unwatchedPerformersState.failed(e)
+                serverErrorActive = shouldShowServerErrorRow(hadError = true, anyContentLoaded())
                 reconcileHomeRows()
                 if (!isAdded) return@launch
                 val message = e.message ?: "Unknown error"
@@ -703,6 +730,9 @@ class MainFragment : RowsSupportFragment() {
         private const val GROUPS_ROW_ID = 11L
         private const val DISCOVERY_ROW_ID = 12L
         private const val UNWATCHED_PERFORMERS_ROW_ID = 13L
+        // Must stay unique vs. content rows above: rowKey() matches focus
+        // restoration by header id.
+        private const val ERROR_ROW_ID = 14L
     }
 }
 
@@ -711,6 +741,13 @@ internal fun shouldLoadHomeRow(rowVisible: Boolean, channelsEnabled: Boolean, fe
 
 /** Reload the home dashboard at most this often on resume (Refresh forces). */
 internal const val HOME_RELOAD_TTL_MS = 15_000L
+
+/**
+ * The persistent server-error row appears only when a load attempt failed
+ * AND no row has content to show — a partial failure keeps existing rows.
+ */
+internal fun shouldShowServerErrorRow(hadError: Boolean, anyContentLoaded: Boolean): Boolean =
+    hadError && !anyContentLoaded
 
 /**
  * Gate for the onResume dashboard reload: skip when the last load is fresher

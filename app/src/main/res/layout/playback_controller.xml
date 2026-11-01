@@ -49,6 +49,41 @@
             android:textSize="16sp"
             android:visibility="gone"
             tools:ignore="HardcodedText" />
+
+        <LinearLayout
+            android:id="@+id/playback_next_up"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/card_focus_border"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/playback_next_thumb"
+                android:layout_width="106dp"
+                android:layout_height="60dp"
+                android:background="#333333"
+                android:importantForAccessibility="no"
+                android:scaleType="centerCrop" />
+
+            <TextView
+                android:id="@+id/playback_next_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:ellipsize="end"
+                android:gravity="center_vertical"
+                android:maxWidth="220dp"
+                android:maxLines="1"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

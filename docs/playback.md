@@ -45,7 +45,7 @@ Common controls:
 - Resume prompt: opening a scene with saved progress ≥ 10 seconds asks whether to resume at that position or start over. Back leaves playback paused with controls shown.
 - Scrub preview: while actively scrubbing, Sinema shows a timestamp and an authenticated Stash frame near that position. Requests are throttled to five-second buckets; the image is hidden if the server cannot provide it.
 - Remaining time: shown at the right side of the time row.
-- Up Next: when a queue is active (Play All, Play from here, or Shuffle), the top bar shows `Up Next · N`. Select it to jump to any upcoming scene (the scene now playing is listed dimmed at the top), shuffle the rest, keep only unwatched scenes, or exit the queue.
+- Up Next: when a queue is active (Play All, Play from here, or Shuffle), the top bar shows `Up Next · N` with a mini card for the next scene (frame thumbnail and title) — select either to open the dialog and jump to any upcoming scene (the scene now playing is listed dimmed at the top), shuffle the rest, keep only unwatched scenes, or exit the queue.
 - Action row: subtitles/audio/speed through Media3 settings, aspect ratio, stream quality, rating, next marker, and seek preset. All actions are D-pad reachable.
 
 ## Queue playback

@@ -251,6 +251,13 @@ class SettingsPresenter : Presenter() {
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }
+            "Retry Connection" -> {
+                title.text = "📡 Retry Connection"
+                content.text = "Server unreachable"
+                image.setImageResource(android.R.drawable.ic_menu_rotate)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
             "About" -> {
                 title.text = "ℹ️ About"
                 content.text = "Version info"

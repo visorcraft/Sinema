@@ -61,6 +61,8 @@ class PlaybackActivity : FragmentActivity() {
     private var resumePromptResolved = false
     /** Paused with the resume prompt outstanding (Back keeps it outstanding). */
     private var resumeAwaitingChoice = false
+    /** Watch Next entry: fetch resume position before the first start. */
+    private var autoResumePending = false
     private var suppressingPromptDismiss = false
     private var sceneSwitchJob: kotlinx.coroutines.Job? = null
     private var aspectRatio = PlaybackAspectRatio.AUTO
@@ -69,6 +71,7 @@ class PlaybackActivity : FragmentActivity() {
     private var sceneTitle = ""
     private var previewBucket = -1L
     private var previewSceneId = ""
+    private var nextThumbSceneId = ""
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
     private val renderersFactory by lazy { PlaybackRenderersFactory(this) }
@@ -101,7 +104,12 @@ class PlaybackActivity : FragmentActivity() {
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
-        loadSceneTitle()
+        if (SceneIntents.autoResumeFrom(intent) && sceneId.isNotEmpty()) {
+            autoResumePending = true
+            resolveAutoResume()
+        } else {
+            loadSceneTitle()
+        }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -120,17 +128,58 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // Watch Next deep links resolve their own resume position first; the
+        // coroutine owns the first start.
+        if (autoResumePending) return
+        beginPlaybackSession()
+    }
+
+    private fun beginPlaybackSession(promptAllowed: Boolean = true) {
+        startPlayback(promptAllowed)
+        handler.post(progressRunnable)
+        startTimeMs = System.currentTimeMillis()
+    }
+
+    private fun startPlayback(promptAllowed: Boolean = true) {
         // Prompt whenever a meaningful saved position is still unresolved —
         // including after a lifecycle dismissal (backgrounding the dialog),
         // which must never silently approve resuming. Once resolved (choice
         // made or manual play), background restarts resume silently at the
         // live position onStop persisted.
-        val promptResume = !resumePromptResolved && shouldPromptResume(resumePositionMs)
+        val promptResume = promptAllowed && !resumePromptResolved && shouldPromptResume(resumePositionMs)
         resumeAwaitingChoice = promptResume
         initPlayer(startPaused = promptResume)
         if (promptResume) showResumePrompt()
-        handler.post(progressRunnable)
-        startTimeMs = System.currentTimeMillis()
+    }
+
+    /** Fetch scene metadata, then resume Watch Next playback silently. */
+    private fun resolveAutoResume() {
+        val targetId = sceneId
+        lifecycleScope.launch {
+            try {
+                val details = SinemaApp.instance.api.findSceneFull(targetId)
+                details?.let { d ->
+                    sceneTitle = d.scene.displayTitle
+                    videoWidth = d.scene.width
+                    videoHeight = d.scene.height
+                    resumePositionMs = (d.scene.resumeTime * 1000).toLong()
+                    captions = d.scene.captions
+                    markers = d.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Offline/unavailable: fall through and let the player surface
+                // the error from position zero.
+                android.util.Log.w("Sinema", "Auto-resume fetch failed for $targetId", e)
+            }
+            autoResumePending = false
+            // Watch Next means "continue" — never prompt on this entry path.
+            resumePromptResolved = true
+            if (isFinishing || isDestroyed) return@launch
+            if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return@launch
+            beginPlaybackSession(promptAllowed = false)
+        }
     }
 
     override fun onPause() {
@@ -306,6 +355,8 @@ class PlaybackActivity : FragmentActivity() {
         existing?.let {
             it.player = null
             container.removeView(it)
+            // Fresh controller views: force the next-up thumbnail to reload.
+            nextThumbSceneId = ""
         }
         val layout = if (wantTexture) R.layout.playback_player_texture else R.layout.playback_player_surface
         playerView = layoutInflater.inflate(layout, container, false) as AspectRatioPlayerView
@@ -379,6 +430,9 @@ class PlaybackActivity : FragmentActivity() {
         playerView.findViewById<View>(R.id.playback_queue_chip).setOnClickListener {
             showUpNextDialog()
         }
+        playerView.findViewById<View>(R.id.playback_next_up).setOnClickListener {
+            showUpNextDialog()
+        }
         playerView.findViewById<android.widget.Button>(R.id.playback_seek_preset_button).apply {
             text = "Seek: ${seekPreset.label}"
             setOnClickListener { cycleSeekPreset() }
@@ -407,6 +461,28 @@ class PlaybackActivity : FragmentActivity() {
                 visibility = View.VISIBLE
             } else {
                 visibility = View.GONE
+            }
+        }
+        playerView.findViewById<View>(R.id.playback_next_up).apply {
+            val next = PlaybackQueue.remaining().firstOrNull()
+            if (next == null) {
+                visibility = View.GONE
+                nextThumbSceneId = ""
+            } else {
+                visibility = View.VISIBLE
+                playerView.findViewById<android.widget.TextView>(R.id.playback_next_title).text =
+                    "▸ ${next.title}"
+                if (nextThumbSceneId != next.id) {
+                    nextThumbSceneId = next.id
+                    val image = playerView.findViewById<android.widget.ImageView>(R.id.playback_next_thumb)
+                    // Frame at ~25% beats a black 0-second screenshot.
+                    val frameSec = next.durationSec * 0.25
+                    Glide.with(image)
+                        .load(GlideAuth.url(SinemaApp.instance.api,
+                            SinemaApp.instance.api.getMarkerScreenshotUrl(next.id, frameSec)))
+                        .centerCrop()
+                        .into(image)
+                }
             }
         }
         playerView.findViewById<View>(R.id.playback_marker_button).apply {

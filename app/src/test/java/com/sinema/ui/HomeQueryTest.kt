@@ -42,4 +42,11 @@ class HomeQueryTest {
         // Force always wins, even mid-TTL
         assertTrue(shouldReloadHome(lastLoadElapsedMs = 10_000, nowElapsedMs = 10_001, force = true))
     }
+
+    @Test
+    fun `server error row shows only when nothing loaded`() {
+        assertTrue(shouldShowServerErrorRow(hadError = true, anyContentLoaded = false))
+        assertFalse(shouldShowServerErrorRow(hadError = true, anyContentLoaded = true))
+        assertFalse(shouldShowServerErrorRow(hadError = false, anyContentLoaded = false))
+    }
 }

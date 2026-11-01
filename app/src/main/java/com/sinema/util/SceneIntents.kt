@@ -28,6 +28,7 @@ object SceneIntents {
     private const val KEY_MARKER_TITLES = "marker_titles"
     private const val KEY_MARKER_SECONDS = "marker_seconds"
     private const val KEY_RESUME_MS = "resume_position_ms"
+    private const val KEY_AUTO_RESUME = "auto_resume"
 
     fun detail(context: Context, scene: Scene): Intent =
         Intent(context, SceneDetailActivity::class.java).apply {
@@ -95,6 +96,16 @@ object SceneIntents {
             putExtra(KEY_WIDTH, width)
             putExtra(KEY_HEIGHT, height)
         }
+
+    /**
+     * Playback that resolves its own resume position: the player fetches the
+     * full scene (resume_time, dimensions, captions, markers) before
+     * starting. Used by Watch Next deep links, which must resume silently.
+     */
+    fun playbackAutoResume(context: Context, sceneId: String): Intent =
+        playback(context, sceneId).putExtra(KEY_AUTO_RESUME, true)
+
+    fun autoResumeFrom(intent: Intent): Boolean = intent.getBooleanExtra(KEY_AUTO_RESUME, false)
 
     fun resumeMsFrom(intent: Intent): Long = intent.getLongExtra(KEY_RESUME_MS, 0L)
 
