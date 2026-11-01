@@ -20,6 +20,7 @@ import com.sinema.model.HomeLayoutSettings
 import com.sinema.model.SavedSceneFilter
 import com.sinema.model.Scene
 import com.sinema.util.SceneIntents
+import com.sinema.util.TonightMix
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -29,6 +30,32 @@ import kotlin.coroutines.cancellation.CancellationException
 class MainActivity : FragmentActivity() {
     private val app get() = SinemaApp.instance
     private var waitingForPin = false
+    private var lastInteractionMs = 0L
+    private val ambientHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val ambientCheck = object : Runnable {
+        override fun run() {
+            val idle = android.os.SystemClock.elapsedRealtime() - lastInteractionMs
+            if (app.prefs.ambientGallery &&
+                !app.prefs.discreetMode &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) &&
+                // Dialogs (About, sort menus…) steal window focus; never
+                // launch the gallery over an open dialog.
+                hasWindowFocus() &&
+                (!app.prefs.hasPinSet() || app.pinVerifiedThisSession) &&
+                idle >= AMBIENT_IDLE_MS
+            ) {
+                startActivity(Intent(this@MainActivity, AmbientActivity::class.java))
+                // Reset so exiting the gallery buys a fresh idle window.
+                lastInteractionMs = android.os.SystemClock.elapsedRealtime()
+            }
+            ambientHandler.postDelayed(this, AMBIENT_CHECK_MS)
+        }
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Wipe saved fragment state to prevent zombie fragment restoration
@@ -53,18 +80,39 @@ class MainActivity : FragmentActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.main_frame, MainFragment())
             .commitNowAllowingStateLoss()
+        startAmbientWatch()
     }
-    
+
     override fun onResume() {
         super.onResume()
+        // Returning from any activity (ambient included) buys a fresh idle
+        // window for the ambient watcher.
+        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
         if (waitingForPin && app.pinVerifiedThisSession) {
             waitingForPin = false
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_frame, MainFragment())
                 .commitNowAllowingStateLoss()
+            startAmbientWatch()
         } else if (waitingForPin && !app.pinVerifiedThisSession) {
             // PIN was cancelled/failed — PinActivity calls finishAffinity on back
         }
+    }
+
+    override fun onDestroy() {
+        ambientHandler.removeCallbacks(ambientCheck)
+        super.onDestroy()
+    }
+
+    private fun startAmbientWatch() {
+        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
+        ambientHandler.removeCallbacks(ambientCheck)
+        ambientHandler.postDelayed(ambientCheck, AMBIENT_CHECK_MS)
+    }
+
+    companion object {
+        private const val AMBIENT_IDLE_MS = 5 * 60_000L
+        private const val AMBIENT_CHECK_MS = 30_000L
     }
 }
 
@@ -162,6 +210,7 @@ class MainFragment : RowsSupportFragment() {
                         "Surprise Me" -> playRandomScene()
                         "Favorites" -> startActivity(Intent(requireContext(), FavoritesActivity::class.java))
                         "Library" -> startActivity(Intent(requireContext(), LibraryActivity::class.java))
+                        "Tonight's Mix" -> playTonightMix()
                         "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
                         "Groups" -> startActivity(GroupGridActivity.intent(requireContext()))
                         "Galleries" -> startActivity(GalleryGridActivity.intent(requireContext()))
@@ -206,10 +255,16 @@ class MainFragment : RowsSupportFragment() {
         }
     }
 
+    /** Shortcut row contents: personalization order + fixed session cards. */
+    private fun addShortcutItems(shortcutsAdapter: ArrayObjectAdapter) {
+        layoutSnapshot.visibleShortcuts().map { it.label }.forEach(shortcutsAdapter::add)
+        shortcutsAdapter.add("Tonight's Mix")
+        if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
+    }
+
     private fun createStaticRows() {
         val shortcutsAdapter = ArrayObjectAdapter(SettingsPresenter())
-        layoutSnapshot.visibleShortcuts().map { it.label }.forEach(shortcutsAdapter::add)
-        if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
+        addShortcutItems(shortcutsAdapter)
         shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, ""), shortcutsAdapter)
 
         val settingsAdapter = ArrayObjectAdapter(SettingsPresenter())
@@ -224,11 +279,27 @@ class MainFragment : RowsSupportFragment() {
 
     override fun onResume() {
         super.onResume()
+        // Discreet toggle while away: rebind visible cards without a reload,
+        // and re-evaluate hero visibility even when the reload TTL would
+        // skip loadContent().
+        if (boundDiscreetGeneration != CardPresenter.discreetGeneration) {
+            boundDiscreetGeneration = CardPresenter.discreetGeneration
+            rebindAllCards()
+            reconcileHomeRows()
+        }
         if (layoutSnapshot != app.prefs.homeLayout) {
             applyHomeLayout()
             return
         }
         loadContent()
+    }
+
+    private fun rebindAllCards() {
+        (heroRow?.adapter as? ArrayObjectAdapter)?.let { it.notifyItemRangeChanged(0, it.size()) }
+        contentRows.values.forEach { row ->
+            (row.adapter as? ArrayObjectAdapter)
+                ?.let { it.notifyItemRangeChanged(0, it.size()) }
+        }
     }
 
     /**
@@ -240,8 +311,7 @@ class MainFragment : RowsSupportFragment() {
         layoutSnapshot = app.prefs.homeLayout
         val shortcutsAdapter = shortcutsRow.adapter as ArrayObjectAdapter
         shortcutsAdapter.clear()
-        layoutSnapshot.visibleShortcuts().map { it.label }.forEach(shortcutsAdapter::add)
-        if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
+        addShortcutItems(shortcutsAdapter)
         contentRows.values.forEach(rowsAdapter::remove)
         contentRows.clear()
         heroRow?.let(rowsAdapter::remove)
@@ -294,6 +364,8 @@ class MainFragment : RowsSupportFragment() {
 
     private var pausedFocus = RowFocus(-1, null, -1, null)
     private var lastLoadElapsedMs = 0L
+    private var boundDiscreetGeneration = CardPresenter.discreetGeneration
+    private var tonightMixJob: Job? = null
 
     override fun onPause() {
         super.onPause()
@@ -357,8 +429,44 @@ class MainFragment : RowsSupportFragment() {
         HomeContentRow.UNWATCHED_PERFORMERS -> UNWATCHED_PERFORMERS_ROW_ID
     }
 
-    private fun openViewAll(item: HomeViewAll) {
-        when (item.row) {
+    /** One button → a seeded ~30-minute queue of unwatched favorites. */
+    private fun playTonightMix() {
+        // Double-select would stack players and swap the shared queue mid-fetch.
+        if (tonightMixJob?.isActive == true) return
+        tonightMixJob = lifecycleScope.launch {
+            try {
+                var candidates = app.api.findFavoriteScenesPaged(
+                    page = 1, perPage = 100, sort = "random", direction = "DESC", unwatchedOnly = true
+                ).second
+                if (candidates.isEmpty()) {
+                    candidates = app.api.findRecentScenesPaged(page = 1, perPage = 100)
+                        .second.filter { !it.isWatched }
+                }
+                if (candidates.isEmpty()) {
+                    if (isAdded) Toast.makeText(requireContext(), "No unwatched scenes found", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                val mix = TonightMix.select(candidates)
+                if (mix.isEmpty()) {
+                    if (isAdded) Toast.makeText(requireContext(), "Nothing to play", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                SceneIntents.playAll(requireContext(), mix)
+                if (isAdded) {
+                    Toast.makeText(requireContext(), "Tonight's Mix: ${TonightMix.summary(mix)}", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Tonight's Mix failed", e)
+                if (isAdded) {
+                    Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun openViewAll(item: HomeViewAll) {        when (item.row) {
             HomeContentRow.SAVED_FILTER -> pinnedFilter?.let {
                 startActivity(SavedFilterScenesActivity.intent(requireContext(), it))
             } ?: Toast.makeText(requireContext(), "Saved filter unavailable", Toast.LENGTH_LONG).show()
@@ -394,6 +502,11 @@ class MainFragment : RowsSupportFragment() {
     }
 
     private fun reconcileHomeRows() {
+        // The hero shows large explicit artwork — hidden entirely in discreet
+        // mode (unfocused cards hide theirs; the hero is always "unfocused").
+        val heroVisible = layoutSnapshot.showHero &&
+            layoutSnapshot.isRowVisible(HomeContentRow.CONTINUE_PLAYING) &&
+            !app.prefs.discreetMode
         // Persistent retry affordance while the dashboard has no content at
         // all; disappears as soon as any row renders data.
         if (serverErrorActive) {
@@ -407,11 +520,11 @@ class MainFragment : RowsSupportFragment() {
             serverErrorRow?.let(rowsAdapter::remove)
             serverErrorRow = null
         }
-        val heroItem = continueState.items.orEmpty().firstOrNull()?.let { (scene, resumeSeconds) ->
-            HeroItem(scene, (resumeSeconds * 1000).toLong())
-        }.takeIf {
-            layoutSnapshot.showHero && layoutSnapshot.isRowVisible(HomeContentRow.CONTINUE_PLAYING)
-        }
+        val heroItem = if (heroVisible) {
+            continueState.items.orEmpty().firstOrNull()?.let { (scene, resumeSeconds) ->
+                HeroItem(scene, (resumeSeconds * 1000).toLong())
+            }
+        } else null
         if (heroItem == null) {
             heroRow?.let(rowsAdapter::remove)
             heroRow = null

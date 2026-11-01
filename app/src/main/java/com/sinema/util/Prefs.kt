@@ -75,6 +75,24 @@ class Prefs(context: Context) {
         get() = prefs.getString("playback_seek_preset", "") ?: ""
         set(value) = prefs.edit().putString("playback_seek_preset", value).apply()
 
+    // Privacy: neutral card labels until focused, no watch-history writes,
+    // and FLAG_SECURE (blocks screenshots + recents thumbnails).
+    var discreetMode: Boolean
+        get() = prefs.getBoolean("discreet_mode", false)
+        set(value) = prefs.edit().putBoolean("discreet_mode", value).apply()
+
+    var incognitoMode: Boolean
+        get() = prefs.getBoolean("incognito_mode", false)
+        set(value) = prefs.edit().putBoolean("incognito_mode", value).apply()
+
+    var blockScreenshots: Boolean
+        get() = prefs.getBoolean("block_screenshots", false)
+        set(value) = prefs.edit().putBoolean("block_screenshots", value).apply()
+
+    var ambientGallery: Boolean
+        get() = prefs.getBoolean("ambient_gallery", false)
+        set(value) = prefs.edit().putBoolean("ambient_gallery", value).apply()
+
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
         get() = ProfileCodec.fromJson(getSecureString("server_profiles"))

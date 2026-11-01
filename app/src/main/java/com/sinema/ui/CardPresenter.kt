@@ -18,6 +18,7 @@ import com.sinema.model.HomeCardSize
 import com.sinema.model.ImageItem
 import com.sinema.model.Scene
 import com.sinema.model.StarRating
+import com.sinema.util.DiscreetMode
 import com.sinema.util.GlideAuth
 
 class CardPresenter(
@@ -25,6 +26,21 @@ class CardPresenter(
     private val cardSize: HomeCardSize = HomeCardSize.COMPACT,
     private val onItemLongClick: ((Any) -> Unit)? = null
 ) : Presenter() {
+    companion object {
+        /**
+         * Bumped whenever discreet mode flips. Screens compare their last
+         * seen generation on resume and rebind visible cards so already-bound
+         * rows switch to/from neutral display without a data reload.
+         */
+        @Volatile var discreetGeneration: Int = 0
+    }
+
+    /** Holds the last-bound scene so discreet mode can re-render on focus. */
+    private class SceneHolder(view: View) : ViewHolder(view) {
+        var scene: Scene? = null
+        var focused: Boolean = false
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_card, parent, false)
@@ -33,12 +49,27 @@ class CardPresenter(
         view.layoutParams.height = (cardSize.heightDp * density).toInt()
         (view.findViewById<ImageView>(R.id.card_image).parent as View).layoutParams.height =
             (cardSize.imageHeightDp * density).toInt()
-        return ViewHolder(view)
+        return SceneHolder(view).also { holder ->
+            view.tag = holder
+            view.setOnFocusChangeListener { _, hasFocus ->
+                holder.focused = hasFocus
+                // No-op for holders currently bound to non-scene items.
+                if (holder.scene != null) applySceneDisplay(holder)
+            }
+        }
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val view = viewHolder.view
         val image = view.findViewById<ImageView>(R.id.card_image)
+        // Reset holder state every bind: recycled views must not leak the
+        // previous scene or its focus state into the new item.
+        (viewHolder as? SceneHolder)?.let { holder ->
+            holder.scene = item as? Scene
+            holder.focused = view.hasFocus()
+        }
+        // Restored per bind; the scene branch may hide it again for discreet.
+        image.visibility = View.VISIBLE
         val title = view.findViewById<TextView>(R.id.card_title)
         val content = view.findViewById<TextView>(R.id.card_content)
         val heart = view.findViewById<TextView>(R.id.card_heart)
@@ -53,29 +84,6 @@ class CardPresenter(
         )
         when (item) {
             is Scene -> {
-                title.text = item.displayTitle
-                content.text = buildString {
-                    if (item.starCount > 0) {
-                        append(StarRating.glyphs(item.starCount))
-                        append("  ")
-                    }
-                    append(item.formatDuration())
-                    if (item.oCounter > 0) {
-                        append("  O×")
-                        append(item.oCounter)
-                    }
-                }
-                heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
-                checkmark?.visibility = if (item.isWatched) View.VISIBLE else View.GONE
-                val percent = item.watchProgressPercent
-                progress?.let { bar ->
-                    if (percent > 0) {
-                        bar.progress = percent
-                        bar.visibility = View.VISIBLE
-                    } else {
-                        bar.visibility = View.GONE
-                    }
-                }
                 val url = api.getScreenshotUrl(item.id)
                 image.scaleType = ImageView.ScaleType.CENTER_CROP
                 image.setBackgroundColor(0xFF333333.toInt())
@@ -83,6 +91,9 @@ class CardPresenter(
                     .load(GlideAuth.url(api, url))
                     .centerCrop()
                     .into(image)
+                val holder = viewHolder as? SceneHolder ?: return
+                holder.scene = item
+                applySceneDisplay(holder)
             }
             is HomeViewAll -> {
                 title.text = item.actionLabel
@@ -158,7 +169,58 @@ class CardPresenter(
         }
     }
 
+    /**
+     * Scene text/overlays/artwork in one place so discreet mode can re-render
+     * on focus change: unfocused cards show a neutral label, no overlays, and
+     * hidden artwork; focused cards reveal everything.
+     */
+    private fun applySceneDisplay(holder: SceneHolder) {
+        val scene = holder.scene ?: return
+        val view = holder.view
+        val image = view.findViewById<ImageView>(R.id.card_image)
+        val title = view.findViewById<TextView>(R.id.card_title)
+        val content = view.findViewById<TextView>(R.id.card_content)
+        val heart = view.findViewById<TextView>(R.id.card_heart)
+        val checkmark = view.findViewById<TextView>(R.id.card_checkmark)
+        val progress = view.findViewById<android.widget.ProgressBar>(R.id.card_progress)
+        val hide = com.sinema.SinemaApp.instance.prefs.discreetMode && !holder.focused
+        if (hide) {
+            title.text = DiscreetMode.neutralTitle(scene.id)
+            content.text = "•••"
+            heart?.visibility = View.GONE
+            checkmark?.visibility = View.GONE
+            progress?.visibility = View.GONE
+            image.visibility = View.INVISIBLE
+            return
+        }
+        title.text = scene.displayTitle
+        content.text = buildString {
+            if (scene.starCount > 0) {
+                append(StarRating.glyphs(scene.starCount))
+                append("  ")
+            }
+            append(scene.formatDuration())
+            if (scene.oCounter > 0) {
+                append("  O×")
+                append(scene.oCounter)
+            }
+        }
+        heart?.visibility = if (scene.isFavorite) View.VISIBLE else View.GONE
+        checkmark?.visibility = if (scene.isWatched) View.VISIBLE else View.GONE
+        val percent = scene.watchProgressPercent
+        progress?.let { bar ->
+            if (percent > 0) {
+                bar.progress = percent
+                bar.visibility = View.VISIBLE
+            } else {
+                bar.visibility = View.GONE
+            }
+        }
+        image.visibility = View.VISIBLE
+    }
+
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
+        (viewHolder as? SceneHolder)?.scene = null
         val image = viewHolder.view.findViewById<ImageView>(R.id.card_image)
         image.setImageDrawable(null)
     }
@@ -290,6 +352,20 @@ class SettingsPresenter : Presenter() {
                 title.text = "📡 Retry Connection"
                 content.text = "Server unreachable"
                 image.setImageResource(android.R.drawable.ic_menu_rotate)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Tonight's Mix" -> {
+                title.text = "🌙 Tonight's Mix"
+                content.text = "~30 min personalized queue"
+                image.setImageResource(android.R.drawable.ic_menu_day)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Untagged Scenes" -> {
+                title.text = "🧹 Untagged Scenes"
+                content.text = "Curate the backlog"
+                image.setImageResource(android.R.drawable.ic_menu_edit)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }

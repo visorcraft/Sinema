@@ -135,6 +135,10 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 `DeepLinks` routes `com.sinema://app/scene/<id>` to the detail screen and `com.sinema://app/play/<id>` (published by `TvChannels.syncWatchNext`) straight to playback. The `/play/` route sets `SceneIntents.playbackAutoResume`; `PlaybackActivity.resolveAutoResume()` fetches the full scene once (resume_time, dimensions, captions, markers) and resumes silently — the resume prompt never appears on this path. When the initial dashboard load fails with no content to show, `shouldShowServerErrorRow` drives a persistent `Retry Connection` row at the top of home.
 
+### Privacy and ambient
+
+`Prefs` holds `discreetMode` / `incognitoMode` / `blockScreenshots` / `ambientGallery`. Discreet rendering lives in `CardPresenter.applySceneDisplay` (neutral `DiscreetMode.neutralTitle`, artwork hidden until focus); incognito short-circuits `savePlayback` and search-history writes; `SinemaApp` applies `FLAG_SECURE` to every activity via lifecycle callbacks so toggles take effect on the next activity start. `TonightMix` (util) is the pure ~30-minute selector behind the home shortcut. `AmbientActivity` (started by `MainActivity`'s idle watcher, 5 min, PIN-guarded) runs the Ken Burns gallery over top-rated favorites. `SinemaApi.findUntaggedScenes` uses `IS_NULL` tag/performer criteria (Stash ≥ 0.26) and `sceneUpdateTags` writes `tag_ids` through `sceneUpdate`.
+
 ### Playback queue
 
 `PlaybackQueue` (util) keeps queued items with id/title/duration/play_count and exposes `next`, `jumpToItem`, `remaining`, seeded `shuffleRemaining`, and `filterRemainingUnwatched` (the dialog's Unwatched-only button); the controller's `Up Next · N` chip opens a jump/shuffle/filter/exit dialog, and the resume prompt (`shouldPromptResume`, 10 s threshold) asks before seeking into saved progress. `QueuePlanning` is the pure planning step (start-at, shuffle, 500 cap) behind `SceneIntents.playAll`; grid long-press actions live in `SceneGridFragment.showCardActions`. O-counter increments (`SinemaApi.sceneIncrementO`) run on the app scope from the playback menu so they survive an immediate exit.

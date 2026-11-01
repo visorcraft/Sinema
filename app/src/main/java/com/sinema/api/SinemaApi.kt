@@ -705,6 +705,38 @@ class SinemaApi(
         graphql(query, mapOf("id" to sceneId))
     }
 
+    /** Replace a scene's tag set (orphan triage on the Untagged grid). */
+    suspend fun sceneUpdateTags(sceneId: String, tagIds: List<String>) {
+        val query = """
+            mutation(${"$"}input: SceneUpdateInput!) {
+                sceneUpdate(input: ${"$"}input) { id }
+            }
+        """.trimIndent()
+        graphql(query, mapOf("input" to mapOf("id" to sceneId, "tag_ids" to tagIds)))
+    }
+
+    /**
+     * Scenes with no tags AND no performers — the curation backlog. Uses
+     * IS_NULL criteria on hierarchical/multi criteria (Stash ≥ 0.26); older
+     * servers reject the filter and callers surface their own error.
+     */
+    suspend fun findUntaggedScenes(
+        page: Int,
+        perPage: Int,
+        sort: String = "created_at",
+        direction: String = "DESC"
+    ): Pair<Int, List<Scene>> =
+        findScenesInternal(
+            page = page,
+            perPage = perPage,
+            sort = sort,
+            direction = direction,
+            sceneFilter = mapOf(
+                "tags" to mapOf("value" to emptyList<String>(), "modifier" to "IS_NULL"),
+                "performers" to mapOf("value" to emptyList<String>(), "modifier" to "IS_NULL")
+            )
+        )
+
     suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> {
         // Server sorts by last_played_at DESC, but Stash's row order is
         // unpredictable for scenes whose last_played_at is NULL even when

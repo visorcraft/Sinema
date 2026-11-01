@@ -73,6 +73,15 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".ui.UntaggedScenesActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.AmbientActivity"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
+        <activity
             android:name=".ui.FavoritesActivity"
             android:screenOrientation="landscape" />
 

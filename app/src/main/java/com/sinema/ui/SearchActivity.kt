@@ -146,6 +146,26 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         activity?.refreshGridControls()
     }
 
+    override fun onResume() {
+        super.onResume()
+        rebindIfDiscreetChanged()
+    }
+
+    private var boundDiscreetGeneration = CardPresenter.discreetGeneration
+
+    /** Discreet toggle while away: rebind visible scene cards, no refetch. */
+    private fun rebindIfDiscreetChanged() {
+        if (boundDiscreetGeneration == CardPresenter.discreetGeneration) return
+        boundDiscreetGeneration = CardPresenter.discreetGeneration
+        (0 until rowsAdapter.size()).forEach { i ->
+            (rowsAdapter.get(i) as? ListRow)?.adapter?.let { rowAdapter ->
+                if (rowAdapter is ArrayObjectAdapter && rowAdapter.size() > 0) {
+                    rowAdapter.notifyItemRangeChanged(0, rowAdapter.size())
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sort = SortOption.fromName(app.prefs.sortFor("search"))
@@ -250,8 +270,9 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
                     }
                     SearchResults(scenes.await(), tags.await(), performers.await(), studios.await(), groups.await())
                 }
-                // Only queries that produced a result render become recents.
-                app.prefs.recordRecentSearch(query)
+                // Only queries that produced a result render become recents,
+                // and never while incognito.
+                if (!app.prefs.incognitoMode) app.prefs.recordRecentSearch(query)
                 renderResults(results)
             } catch (e: CancellationException) {
                 throw e

@@ -28,6 +28,34 @@ class SinemaApp : Application() {
         )
         configureApi()
         configureGlideTransport()
+        // FLAG_SECURE must cover every activity, including ones opened before
+        // the setting flips — re-apply on each start.
+        registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: android.app.Activity) {
+                applySecureFlag(activity)
+            }
+            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
+            override fun onActivityResumed(activity: android.app.Activity) {}
+            override fun onActivityPaused(activity: android.app.Activity) {}
+            override fun onActivityStopped(activity: android.app.Activity) {}
+            override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
+            override fun onActivityDestroyed(activity: android.app.Activity) {}
+        })
+    }
+
+    private fun applySecureFlag(activity: android.app.Activity) {
+        try {
+            val secure = prefs.blockScreenshots
+            val flags = activity.window.attributes.flags
+            val hasFlag = (flags and android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0
+            if (secure && !hasFlag) {
+                activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            } else if (!secure && hasFlag) {
+                activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("Sinema", "Could not apply FLAG_SECURE", e)
+        }
     }
 
     fun refreshApi() {

@@ -45,6 +45,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     }
 
     protected open val sortScreenKey: String? = null
+    /** Long-press "Assign tags" availability (Untagged triage grid). */
+    protected open val canAssignTags: Boolean = false
     protected open val filterScreenKey: String? get() = sortScreenKey
     protected open val defaultSort: SortOption = SortOption.PATH_ASC
     /** Cards shown in this grid; grids of non-Scene items override this. */
@@ -117,7 +119,9 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     reload()
                 },
                 onPlayAll = { playAll() },
-                onShuffle = { playAll(shuffle = true) }
+                onShuffle = { playAll(shuffle = true) },
+                onMarkAllWatched = { markAllWatched() },
+                onRateAll = { showRateAllDialog() }
             )
         } else {
             showSortDialog()
@@ -128,6 +132,71 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         val scenes = (0 until gridAdapter.size())
             .mapNotNull { gridAdapter.get(it) as? Scene }
         SceneIntents.playAll(requireContext(), scenes, shuffle = shuffle)
+    }
+
+    /** Scenes currently visible in this grid (used by bulk actions). */
+    private fun scenesInGrid(): List<Scene> =
+        (0 until gridAdapter.size()).mapNotNull { gridAdapter.get(it) as? Scene }
+
+    private fun markAllWatched() {
+        bulkEdit("Mark all watched") { scene ->
+            if (!scene.isWatched) {
+                app.api.clearResumeTime(scene.id)
+                app.api.incrementPlayCount(scene.id)
+            }
+        }
+    }
+
+    private fun showRateAllDialog() {
+        val options = (0..5).map { if (it == 0) "No rating" else "★".repeat(it) }
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("Rate all scenes")
+            .setSingleChoiceItems(options.toTypedArray(), -1) { dialog, which ->
+                dialog.dismiss()
+                val rating100 = if (which == 0) null else which * 20
+                bulkEdit("Rated all scenes") { scene ->
+                    app.api.setSceneRating(scene.id, rating100)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private var bulkJob: Job? = null
+
+    private fun bulkEdit(label: String, action: suspend (Scene) -> Unit) {
+        val scenes = scenesInGrid()
+        if (scenes.isEmpty()) return
+        // One bulk job at a time: concurrent loops over stale snapshots would
+        // double-apply play counts and ratings.
+        if (bulkJob?.isActive == true) {
+            Toast.makeText(requireContext(), "Still working on the previous bulk edit", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(requireContext(), "$label…", Toast.LENGTH_SHORT).show()
+        bulkJob = lifecycleScope.launch {
+            var ok = 0
+            var failed = 0
+            for (scene in scenes) {
+                try {
+                    action(scene)
+                    ok++
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    failed++
+                    Log.e("Sinema", "$label failed for ${scene.id}", e)
+                }
+            }
+            // Hold the single-flight guard until fresh server state replaced
+            // the grid, so a retried bulk edit never re-applies to scenes
+            // that already succeeded.
+            if (isAdded) {
+                val suffix = if (failed > 0) ", $failed failed" else ""
+                Toast.makeText(requireContext(), "$label: $ok scenes$suffix", Toast.LENGTH_LONG).show()
+                reload()?.join()
+            }
+        }
     }
 
     /** Long-press actions for a focused scene card. */
@@ -153,6 +222,9 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             if (scene.resumeTime > 0.0) {
                 add("✖ Remove from Continue Playing" to Runnable { clearResume(scene, index) })
             }
+            if (canAssignTags) {
+                add("🏷 Assign tags" to Runnable { showAssignTagsDialog(scene) })
+            }
             add(WatchedToggle.buttonLabel(scene.isWatched) to Runnable { toggleWatched(scene, index) })
             add(
                 (if (scene.isFavorite) "💔 Unfavorite" else "❤️ Favorite") to
@@ -171,8 +243,69 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             .show()
     }
 
-    /** Clears the server resume point so the scene drops off Continue Playing. */
-    private fun clearResume(scene: Scene, index: Int) {
+    /** Multi-select tag picker for the untagged triage grid. */
+    private fun showAssignTagsDialog(scene: Scene) {
+        lifecycleScope.launch {
+            try {
+                val tags = mutableListOf<com.sinema.model.EntityItem>()
+                var page = 1
+                while (page <= 20) { // cap: 2000 tags
+                    val (count, items) = app.api.findEntities(
+                        com.sinema.model.EntityItem.Kind.TAG, page = page, perPage = 100
+                    )
+                    tags += items
+                    if (items.isEmpty() || tags.size >= count) break
+                    page++
+                }
+                if (!isAdded) return@launch
+                if (tags.isEmpty()) {
+                    Toast.makeText(requireContext(), "No tags on this server", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                val checked = BooleanArray(tags.size)
+                android.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Assign tags — ${scene.displayTitle}")
+                    .setMultiChoiceItems(tags.map { it.name }.toTypedArray(), checked) { _, which, value ->
+                        checked[which] = value
+                    }
+                    .setPositiveButton("Assign") { dialog, _ ->
+                        dialog.dismiss()
+                        val selected = tags.filterIndexed { i, _ -> checked[i] }.map { it.id }
+                        if (selected.isEmpty()) return@setPositiveButton
+                        lifecycleScope.launch {
+                            try {
+                                app.api.sceneUpdateTags(scene.id, selected)
+                                if (isAdded) {
+                                    Toast.makeText(
+                                        requireContext(),
+                                        "Assigned ${selected.size} tags", Toast.LENGTH_SHORT
+                                    ).show()
+                                    reload()
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e("Sinema", "Tag assign failed for ${scene.id}", e)
+                                if (isAdded) {
+                                    Toast.makeText(requireContext(), "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Tag list load failed", e)
+                if (isAdded) {
+                    Toast.makeText(requireContext(), "Could not load tags: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    /** Clears the server resume point so the scene drops off Continue Playing. */    private fun clearResume(scene: Scene, index: Int) {
         lifecycleScope.launch {
             try {
                 app.api.clearResumeTime(scene.id)
@@ -247,6 +380,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     private var pausedFocusIndex = -1
     private var pausedFocusKey: String? = null
+    private var boundDiscreetGeneration = CardPresenter.discreetGeneration
 
     private val gridView get() = view?.let { findGridView(it as? ViewGroup) }
 
@@ -257,6 +391,15 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         pausedFocusIndex = idx
         pausedFocusKey = if (idx in 0 until gridAdapter.size())
             gridAdapter.get(idx)?.let(FocusRestore::keyOf) else null
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Discreet toggle while away: rebind visible cards without a reload.
+        if (boundDiscreetGeneration != CardPresenter.discreetGeneration) {
+            boundDiscreetGeneration = CardPresenter.discreetGeneration
+            if (gridAdapter.size() > 0) gridAdapter.notifyItemRangeChanged(0, gridAdapter.size())
+        }
     }
 
     private fun updateTitle() {
@@ -324,7 +467,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         })
     }
 
-    protected fun reload() {
+    protected fun reload(): Job? {
         updateTitle()
         loadJob?.cancel()
         val generation = ++loadGeneration
@@ -368,6 +511,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 if (generation == loadGeneration) loadingPage = false
             }
         }
+        return loadJob
     }
 
     private fun loadNextPage() {

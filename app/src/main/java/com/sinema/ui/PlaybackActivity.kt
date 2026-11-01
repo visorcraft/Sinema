@@ -63,6 +63,8 @@ class PlaybackActivity : FragmentActivity() {
     private var resumeAwaitingChoice = false
     /** Watch Next entry: fetch resume position before the first start. */
     private var autoResumePending = false
+    /** Scene viewed (partly) under incognito — stays unrecorded. */
+    private var incognitoLatchSceneId: String? = null
     private var suppressingPromptDismiss = false
     private var sceneSwitchJob: kotlinx.coroutines.Job? = null
     private var aspectRatio = PlaybackAspectRatio.AUTO
@@ -110,6 +112,9 @@ class PlaybackActivity : FragmentActivity() {
         } else {
             loadSceneTitle()
         }
+        // A scene begun under incognito stays unrecorded even if the user
+        // turns incognito off before leaving it.
+        if (SinemaApp.instance.prefs.incognitoMode) incognitoLatchSceneId = sceneId
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -254,6 +259,11 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun savePlayback() {
         val exo = player ?: return
+        // Incognito: never write watch history (resume, play count, duration)
+        // or feed Watch Next from this session. The latch keeps viewing that
+        // happened *while* incognito was on unrecorded even if the user turns
+        // it off again before leaving this scene.
+        if (SinemaApp.instance.prefs.incognitoMode || incognitoLatchSceneId == sceneId) return
         // Snapshot the id now: auto-advance reassigns sceneId synchronously
         // after this call, but the save below runs asynchronously, so reading
         // the field there could attribute the save to the next scene.
@@ -792,10 +802,12 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun showPlayerMenu() {
         if (playerMenuDialog?.isShowing == true) return
+        val incognito = SinemaApp.instance.prefs.incognitoMode
         val items = buildList {
             if (markers.isNotEmpty()) add("Chapters")
             add("★ Rate scene")
             add("🔥 O +1")
+            add(if (incognito) "🕶 Incognito: ON" else "🕶 Incognito: OFF")
             add("Aspect ratio")
             add("Stream quality")
             add("Seek buttons")
@@ -808,6 +820,17 @@ class PlaybackActivity : FragmentActivity() {
                     "Chapters" -> showChapters()
                     "★ Rate scene" -> showRateDialog()
                     "🔥 O +1" -> incrementOCount()
+                    "🕶 Incognito: ON" -> {
+                        SinemaApp.instance.prefs.incognitoMode = false
+                        Toast.makeText(this, "Incognito off", Toast.LENGTH_SHORT).show()
+                    }
+                    "🕶 Incognito: OFF" -> {
+                        SinemaApp.instance.prefs.incognitoMode = true
+                        // Viewing from here on must stay unrecorded for this
+                        // scene even if incognito is disabled before exit.
+                        incognitoLatchSceneId = sceneId
+                        Toast.makeText(this, "Incognito on — watch history paused", Toast.LENGTH_SHORT).show()
+                    }
                     "Aspect ratio" -> showAspectRatioDialog()
                     "Stream quality" -> showStreamQualityDialog()
                     "Seek buttons" -> cycleSeekPreset()
@@ -947,6 +970,7 @@ class PlaybackActivity : FragmentActivity() {
             }
             if (isFinishing || isDestroyed) return@launch
             hideSeekPreview()
+            incognitoLatchSceneId = if (SinemaApp.instance.prefs.incognitoMode) nextId else null
             sceneTitle = nextTitle
             sceneId = nextId
             videoWidth = nextWidth

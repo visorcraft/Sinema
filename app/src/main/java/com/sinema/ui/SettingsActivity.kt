@@ -306,6 +306,52 @@ class SettingsFragment : Fragment() {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = 16 })
 
+        // Privacy / ambient toggles: plain preference flips, label-refresh
+        // keeps D-pad focus on the button.
+        fun prefToggle(labelOn: String, labelOff: String, read: () -> Boolean, write: (Boolean) -> Unit): Button =
+            Button(ctx).apply {
+                text = if (read()) labelOn else labelOff
+                isFocusable = true
+                setBackgroundColor(0xFF333333.toInt())
+                setTextColor(0xFFFFFFFF.toInt())
+                setOnFocusChangeListener { _, hasFocus ->
+                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
+                }
+                setOnClickListener {
+                    write(!read())
+                    this.text = if (read()) labelOn else labelOff
+                }
+            }
+        layout.addView(prefToggle(
+            "Discreet Mode: ON", "Discreet Mode: OFF",
+            { app.prefs.discreetMode },
+            { value ->
+                app.prefs.discreetMode = value
+                // Bound cards re-apply their display state on screen resume.
+                CardPresenter.discreetGeneration++
+            }
+        ), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 16 })
+        layout.addView(prefToggle(
+            "Incognito (pause watch history): ON", "Incognito (pause watch history): OFF",
+            { app.prefs.incognitoMode }, { app.prefs.incognitoMode = it }
+        ), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 16 })
+        layout.addView(prefToggle(
+            "Block Screenshots: ON", "Block Screenshots: OFF",
+            { app.prefs.blockScreenshots }, { app.prefs.blockScreenshots = it }
+        ), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 16 })
+        layout.addView(prefToggle(
+            "Ambient Gallery: ON", "Ambient Gallery: OFF",
+            { app.prefs.ambientGallery }, { app.prefs.ambientGallery = it }
+        ), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 16 })
+
         val homeSettingsBtn = Button(ctx).apply {
             text = "Home Settings"
             isFocusable = true

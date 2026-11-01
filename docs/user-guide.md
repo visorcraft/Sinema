@@ -55,6 +55,26 @@ Open `Settings` → `Home Settings` to:
 
 Every non-empty content row ends with `View All`. Scene grids provide sorting and filtering where applicable; Groups opens the full Group browser, and Because You Watched opens its bounded recommendation grid. Changes apply when you return home.
 
+### Tonight's Mix
+
+The `🌙 Tonight's Mix` card on the shortcut row builds a ~30-minute queue from your unwatched favorites (falling back to recent unwatched scenes) and starts playback immediately. The selection is reshuffled every run.
+
+### Privacy
+
+`Settings` exposes three privacy switches (Incognito also toggles from the playback menu):
+
+- **Discreet Mode** — scene cards show a neutral label (for example `Scene 4271`), no overlays, and no artwork until the card is focused, and the home hero banner is hidden. A passing glance reveals nothing.
+- **Incognito (pause watch history)** — stops writing resume positions, play counts, and play durations to Stash and skips Watch Next syncing and search-history recording. Server data stays untouched from this device.
+- **Block Screenshots** — sets `FLAG_SECURE` on every screen, blocking screenshots and recents thumbnails.
+
+### Ambient gallery
+
+Enable `Ambient Gallery` in Settings and leave the home screen idle for five minutes: a slow Ken Burns slideshow of your top-rated scenes takes over with a clock in the corner. Any key or touch exits. It never starts while a PIN is unverified or while Discreet Mode is on, and it respects Block Screenshots.
+
+### Untagged scenes
+
+`Library` → `🧹 Untagged Scenes` lists scenes with no tags and no performers — the curation backlog. Long-press a card and choose `🏷 Assign tags` to apply existing tags (multi-select); the scene leaves the grid once tagged. Requires a Stash version that supports null filters (≥ 0.26); older servers show an error.
+
 ## Search
 
 Open `Search` from the main screen.
@@ -281,7 +301,7 @@ Rate a scene 1–5 stars on its detail screen, or press Menu during playback and
 
 ## Play All
 
-Press Menu on folder, favorite, or entity scene grids to open the grid menu, then choose Play All.
+Press Menu on folder, favorite, or entity scene grids to open the grid menu, then choose Play All. Scene-grid menus also offer bulk curation: `👁 Mark All Watched` and `★ Rate All…` (0–5 stars or clear) apply to every scene currently loaded in the grid.
 
 Play All behavior:
 

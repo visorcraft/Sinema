@@ -35,6 +35,7 @@ class LibraryFragment : VerticalGridSupportFragment() {
         val shortcuts = SinemaApp.instance.prefs.homeLayout.visibleLibraryShortcuts().map { it.label }
         val items = ArrayObjectAdapter(SettingsPresenter())
         shortcuts.forEach(items::add)
+        items.add("Untagged Scenes")
         adapter = items
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
@@ -46,6 +47,7 @@ class LibraryFragment : VerticalGridSupportFragment() {
                 "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))
                 "Markers" -> startActivity(Intent(requireContext(), MarkerBrowserActivity::class.java))
                 "Stats" -> startActivity(Intent(requireContext(), StatsActivity::class.java))
+                "Untagged Scenes" -> startActivity(Intent(requireContext(), UntaggedScenesActivity::class.java))
                 "Saved Filters" -> startActivity(Intent(requireContext(), SavedFiltersActivity::class.java))
             }
         }
