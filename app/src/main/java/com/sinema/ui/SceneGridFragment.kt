@@ -510,7 +510,9 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         sortScreenKey?.let { sort = SortOption.fromName(app.prefs.sortFor(it), defaultSort) }
         if (canFilter) filterScreenKey?.let { sceneFilter = app.prefs.sceneFilterFor(it) }
         updateTitle()
-        badgeDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.sinema_logo)
+        // No badgeDrawable here: it overlays the first grid row on screens
+        // with their own headers (entity scenes, folders). The title text
+        // alone identifies the screen.
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
         gridPresenter.numberOfColumns = columns
         setGridPresenter(gridPresenter)

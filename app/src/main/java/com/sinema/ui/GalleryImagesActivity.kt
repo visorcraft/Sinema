@@ -57,6 +57,15 @@ class GalleryImagesActivity : FragmentActivity() {
                 startActivity(ImageViewActivity.intentForGallery(this@GalleryImagesActivity, galleryId, 0, true))
             }
         }
+        // Collapse the gallery header while the grid scrolls; restore at top.
+        val frame = findViewById<View>(R.id.main_frame)
+        frame.post {
+            frame.findRecyclerView()?.let { grid ->
+                findViewById<View>(R.id.entity_header)?.let { header ->
+                    CollapsingHeader.bind(grid, header)
+                }
+            }
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =

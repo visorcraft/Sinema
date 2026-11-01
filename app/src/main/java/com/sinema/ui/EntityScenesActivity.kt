@@ -35,7 +35,7 @@ class EntityScenesActivity : FragmentActivity() {
         setContentView(R.layout.activity_grid)
         // Header binds on every create so it survives recreation; only the
         // fragment creation is skipped when restoring.
-        val kind = parseKind(intent.getStringExtra("kind"))
+        val kind = EntityItem.parseOrTag(intent.getStringExtra("kind"))
         bindEntityHeader(kind, intent.getStringExtra("id") ?: "", intent.getStringExtra("name") ?: "")
         if (savedInstanceState == null) {
             val fragment = EntityScenesFragment.create(
@@ -50,6 +50,17 @@ class EntityScenesActivity : FragmentActivity() {
         } else {
             (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
                 ?.let { bindGridControls(it) }
+        }
+        // Collapse the tall entity header while the grid is scrolled so
+        // content rows get the full viewport; it returns at the top. Runs on
+        // every create so restored fragments keep the behavior.
+        val frame = findViewById<View>(R.id.main_frame)
+        frame.post {
+            frame.findRecyclerView()?.let { grid ->
+                findViewById<View>(R.id.entity_header)?.let { header ->
+                    CollapsingHeader.bind(grid, header)
+                }
+            }
         }
     }
 
@@ -71,14 +82,13 @@ class EntityScenesActivity : FragmentActivity() {
                 count.text = "${info.sceneCount} " +
                     if (info.sceneCount == 1) "scene" else "scenes"
                 val image = findViewById<ImageView>(R.id.entity_header_image)
-                if (info.imagePath != null) {
-                    Glide.with(this@EntityScenesActivity)
-                        .load(GlideAuth.url(SinemaApp.instance.api, info.imagePath))
-                        .centerCrop()
-                        .into(image)
-                } else {
-                    image.visibility = View.INVISIBLE
-                }
+                val headerImageUrl = info.imagePath
+                    ?: SinemaApp.instance.api.entityImageUrl(kind, id)
+                Glide.with(this@EntityScenesActivity)
+                    .load(GlideAuth.url(SinemaApp.instance.api, headerImageUrl))
+                    .centerCrop()
+                    .error(android.R.drawable.ic_menu_gallery)
+                    .into(image)
                 bindHeaderTagChips(info.tags)
                 bindHeaderActions(kind, info)
             } catch (e: CancellationException) {
@@ -165,12 +175,6 @@ class EntityScenesActivity : FragmentActivity() {
         scroll.visibility = View.VISIBLE
     }
 
-    private fun parseKind(raw: String?): EntityItem.Kind =
-        try {
-            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
-        } catch (_: IllegalArgumentException) {
-            EntityItem.Kind.TAG
-        }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
         if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
@@ -185,19 +189,13 @@ class EntityScenesFragment : SceneGridFragment() {
         }
     }
 
-    private val kind get() = parseKind(requireArguments().getString("kind"))
+    private val kind get() = EntityItem.parseOrTag(requireArguments().getString("kind"))
     override val sortScreenKey: String? get() = "entity_scenes_${kind.name}_${requireArguments().getString("id")}"
     override val gridTitle get() = requireArguments().getString("name") ?: ""
     override val emptyMessage = "No scenes"
     override val canFilter = true
     override val paged = true
 
-    private fun parseKind(raw: String?): EntityItem.Kind =
-        try {
-            raw?.let { EntityItem.Kind.valueOf(it) } ?: EntityItem.Kind.TAG
-        } catch (_: IllegalArgumentException) {
-            EntityItem.Kind.TAG
-        }
 
     override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
 
@@ -223,4 +221,15 @@ class EntityScenesFragment : SceneGridFragment() {
         }
         com.sinema.util.SceneIntents.playAll(requireContext(), unwatched, shuffle = true)
     }
+}
+
+/** Depth-first RecyclerView lookup for grid fragments hosted in a frame. */
+internal fun View.findRecyclerView(): androidx.recyclerview.widget.RecyclerView? {
+    if (this is androidx.recyclerview.widget.RecyclerView) return this
+    if (this is android.view.ViewGroup) {
+        for (i in 0 until childCount) {
+            getChildAt(i).findRecyclerView()?.let { return it }
+        }
+    }
+    return null
 }

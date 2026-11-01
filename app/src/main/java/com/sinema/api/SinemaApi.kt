@@ -159,6 +159,16 @@ class SinemaApi(
         trustAllCerts = allowSelfSigned
     }
 
+    /**
+     * Direct image endpoint per entity kind. Used as a fallback when list
+     * queries no longer return image_path (newer Stash schemas).
+     */
+    fun entityImageUrl(kind: EntityItem.Kind, entityId: String): String = when (kind) {
+        EntityItem.Kind.PERFORMER -> "$serverUrl/performer/$entityId/image"
+        EntityItem.Kind.STUDIO -> "$serverUrl/studio/$entityId/image"
+        EntityItem.Kind.TAG -> "$serverUrl/tag/$entityId/image"
+    }
+
     fun getScreenshotUrl(sceneId: String): String = "$serverUrl/scene/$sceneId/screenshot"
 
     /** Scene frame at a timestamp — used as the marker card thumbnail. */

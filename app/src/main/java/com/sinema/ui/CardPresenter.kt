@@ -152,19 +152,16 @@ class CardPresenter(
                 heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 checkmark?.visibility = View.GONE
                 progress?.visibility = View.GONE
-                if (item.imagePath != null) {
-                    image.scaleType = ImageView.ScaleType.CENTER_CROP
-                    image.setBackgroundColor(0xFF333333.toInt())
-                    Glide.with(view.context)
-                        .load(GlideAuth.url(api, item.imagePath))
-                        .centerCrop()
-                        .into(image)
-                } else {
-                    Glide.with(view.context).clear(image)
-                    image.setImageResource(android.R.drawable.ic_menu_agenda)
-                    image.scaleType = ImageView.ScaleType.CENTER
-                    image.setBackgroundColor(0xFF444444.toInt())
-                }
+                image.scaleType = ImageView.ScaleType.CENTER_CROP
+                image.setBackgroundColor(0xFF333333.toInt())
+                // Prefer the list payload's image_path; newer Stash schemas
+                // can omit it, so fall back to the direct image endpoint.
+                val imageUrl = item.imagePath ?: api.entityImageUrl(item.kind, item.id)
+                Glide.with(view.context)
+                    .load(GlideAuth.url(api, imageUrl))
+                    .centerCrop()
+                    .error(android.R.drawable.ic_menu_agenda)
+                    .into(image)
             }
         }
     }
