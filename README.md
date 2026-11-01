@@ -123,14 +123,15 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 - **🎞️ Groups & Collections** — Browse Stash Groups with artwork and metadata, play scenes in order, shuffle, or resume progression. Legacy Movies on Stash 0.24 are supported automatically.
 - **🖼️ Galleries** — Browse Stash Galleries with covers, image counts, search, sorting, metadata, and paged image grids.
-- **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with images, scene counts, detail headers, and performer tag chips.
+- **🏷️ Metadata Browsing & Favorites** — Search, sort, and incrementally browse Tags, Performers, and Studios with images, scene counts, detail headers, and performer tag chips. Long-press an entity card to favorite or unfavorite it.
 - **📁 Folder Browser** — Navigate directories, subfolders, videos, and pictures, with folder counts, artwork, and favorite indicators.
-- **🎛️ Advanced Grid Controls** — D-pad-reachable sorting, quick watched/favorite toggles, and removable filter chips for rating, resolution, markers, captions, duration, release date, codec, and included/excluded performers, studios, or tags.
+- **🎛️ Advanced Grid Controls** — D-pad-reachable sorting, quick watched/favorite toggles, removable filter chips for rating, resolution, markers, captions, duration, release date, codec, and included/excluded performers, studios, or tags, plus A–Z/0–9 path-prefix jumping in View All grids.
 - **🎬 Rich Scene Details & Card Actions** — Friendly titles, synopsis, metadata chips, collapsible technical details, resume/play, Play from here, watched and favorite toggles, and Continue Playing removal.
 - **⭐ Ratings, Favorites & O Counter** — Rate 1–5 stars from details or playback, clear ratings, see favorite/progress overlays, and record or display Stash O counts.
 - **🧹 Curation Tools** — Find untagged scenes and assign existing tags; bulk-mark loaded scenes watched or apply a rating from grid menus. Untagged filtering requires Stash 0.26 or newer.
 - **📑 Marker Browser** — Browse every scene marker with thumbnail previews, title search, tag filtering, and sorting; select one to play from its timestamp.
-- **📊 Library Stats** — Total watch time, plays, library totals, and most-watched scenes, performers, tags, and studios.
+- **📊 Library Stats & Taste Insights** — Total watch time, plays, library totals, and most-watched scenes, performers, tags, and studios, plus a 14-day viewing summary and recent tag, performer, and studio trends from the top-played snapshot.
+- **🖥️ Server Dashboard** — Check the Stash version, library and play totals, running jobs where supported, and recent errors recorded by Sinema.
 
 ### Playback and images
 
@@ -147,7 +148,8 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 ### Privacy and Android TV integration
 
 - **🕶️ Privacy Modes** — Discreet Mode uses neutral titles and hides overlays and artwork until a card is focused, Incognito pauses watch-history and search-history writes, and Block Screenshots protects app screens and recents thumbnails.
-- **🔒 PIN Lock** — Optional local four-digit PIN with a Log Out action that locks the app until re-entry.
+- **🔒 PIN Lock, Auto-Lock & Decoy PIN** — Optional local four-digit PIN with a Log Out action and automatic locking after 5, 15, or 30 idle minutes. A separate Decoy PIN opens a blank “No content” shell instead of the library.
+- **💾 Settings Backup & Restore** — Export or import a JSON backup containing all settings and server profiles. Imports replace current settings and require a restart; backups contain credentials and must be stored safely.
 - **🌌 Ambient Gallery** — Optional idle slideshow of top-rated scenes with a clock, disabled while Discreet Mode or an unverified PIN is active.
 - **🖥️ Multi-Server Profiles & Auth** — Add, rename, remove, and switch Stash servers with API-key or session-cookie authentication; server and playback options are organized into categorized Settings.
 - **🔐 Self-Signed HTTPS** — Per-server opt-in to trust self-signed certificates for self-hosted TLS setups.
