@@ -96,6 +96,17 @@ Press Menu during playback and choose `Stream quality` to override how Sinema st
 
 The choice applies immediately (playback resumes at the same position) and is remembered for later videos. With Auto, the player also falls back from a failed transcode to the direct stream.
 
+## Playback recovery
+
+If the selected stream and its automatic fallback both fail, Sinema shows a Playback problem dialog with a short explanation and four D-pad-accessible actions:
+
+- **Retry** restarts the selected quality with a fresh fallback attempt.
+- **Try transcoded 720p** switches the current scene to Stash's aligned HLS 720p stream without changing your saved quality default.
+- **Try direct stream** switches the current scene to the original stream without changing your saved quality default.
+- **Back** leaves playback.
+
+Retries preserve the current playback position and leave the existing queue unchanged.
+
 ## Scene markers as chapters
 
 Sinema reads Stash scene markers and exposes them during playback.

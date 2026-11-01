@@ -45,7 +45,7 @@ Sinema refreshes the home screen when you return to it, so changes made in playb
 
 ### Personalize home
 
-Open `Settings` → `Home Settings` to:
+Open `Settings` → `Home` → `Home Settings` to:
 
 - Reorder, show, or hide shortcuts and content rows.
 - Choose compact or large scene artwork and show or hide the hero banner.
@@ -61,7 +61,7 @@ The `🌙 Tonight's Mix` card on the shortcut row builds a ~30-minute queue from
 
 ### Privacy
 
-`Settings` exposes three privacy switches (Incognito also toggles from the playback menu):
+`Settings` → `Privacy` exposes three privacy switches (Incognito also toggles from the playback menu):
 
 - **Discreet Mode** — scene cards show a neutral label (for example `Scene 4271`), no overlays, and no artwork until the card is focused, and the home hero banner is hidden. A passing glance reveals nothing.
 - **Incognito (pause watch history)** — stops writing resume positions, play counts, and play durations to Stash and skips Watch Next syncing and search-history recording. Server data stays untouched from this device.
@@ -69,7 +69,7 @@ The `🌙 Tonight's Mix` card on the shortcut row builds a ~30-minute queue from
 
 ### Ambient gallery
 
-Enable `Ambient Gallery` in Settings and leave the home screen idle for five minutes: a slow Ken Burns slideshow of your top-rated scenes takes over with a clock in the corner. Any key or touch exits. It never starts while a PIN is unverified or while Discreet Mode is on, and it respects Block Screenshots.
+Enable `Ambient Gallery` in `Settings` → `Home` and leave the home screen idle for five minutes: a slow Ken Burns slideshow of your top-rated scenes takes over with a clock in the corner. Any key or touch exits. It never starts while a PIN is unverified or while Discreet Mode is on, and it respects Block Screenshots.
 
 ### Untagged scenes
 

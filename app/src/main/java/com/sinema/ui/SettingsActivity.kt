@@ -9,15 +9,55 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.sinema.R
 import com.sinema.SinemaApp
+import com.sinema.model.PlaybackAspectRatio
+import com.sinema.model.PlaybackStreamQuality
+import com.sinema.model.ServerProfile
+
+internal enum class SettingsCategory(val title: String) {
+    SERVER("Server"),
+    HOME("Home"),
+    PLAYBACK("Playback"),
+    PRIVACY("Privacy"),
+    SYSTEM("System")
+}
+
+internal data class ServerSettingsDraft(
+    private val originalUrl: String,
+    private val originalApiKey: String,
+    var url: String = originalUrl,
+    var apiKey: String = originalApiKey
+) {
+    val hasChanges: Boolean
+        get() = normalizedUrl() != originalUrl.trim() || normalizedApiKey() != originalApiKey.trim()
+
+    fun normalizedUrl(): String = url.trim()
+    fun normalizedApiKey(): String = apiKey.trim()
+}
+
+internal fun shouldResetServerSettingsDraft(
+    draftProfileId: String?,
+    activeProfileId: String
+): Boolean = draftProfileId != activeProfileId
+
+internal class SettingsDraftViewModel : ViewModel() {
+    var serverDraft: ServerSettingsDraft? = null
+    var draftProfileId: String? = null
+    var apiKeyVisible = false
+}
 
 class SettingsActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,26 +72,33 @@ class SettingsActivity : FragmentActivity() {
 }
 
 class SettingsFragment : Fragment() {
-    private lateinit var apiKeyEdit: EditText
+    private val app get() = SinemaApp.instance
+    private lateinit var container: FrameLayout
+    private lateinit var draftState: SettingsDraftViewModel
+    private var serverDraft: ServerSettingsDraft
+        get() = checkNotNull(draftState.serverDraft)
+        set(value) { draftState.serverDraft = value }
+    private var apiKeyVisible: Boolean
+        get() = draftState.apiKeyVisible
+        set(value) { draftState.apiKeyVisible = value }
+    private var currentCategory: SettingsCategory? = null
+    private var returnFocusCategory: SettingsCategory? = null
+    private var discardDialog: AlertDialog? = null
+    private var qualityDialog: AlertDialog? = null
+    private var aspectDialog: AlertDialog? = null
 
     private val pinActivityLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
 
-        val app = SinemaApp.instance
         val data = result.data
-
         if (data?.getBooleanExtra("verify_for_removal", false) == true) {
-            // Remove PIN after successful verification
             app.prefs.removePin()
             Toast.makeText(requireContext(), "PIN removed!", Toast.LENGTH_SHORT).show()
         } else {
-            // PIN was set
             Toast.makeText(requireContext(), "PIN set successfully!", Toast.LENGTH_SHORT).show()
         }
-
-        // Refresh the settings view
         requireActivity().recreate()
     }
 
@@ -60,13 +107,13 @@ class SettingsFragment : Fragment() {
     ) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
 
-        val app = SinemaApp.instance
         val prefs = app.prefs
-
-        // SetupActivity wrote credentials into legacy prefs; wrap them into a new profile.
-        // The setup screens persist the self-signed opt-in alongside the credentials.
-        val name = try { java.net.URI(prefs.serverUrl).host ?: prefs.serverUrl } catch (_: Exception) { prefs.serverUrl }
-        val p = com.sinema.model.ServerProfile(
+        val name = try {
+            java.net.URI(prefs.serverUrl).host ?: prefs.serverUrl
+        } catch (_: Exception) {
+            prefs.serverUrl
+        }
+        val profile = ServerProfile(
             name = name,
             serverUrl = prefs.serverUrl,
             apiKey = prefs.apiKey,
@@ -76,353 +123,534 @@ class SettingsFragment : Fragment() {
             stashPassword = prefs.stashPassword,
             allowSelfSigned = prefs.setupAllowSelfSigned
         )
-        prefs.profiles = prefs.profiles + p
-        prefs.applyProfile(p)
+        prefs.profiles = prefs.profiles + profile
+        prefs.applyProfile(profile)
         prefs.setupAllowSelfSigned = false
         app.refreshApi()
+        serverDraft = ServerSettingsDraft(prefs.serverUrl, prefs.apiKey)
+        draftState.draftProfileId = prefs.activeProfileId
 
-        Toast.makeText(requireContext(), "Server added: ${p.name}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(requireContext(), "Server added: ${profile.name}", Toast.LENGTH_SHORT).show()
         requireActivity().recreate()
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        val app = SinemaApp.instance
-        val ctx = requireContext()
-        val padding = 48
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        draftState = ViewModelProvider(this)[SettingsDraftViewModel::class.java]
+        ensureServerDraftForActiveProfile(savedInstanceState?.getString(KEY_SERVER_URL))
+        currentCategory = categoryNamed(savedInstanceState?.getString(KEY_CATEGORY))
+        returnFocusCategory = categoryNamed(savedInstanceState?.getString(KEY_RETURN_FOCUS))
+    }
 
-        val layout = LinearLayout(ctx).apply {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        parent: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View = FrameLayout(requireContext()).apply {
+        container = this
+        setBackgroundColor(BACKGROUND_COLOR)
+        layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        )
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    when {
+                        currentCategory != null -> showCategories()
+                        serverDraft.hasChanges -> confirmDiscardServerChanges()
+                        else -> {
+                            isEnabled = false
+                            requireActivity().onBackPressedDispatcher.onBackPressed()
+                        }
+                    }
+                }
+            }
+        )
+        currentCategory?.let(::renderCategory) ?: showCategories()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString(KEY_SERVER_URL, serverDraft.url)
+        outState.putString(KEY_CATEGORY, currentCategory?.name)
+        outState.putString(KEY_RETURN_FOCUS, returnFocusCategory?.name)
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onPause() {
+        dismissSettingsDialogs()
+        super.onPause()
+    }
+
+    override fun onStop() {
+        dismissSettingsDialogs()
+        super.onStop()
+    }
+
+    private fun dismissSettingsDialogs() {
+        discardDialog?.dismiss()
+        discardDialog = null
+        qualityDialog?.dismiss()
+        qualityDialog = null
+        aspectDialog?.dismiss()
+        aspectDialog = null
+    }
+
+    private fun categoryNamed(name: String?): SettingsCategory? =
+        SettingsCategory.entries.firstOrNull { it.name == name }
+
+    private fun ensureServerDraftForActiveProfile(savedUrl: String? = null) {
+        val hasDraft = draftState.serverDraft != null
+        if (hasDraft && !shouldResetServerSettingsDraft(
+                draftState.draftProfileId,
+                app.prefs.activeProfileId
+            )
+        ) return
+        serverDraft = ServerSettingsDraft(
+            originalUrl = app.prefs.serverUrl,
+            originalApiKey = app.prefs.apiKey,
+            url = if (hasDraft) app.prefs.serverUrl else savedUrl ?: app.prefs.serverUrl
+        )
+        draftState.draftProfileId = app.prefs.activeProfileId
+    }
+
+    private fun showCategories() {
+        currentCategory = null
+        var firstButton: Button? = null
+        var focusButton: Button? = null
+        showContent(
+            "Settings",
+            "Choose a category. Server edits are kept while you move between categories."
+        ) { layout ->
+            SettingsCategory.entries.forEach { category ->
+                val button = addButton(
+                    layout,
+                    "${category.title}\n${categorySummary(category)}"
+                ) {
+                    returnFocusCategory = category
+                    currentCategory = category
+                    renderCategory(category)
+                }
+                if (firstButton == null) firstButton = button
+                if (category == returnFocusCategory) focusButton = button
+            }
+            focusButton ?: firstButton
+        }
+    }
+
+    private fun categorySummary(category: SettingsCategory): String = when (category) {
+        SettingsCategory.SERVER -> {
+            val profile = app.prefs.profiles.firstOrNull { it.id == app.prefs.activeProfileId }?.name
+                ?: app.prefs.serverUrl
+            profile + if (serverDraft.hasChanges) " · Unsaved changes" else ""
+        }
+        SettingsCategory.HOME ->
+            "Rows, shortcuts, artwork · Ambient ${onOff(app.prefs.ambientGallery)}"
+        SettingsCategory.PLAYBACK ->
+            PlaybackStreamQuality.fromName(app.prefs.playbackStreamQuality).label
+        SettingsCategory.PRIVACY -> {
+            val enabled = listOfNotNull(
+                "Discreet".takeIf { app.prefs.discreetMode },
+                "Incognito".takeIf { app.prefs.incognitoMode },
+                "Screenshots blocked".takeIf { app.prefs.blockScreenshots }
+            )
+            if (enabled.isEmpty()) "PIN and local privacy controls" else enabled.joinToString(" · ")
+        }
+        SettingsCategory.SYSTEM ->
+            "Channels ${onOff(app.prefs.channelsEnabled)} · Global Search ${onOff(app.prefs.globalSearchEnabled)}"
+    }
+
+    private fun renderCategory(category: SettingsCategory) = when (category) {
+        SettingsCategory.SERVER -> showServerSettings()
+        SettingsCategory.HOME -> showHomeSettings()
+        SettingsCategory.PLAYBACK -> showPlaybackSettings()
+        SettingsCategory.PRIVACY -> showPrivacySettings()
+        SettingsCategory.SYSTEM -> showSystemSettings()
+    }
+
+    private fun showServerSettings() {
+        ensureServerDraftForActiveProfile()
+        showContent(
+            "Server",
+            "Edit the active connection or manage server profiles. Save applies URL and API-key changes."
+        ) { layout ->
+            addLabel(layout, "Server URL")
+            val urlEdit = addEditText(layout, serverDraft.url) { serverDraft.url = it }
+            addLabel(layout, "Stash API Key")
+            lateinit var apiKeyEdit: EditText
+            val apiKeyToggle = addButton(layout, apiKeyToggleLabel()) {
+                apiKeyVisible = !apiKeyVisible
+                apiKeyEdit.visibility = if (apiKeyVisible) View.VISIBLE else View.GONE
+                (it as Button).text = apiKeyToggleLabel()
+                if (apiKeyVisible) apiKeyEdit.requestFocus()
+            }
+            apiKeyEdit = addEditText(layout, serverDraft.apiKey) { serverDraft.apiKey = it }
+            apiKeyEdit.visibility = if (apiKeyVisible) View.VISIBLE else View.GONE
+
+            ServerProfileSection.build(requireContext(), layout) {
+                val intent = Intent(requireContext(), SetupActivity::class.java)
+                intent.putExtra("add_profile", true)
+                setupLauncher.launch(intent)
+            }
+            addButton(layout, "Save Server Settings") { saveServerSettings() }
+            urlEdit
+        }
+    }
+
+    private fun apiKeyToggleLabel(): String = when {
+        apiKeyVisible -> "Hide API Key"
+        serverDraft.apiKey.isNotEmpty() -> "Change API Key"
+        else -> "Set API Key"
+    }
+
+    private fun saveServerSettings() {
+        app.prefs.serverUrl = serverDraft.normalizedUrl()
+        app.prefs.apiKey = serverDraft.normalizedApiKey()
+        val activeId = app.prefs.activeProfileId
+        if (activeId.isNotBlank()) {
+            app.prefs.profiles = app.prefs.profiles.map {
+                if (it.id == activeId) it.copy(
+                    serverUrl = app.prefs.serverUrl,
+                    apiKey = app.prefs.apiKey,
+                    sessionCookie = app.prefs.sessionCookie,
+                    authMode = app.prefs.authMode,
+                    stashUsername = app.prefs.stashUsername,
+                    stashPassword = app.prefs.stashPassword
+                ) else it
+            }
+        }
+        app.refreshApi()
+        serverDraft = ServerSettingsDraft(app.prefs.serverUrl, app.prefs.apiKey)
+        Toast.makeText(requireContext(), "Server settings saved", Toast.LENGTH_SHORT).show()
+        showCategories()
+    }
+
+    private fun confirmDiscardServerChanges() {
+        if (discardDialog?.isShowing == true) return
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Unsaved server changes")
+            .setMessage("Save your URL or API-key edits before leaving Settings?")
+            .setPositiveButton("Save") { _, _ -> saveServerSettings() }
+            .setNeutralButton("Discard") { _, _ -> requireActivity().finish() }
+            .setNegativeButton("Keep editing") { _, _ ->
+                returnFocusCategory = SettingsCategory.SERVER
+                currentCategory = SettingsCategory.SERVER
+                renderCategory(SettingsCategory.SERVER)
+            }
+            .create()
+        discardDialog = dialog
+        dialog.setOnDismissListener {
+            if (discardDialog === dialog) discardDialog = null
+        }
+        dialog.show()
+    }
+
+    private fun showHomeSettings() {
+        showContent("Home", "Personalize the dashboard and its idle behavior.") { layout ->
+            val homeButton = addButton(layout, "Home Settings") {
+                startActivity(Intent(requireContext(), HomeSettingsActivity::class.java))
+            }
+            addDescription(layout, "Reorder, show, or hide shortcuts and content rows; choose artwork and the hero banner.")
+            addToggle(
+                layout,
+                "Ambient Gallery",
+                "Show a top-rated slideshow after five minutes idle on Home. Discreet Mode and an unverified PIN prevent it.",
+                { app.prefs.ambientGallery },
+                { app.prefs.ambientGallery = it }
+            )
+            homeButton
+        }
+    }
+
+    private fun showPlaybackSettings() {
+        showContent("Playback", "Defaults for new playback sessions. Player controls can still override them.") { layout ->
+            lateinit var qualityButton: Button
+            qualityButton = addButton(layout, qualityLabel()) {
+                val dialog = StreamQualityDialog.show(
+                    requireContext(),
+                    PlaybackStreamQuality.fromName(app.prefs.playbackStreamQuality)
+                ) { chosen ->
+                    app.prefs.playbackStreamQuality = chosen.name
+                    qualityButton.text = qualityLabel()
+                }
+                qualityDialog = dialog
+                dialog.setOnDismissListener {
+                    if (qualityDialog === dialog) qualityDialog = null
+                }
+            }
+            addDescription(layout, "Auto tries direct playback with compatible transcoding fallbacks.")
+
+            lateinit var aspectButton: Button
+            aspectButton = addButton(layout, aspectRatioLabel()) {
+                val dialog = AspectRatioDialog.show(
+                    requireContext(),
+                    PlaybackAspectRatio.fromName(app.prefs.playbackAspectRatio)
+                ) { chosen ->
+                    app.prefs.playbackAspectRatio = chosen.name
+                    aspectButton.text = aspectRatioLabel()
+                }
+                aspectDialog = dialog
+                dialog.setOnDismissListener {
+                    if (aspectDialog === dialog) aspectDialog = null
+                }
+            }
+
+            lateinit var seekButton: Button
+            seekButton = addButton(layout, seekPresetLabel()) {
+                val next = SeekPreset.fromName(app.prefs.playbackSeekPreset).next()
+                app.prefs.playbackSeekPreset = next.name
+                seekButton.text = seekPresetLabel()
+            }
+            addDescription(layout, "Sets the rewind and forward increments used by the player and timeline.")
+
+            addToggle(
+                layout,
+                "Loop current scene",
+                "Repeat one scene instead of advancing through a queue.",
+                { app.prefs.loopEnabled },
+                { app.prefs.loopEnabled = it }
+            )
+            qualityButton
+        }
+    }
+
+    private fun qualityLabel(): String =
+        "Stream quality: ${PlaybackStreamQuality.fromName(app.prefs.playbackStreamQuality).label}"
+
+    private fun aspectRatioLabel(): String =
+        "Aspect ratio: ${PlaybackAspectRatio.fromName(app.prefs.playbackAspectRatio).label}"
+
+    private fun seekPresetLabel(): String =
+        "Seek buttons: ${SeekPreset.fromName(app.prefs.playbackSeekPreset).label}"
+
+    private fun showPrivacySettings() {
+        showContent("Privacy", "These controls affect Sinema on this device unless stated otherwise.") { layout ->
+            addLabel(layout, if (app.prefs.hasPinSet()) "PIN Lock: set" else "PIN Lock: not set")
+            val pinButton = addButton(layout, if (app.prefs.hasPinSet()) "Remove PIN" else "Set PIN") {
+                val intent = Intent(requireContext(), PinActivity::class.java).apply {
+                    putExtra(if (app.prefs.hasPinSet()) "verify_for_removal" else "setup_mode", true)
+                }
+                pinActivityLauncher.launch(intent)
+            }
+            addDescription(layout, "A local four-digit lock for launching Sinema; it does not lock the Stash web interface.")
+
+            addToggle(
+                layout,
+                "Discreet Mode",
+                "Use neutral labels and hide artwork until cards are focused. Stash metadata is unchanged.",
+                { app.prefs.discreetMode },
+                { value ->
+                    app.prefs.discreetMode = value
+                    CardPresenter.discreetGeneration++
+                }
+            )
+            addToggle(
+                layout,
+                "Incognito (pause watch history)",
+                "Pause resume, play-count, Watch Next, and search-history writes from this device.",
+                { app.prefs.incognitoMode },
+                { app.prefs.incognitoMode = it }
+            )
+            addToggle(
+                layout,
+                "Block Screenshots",
+                "Block screenshots and recents thumbnails throughout Sinema on this device.",
+                { app.prefs.blockScreenshots },
+                { app.prefs.blockScreenshots = it }
+            )
+            pinButton
+        }
+    }
+
+    private fun showSystemSettings() {
+        showContent("System", "Optional Android TV integrations. Both are off by default.") { layout ->
+            var firstButton: Button? = null
+            val pm = requireContext().packageManager
+            if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
+                val channelsButton = addToggle(
+                    layout,
+                    "Android TV Channels",
+                    "Publish Continue Playing and Recently Added to the TV launcher. Disabling removes Sinema's entries.",
+                    { app.prefs.channelsEnabled },
+                    { value ->
+                        app.prefs.channelsEnabled = value
+                        if (!value) com.sinema.util.TvChannels.clearAll(requireContext())
+                        Toast.makeText(
+                            requireContext(),
+                            "Channels ${if (value) "enabled" else "disabled"}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
+                firstButton = channelsButton
+            }
+
+            val globalSearchButton = addToggle(
+                layout,
+                "Global Search",
+                "Allow the Android TV system search to query scene titles and metadata on your Stash server.",
+                { app.prefs.globalSearchEnabled },
+                { value ->
+                    app.prefs.globalSearchEnabled = value
+                    val flag = android.content.pm.PackageManager.DONT_KILL_APP
+                    val state = if (value) {
+                        android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    } else {
+                        android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                    }
+                    pm.setComponentEnabledSetting(
+                        android.content.ComponentName(requireContext(), com.sinema.util.GlobalSearchProvider::class.java),
+                        state,
+                        flag
+                    )
+                    pm.setComponentEnabledSetting(
+                        android.content.ComponentName(requireContext(), GlobalSearchActivity::class.java),
+                        state,
+                        flag
+                    )
+                    Toast.makeText(
+                        requireContext(),
+                        if (value) "Global search enabled — Sinema scenes appear in Android TV search"
+                        else "Global search disabled",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            )
+            firstButton ?: globalSearchButton
+        }
+    }
+
+    private fun showContent(
+        title: String,
+        subtitle: String,
+        build: (LinearLayout) -> View?
+    ) {
+        val context = requireContext()
+        val layout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(padding, padding, padding, padding)
+            setPadding(48, 48, 48, 48)
             isFocusable = false
             descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-            setBackgroundColor(0xFF1B1B1B.toInt())
+            setBackgroundColor(BACKGROUND_COLOR)
         }
-
-        val title = TextView(ctx).apply {
-            text = "Sinema Settings"
+        layout.addView(TextView(context).apply {
+            text = title
             textSize = 28f
-            setTextColor(0xFFFFFFFF.toInt())
-        }
-        layout.addView(title)
-
-        val urlLabel = TextView(ctx).apply {
-            text = "\nServer URL:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        }
-        layout.addView(urlLabel)
-
-        val urlEdit = EditText(ctx).apply {
-            setText(app.prefs.serverUrl)
+            setTextColor(TEXT_COLOR)
+        })
+        layout.addView(TextView(context).apply {
+            text = subtitle
             textSize = 16f
-            isFocusable = true
-            isFocusableInTouchMode = true
-            setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFF333333.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF555555.toInt() else 0xFF333333.toInt())
-            }
-        }
-        layout.addView(urlEdit, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 16 })
-
-        // API Key Section
-        val apiKeyLabel = TextView(ctx).apply {
-            text = "\nStash API Key:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        }
-        layout.addView(apiKeyLabel)
-
-        apiKeyEdit = EditText(ctx).apply {
-            setText(app.prefs.apiKey)
-            textSize = 16f
-            isFocusable = true
-            isFocusableInTouchMode = true
-            setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFF333333.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF555555.toInt() else 0xFF333333.toInt())
-            }
-            visibility = View.GONE
-        }
-
-        val apiKeyToggleBtn = Button(ctx).apply {
-            text = if (app.prefs.apiKey.isNotEmpty()) "Change API Key" else "Set API Key"
-            isFocusable = true
-            setBackgroundColor(0xFF333333.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener {
-                if (apiKeyEdit.visibility == View.VISIBLE) {
-                    apiKeyEdit.visibility = View.GONE
-                    this.text = if (app.prefs.apiKey.isNotEmpty()) "Change API Key" else "Set API Key"
-                } else {
-                    apiKeyEdit.visibility = View.VISIBLE
-                    this.text = "Hide API Key"
-                    apiKeyEdit.requestFocus()
-                }
-            }
-        }
-        layout.addView(apiKeyToggleBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 8; bottomMargin = 8 })
-
-        layout.addView(apiKeyEdit, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 16 })
-
-        // PIN Management Section
-        val pinSectionLabel = TextView(ctx).apply {
-            text = "\nPIN Lock:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        }
-        layout.addView(pinSectionLabel)
-
-        val pinStatusText = TextView(ctx).apply {
-            text = if (app.prefs.hasPinSet()) "PIN is currently set" else "No PIN set"
-            textSize = 16f
-            setTextColor(0xFFFFFFFF.toInt())
-        }
-        layout.addView(pinStatusText)
-
-        if (app.prefs.hasPinSet()) {
-            val removePinBtn = Button(ctx).apply {
-                text = "Remove PIN"
-                isFocusable = true
-                setBackgroundColor(0xFF333333.toInt())
-                setTextColor(0xFFFFFFFF.toInt())
-                setOnFocusChangeListener { _, hasFocus ->
-                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-                }
-                setOnClickListener {
-                    promptForCurrentPinAndRemove()
-                }
-            }
-            layout.addView(removePinBtn, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 16; bottomMargin = 16 })
-        } else {
-            val setPinBtn = Button(ctx).apply {
-                text = "Set PIN"
-                isFocusable = true
-                setBackgroundColor(0xFF333333.toInt())
-                setTextColor(0xFFFFFFFF.toInt())
-                setOnFocusChangeListener { _, hasFocus ->
-                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-                }
-                setOnClickListener {
-                    val intent = Intent(requireContext(), PinActivity::class.java)
-                    intent.putExtra("setup_mode", true)
-                    pinActivityLauncher.launch(intent)
-                }
-            }
-            layout.addView(setPinBtn, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 16; bottomMargin = 16 })
-        }
-
-        ServerProfileSection.build(ctx, layout) {
-            val intent = Intent(ctx, SetupActivity::class.java)
-            intent.putExtra("add_profile", true)
-            setupLauncher.launch(intent)
-        }
-
-        val pm = ctx.packageManager
-        if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
-            val channelsToggle = Button(ctx).apply {
-                text = if (app.prefs.channelsEnabled) "Android TV Channels: ON" else "Android TV Channels: OFF"
-                isFocusable = true
-                setBackgroundColor(0xFF333333.toInt())
-                setTextColor(0xFFFFFFFF.toInt())
-                setOnFocusChangeListener { _, hasFocus ->
-                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-                }
-                setOnClickListener {
-                    val newState = !app.prefs.channelsEnabled
-                    app.prefs.channelsEnabled = newState
-                    this.text = if (newState) "Android TV Channels: ON" else "Android TV Channels: OFF"
-                    if (!newState) {
-                        com.sinema.util.TvChannels.clearAll(ctx)
-                    }
-                    Toast.makeText(ctx, "Channels ${if (newState) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
-                }
-            }
-            layout.addView(channelsToggle, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 16 })
-        }
-
-        // Global (system) search: opt-in participation in the Android TV
-        // search dialog. Flips the search provider + searchable activity
-        // components together; both ship disabled by default.
-        val globalSearchToggle = Button(ctx).apply {
-            text = if (app.prefs.globalSearchEnabled) "Global Search: ON" else "Global Search: OFF"
-            isFocusable = true
-            setBackgroundColor(0xFF333333.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener {
-                val newState = !app.prefs.globalSearchEnabled
-                app.prefs.globalSearchEnabled = newState
-                val flag = android.content.pm.PackageManager.DONT_KILL_APP
-                pm.setComponentEnabledSetting(
-                    android.content.ComponentName(ctx, com.sinema.util.GlobalSearchProvider::class.java),
-                    if (newState) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    flag
-                )
-                pm.setComponentEnabledSetting(
-                    android.content.ComponentName(ctx, com.sinema.ui.GlobalSearchActivity::class.java),
-                    if (newState) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    flag
-                )
-                this.text = if (newState) "Global Search: ON" else "Global Search: OFF"
-                Toast.makeText(
-                    ctx,
-                    if (newState)
-                        "Global search enabled — Sinema scenes appear in Android TV search"
-                    else
-                        "Global search disabled",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-        layout.addView(globalSearchToggle, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
-
-        // Privacy / ambient toggles: plain preference flips, label-refresh
-        // keeps D-pad focus on the button.
-        fun prefToggle(labelOn: String, labelOff: String, read: () -> Boolean, write: (Boolean) -> Unit): Button =
-            Button(ctx).apply {
-                text = if (read()) labelOn else labelOff
-                isFocusable = true
-                setBackgroundColor(0xFF333333.toInt())
-                setTextColor(0xFFFFFFFF.toInt())
-                setOnFocusChangeListener { _, hasFocus ->
-                    setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-                }
-                setOnClickListener {
-                    write(!read())
-                    this.text = if (read()) labelOn else labelOff
-                }
-            }
-        layout.addView(prefToggle(
-            "Discreet Mode: ON", "Discreet Mode: OFF",
-            { app.prefs.discreetMode },
-            { value ->
-                app.prefs.discreetMode = value
-                // Bound cards re-apply their display state on screen resume.
-                CardPresenter.discreetGeneration++
-            }
-        ), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
-        layout.addView(prefToggle(
-            "Incognito (pause watch history): ON", "Incognito (pause watch history): OFF",
-            { app.prefs.incognitoMode }, { app.prefs.incognitoMode = it }
-        ), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
-        layout.addView(prefToggle(
-            "Block Screenshots: ON", "Block Screenshots: OFF",
-            { app.prefs.blockScreenshots }, { app.prefs.blockScreenshots = it }
-        ), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
-        layout.addView(prefToggle(
-            "Ambient Gallery: ON", "Ambient Gallery: OFF",
-            { app.prefs.ambientGallery }, { app.prefs.ambientGallery = it }
-        ), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
-
-        val homeSettingsBtn = Button(ctx).apply {
-            text = "Home Settings"
-            isFocusable = true
-            setBackgroundColor(0xFF333333.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener {
-                startActivity(Intent(ctx, HomeSettingsActivity::class.java))
-            }
-        }
-        layout.addView(homeSettingsBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
-
-        val saveBtn = Button(ctx).apply {
-            text = "Save Settings"
-            isFocusable = true
-            setBackgroundColor(0xFF333333.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener {
-                app.prefs.serverUrl = urlEdit.text.toString().trim()
-                if (apiKeyEdit.visibility == View.VISIBLE) {
-                    app.prefs.apiKey = apiKeyEdit.text.toString().trim()
-                }
-                // Also update the active profile so the change survives switches.
-                // If activeProfileId is stale, update the profile with matching ID directly.
-                val activeId = app.prefs.activeProfileId
-                if (activeId.isNotBlank()) {
-                    app.prefs.profiles = app.prefs.profiles.map {
-                        if (it.id == activeId) it.copy(
-                            serverUrl = app.prefs.serverUrl,
-                            apiKey = app.prefs.apiKey,
-                            sessionCookie = app.prefs.sessionCookie,
-                            authMode = app.prefs.authMode,
-                            stashUsername = app.prefs.stashUsername,
-                            stashPassword = app.prefs.stashPassword
-                        ) else it
-                    }
-                }
-                app.refreshApi()
-                Toast.makeText(ctx, "Settings saved!", Toast.LENGTH_SHORT).show()
-                requireActivity().finish()
-            }
-        }
-        layout.addView(saveBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 16 })
-
-        // Wrap in ScrollView for D-pad scrolling
-        val scrollView = ScrollView(ctx).apply {
+            setTextColor(SECONDARY_TEXT_COLOR)
+            setPadding(0, 12, 0, 12)
+        })
+        val initialFocus = build(layout)
+        val scrollView = ScrollView(context).apply {
             isFocusable = false
-            setBackgroundColor(0xFF1B1B1B.toInt())
+            setBackgroundColor(BACKGROUND_COLOR)
             addView(layout)
         }
-
-        // Request focus on first interactive element
-        urlEdit.requestFocus()
-
-        return scrollView
+        container.removeAllViews()
+        container.addView(scrollView)
+        initialFocus?.requestFocus()
     }
-    
-    private fun promptForCurrentPinAndRemove() {
-        val intent = Intent(requireContext(), PinActivity::class.java)
-        intent.putExtra("verify_for_removal", true)
-        pinActivityLauncher.launch(intent)
+
+    private fun addLabel(parent: LinearLayout, value: String) {
+        parent.addView(TextView(requireContext()).apply {
+            text = value
+            textSize = 18f
+            setTextColor(SECONDARY_TEXT_COLOR)
+            setPadding(0, 12, 0, 4)
+        })
+    }
+
+    private fun addDescription(parent: LinearLayout, value: String) {
+        parent.addView(TextView(requireContext()).apply {
+            text = value
+            textSize = 14f
+            setTextColor(SECONDARY_TEXT_COLOR)
+            setPadding(8, 4, 8, 12)
+        })
+    }
+
+    private fun addEditText(
+        parent: LinearLayout,
+        initialValue: String,
+        onChanged: (String) -> Unit
+    ): EditText {
+        val edit = EditText(requireContext()).apply {
+            setText(initialValue)
+            textSize = 16f
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setTextColor(TEXT_COLOR)
+            setBackgroundColor(INPUT_COLOR)
+            setOnFocusChangeListener { _, hasFocus ->
+                setBackgroundColor(if (hasFocus) FOCUSED_INPUT_COLOR else INPUT_COLOR)
+            }
+            doAfterTextChanged { onChanged(it?.toString().orEmpty()) }
+        }
+        parent.addView(edit, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = 16 })
+        return edit
+    }
+
+    private fun addButton(
+        parent: LinearLayout,
+        label: String,
+        action: (View) -> Unit
+    ): Button {
+        val button = Button(requireContext()).apply {
+            text = label
+            isFocusable = true
+            setBackgroundColor(INPUT_COLOR)
+            setTextColor(TEXT_COLOR)
+            setOnFocusChangeListener { _, focused ->
+                setBackgroundColor(if (focused) FOCUS_COLOR else INPUT_COLOR)
+            }
+            setOnClickListener { action(it) }
+        }
+        parent.addView(button, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 12 })
+        return button
+    }
+
+    private fun addToggle(
+        parent: LinearLayout,
+        label: String,
+        description: String,
+        read: () -> Boolean,
+        write: (Boolean) -> Unit
+    ): Button {
+        lateinit var button: Button
+        button = addButton(parent, "$label: ${onOff(read())}") {
+            write(!read())
+            button.text = "$label: ${onOff(read())}"
+        }
+        addDescription(parent, description)
+        return button
+    }
+
+    private fun onOff(value: Boolean): String = if (value) "ON" else "OFF"
+
+    companion object {
+        private const val KEY_SERVER_URL = "settings_server_url"
+        private const val KEY_CATEGORY = "settings_category"
+        private const val KEY_RETURN_FOCUS = "settings_return_focus"
+        private const val BACKGROUND_COLOR = 0xFF1B1B1B.toInt()
+        private const val TEXT_COLOR = 0xFFFFFFFF.toInt()
+        private const val SECONDARY_TEXT_COLOR = 0xFFCCCCCC.toInt()
+        private const val INPUT_COLOR = 0xFF333333.toInt()
+        private const val FOCUSED_INPUT_COLOR = 0xFF555555.toInt()
+        private const val FOCUS_COLOR = 0xFF2AABE0.toInt()
     }
 }

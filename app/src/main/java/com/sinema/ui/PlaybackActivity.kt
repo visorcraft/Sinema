@@ -57,6 +57,7 @@ class PlaybackActivity : FragmentActivity() {
     private var streamQualityDialog: android.app.AlertDialog? = null
     private var resumePromptDialog: android.app.AlertDialog? = null
     private var upNextDialog: android.app.AlertDialog? = null
+    private var playbackErrorDialog: android.app.AlertDialog? = null
     /** True once the user picked Resume/Start-over or started playback manually. */
     private var resumePromptResolved = false
     /** Paused with the resume prompt outstanding (Back keeps it outstanding). */
@@ -69,6 +70,7 @@ class PlaybackActivity : FragmentActivity() {
     private var sceneSwitchJob: kotlinx.coroutines.Job? = null
     private var aspectRatio = PlaybackAspectRatio.AUTO
     private var streamQuality = PlaybackStreamQuality.AUTO
+    private var recoveryQualityRestore: PlaybackStreamQuality? = null
     private var seekPreset = SeekPreset.TEN_THIRTY
     private var sceneTitle = ""
     private var previewBucket = -1L
@@ -211,6 +213,8 @@ class PlaybackActivity : FragmentActivity() {
         resumePromptDialog = null
         upNextDialog?.dismiss()
         upNextDialog = null
+        playbackErrorDialog?.dismiss()
+        playbackErrorDialog = null
     }
 
     override fun onStop() {
@@ -237,6 +241,8 @@ class PlaybackActivity : FragmentActivity() {
         resumePromptDialog = null
         upNextDialog?.dismiss()
         upNextDialog = null
+        playbackErrorDialog?.dismiss()
+        playbackErrorDialog = null
         // Keep the in-session position so a restart resumes where the user
         // left off instead of the intent's original resume point. Always
         // update — leaving a stale value would jump backwards after seeks to
@@ -707,8 +713,10 @@ class PlaybackActivity : FragmentActivity() {
                                 android.util.Log.w("Sinema", "Stream failed; retrying aligned HLS", error)
                                 rebuildCurrentStream()
                             }
-                            FallbackAction.TERMINAL ->
+                            FallbackAction.TERMINAL -> {
                                 android.util.Log.e("Sinema", "Playback failed for scene $sceneId", error)
+                                showPlaybackRecovery(error)
+                            }
                         }
                     }
 
@@ -774,17 +782,60 @@ class PlaybackActivity : FragmentActivity() {
         }
     }
 
+    private fun showPlaybackRecovery(error: androidx.media3.common.PlaybackException) {
+        if (playbackErrorDialog?.isShowing == true) return
+        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) ||
+            isFinishing || isDestroyed
+        ) return
+        resumePositionMs = player?.currentPosition?.takeIf { it > 0L } ?: resumePositionMs
+        player?.playWhenReady = false
+        val message = playbackRecoveryMessage(error.errorCode) +
+            sceneTitle.takeIf { it.isNotBlank() }?.let { "\n\n$it" }.orEmpty()
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Playback problem")
+            .setMessage(message)
+            .setItems(PlaybackRecoveryAction.entries.map { it.label }.toTypedArray()) { _, which ->
+                when (PlaybackRecoveryAction.entries[which]) {
+                    PlaybackRecoveryAction.RETRY -> recoverPlayback()
+                    PlaybackRecoveryAction.TRANSCODED_720P ->
+                        recoverPlayback(PlaybackStreamQuality.HLS_720P)
+                    PlaybackRecoveryAction.DIRECT -> recoverPlayback(PlaybackStreamQuality.DIRECT)
+                }
+            }
+            .setNegativeButton("Back") { _, _ -> finish() }
+            .setCancelable(false)
+            .create()
+        playbackErrorDialog = dialog
+        dialog.setOnDismissListener {
+            if (playbackErrorDialog === dialog) playbackErrorDialog = null
+        }
+        dialog.show()
+    }
+
+    private fun recoverPlayback(temporaryQuality: PlaybackStreamQuality? = null) {
+        playbackErrorDialog?.dismiss()
+        playbackErrorDialog = null
+        val selection = recoveryQualitySelection(streamQuality, recoveryQualityRestore, temporaryQuality)
+        streamQuality = selection.quality
+        recoveryQualityRestore = selection.restoreAfterScene
+        restartCurrentStream()
+    }
+
     /** Switch stream quality mid-playback, preserving the current position. */
     private fun applyStreamQuality(chosen: PlaybackStreamQuality) {
         streamQuality = chosen
+        recoveryQualityRestore = null
         prefs.playbackStreamQuality = chosen.name
+        restartCurrentStream()
+        android.util.Log.i("Sinema", "Stream quality changed to ${chosen.name}")
+    }
+
+    private fun restartCurrentStream() {
         if (player == null) return
-        // Reset fallback state so the new selection takes effect cleanly.
         forceAlignedHls = false
         hasFallenBackToDirect = false
         hasVideoOutput = false
         rebuildCurrentStream()
-        android.util.Log.i("Sinema", "Stream quality changed to ${chosen.name}")
     }
 
     private fun showChapters() {
@@ -944,6 +995,8 @@ class PlaybackActivity : FragmentActivity() {
         // chapters list (it belongs to the outgoing scene).
         upNextDialog?.dismiss()
         upNextDialog = null
+        playbackErrorDialog?.dismiss()
+        playbackErrorDialog = null
         chaptersDialog?.dismiss()
         chaptersDialog = null
         // Serialize switches: a superseded jump must not interleave metadata
@@ -975,6 +1028,9 @@ class PlaybackActivity : FragmentActivity() {
             sceneId = nextId
             videoWidth = nextWidth
             videoHeight = nextHeight
+            val quality = qualityAfterRecoveredScene(streamQuality, recoveryQualityRestore)
+            streamQuality = quality.quality
+            recoveryQualityRestore = quality.restoreAfterScene
             hasFallenBackToDirect = false
             forceAlignedHls = false
             hasVideoOutput = false

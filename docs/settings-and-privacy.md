@@ -1,29 +1,35 @@
 # Settings and Privacy
 
-Open `Settings` from the bottom row of the main screen.
+Open `Settings` from the bottom row of the main screen, then choose a category:
+
+- **Server**: connection details and server profiles.
+- **Home**: Home Settings and Ambient Gallery.
+- **Playback**: stream quality, aspect ratio, seek buttons, and looping defaults.
+- **Privacy**: PIN lock, Discreet Mode, Incognito, and screenshot blocking.
+- **System**: Android TV Channels and Global Search.
+
+Back returns from a category to the category list. URL and API-key edits remain available while moving between categories. If you press Back at the category list with unsaved server edits, Sinema offers **Save**, **Discard**, or **Keep editing**. API-key drafts are retained in memory during activity recreation and are not written into Android instance-state storage.
 
 ## Server URL and API key
 
-Settings shows the current Stash server URL.
+Open `Settings` → `Server` to see the active connection.
 
 To change the URL:
 
 1. Edit `Server URL`.
-2. Select `Save Settings`.
+2. Select `Save Server Settings`.
 
 To change the API key:
 
 1. Select `Change API Key` or `Set API Key`.
 2. Edit the API key field.
-3. Select `Save Settings`.
+3. Select `Save Server Settings`.
 
-The API key field is hidden until you choose to show it.
-
-Saving settings updates the active server profile as well as the live API client.
+The API key field is hidden until you choose to show it. Saving trims surrounding whitespace, updates the active server profile and live API client, and returns to the category list.
 
 ## Multi-server profiles
 
-Sinema can store multiple Stash server profiles.
+Sinema can store multiple Stash server profiles under `Settings` → `Server`.
 
 Each profile stores:
 
@@ -36,7 +42,7 @@ Each profile stores:
 
 ### Add a server
 
-1. Open Settings.
+1. Open `Settings` → `Server`.
 2. Select `+ Add Server`.
 3. Complete the normal setup wizard for the new server.
 
@@ -44,7 +50,7 @@ The new profile name defaults to the server host when possible.
 
 ### Switch servers
 
-1. Open Settings.
+1. Open `Settings` → `Server`.
 2. Select the server profile row.
 3. Confirm the switch.
 
@@ -52,19 +58,38 @@ Sinema applies the profile, refreshes the API client, and returns to the main sc
 
 ### Rename a server
 
-1. Open Settings.
+1. Open `Settings` → `Server`.
 2. Move to the profile's options button.
 3. Choose Rename.
 4. Enter the new name and save.
 
 ### Remove a server
 
-1. Open Settings.
+1. Open `Settings` → `Server`.
 2. Move to the profile's options button.
 3. Choose Remove.
 4. Confirm removal.
 
 Sinema will not remove the last remaining server profile. If you remove the active profile while other profiles remain, Sinema switches to the first remaining profile.
+
+## Playback defaults
+
+Open `Settings` → `Playback` to choose:
+
+- **Stream quality**: Auto, direct only, or a transcoded resolution.
+- **Aspect ratio**: Auto, 16:9, 4:3, or 9:16.
+- **Seek buttons**: the rewind/forward increments used by player buttons and timeline scrubbing.
+- **Loop current scene**: repeat one scene instead of advancing through a queue.
+
+These settings use the same saved choices as the player controls. Choosing a recovery stream after a playback failure is temporary and does not change these defaults.
+
+## Privacy controls
+
+Open `Settings` → `Privacy` for local privacy controls:
+
+- **Discreet Mode** uses neutral labels and hides artwork until cards are focused. It does not change Stash metadata.
+- **Incognito** pauses resume, play-count, Watch Next, and search-history writes from this device.
+- **Block Screenshots** blocks screenshots and recents thumbnails throughout Sinema on this device.
 
 ## PIN lock
 
@@ -72,7 +97,7 @@ The PIN lock is a local four-digit lock for Sinema.
 
 ### Set a PIN
 
-1. Open Settings.
+1. Open `Settings` → `Privacy`.
 2. Select `Set PIN`.
 3. Enter a four-digit PIN.
 4. Enter the same PIN again to confirm.
@@ -85,7 +110,7 @@ After a PIN is set:
 
 ### Remove a PIN
 
-1. Open Settings.
+1. Open `Settings` → `Privacy`.
 2. Select `Remove PIN`.
 3. Enter the current PIN.
 
@@ -99,11 +124,11 @@ If verification succeeds, Sinema removes the PIN.
 - Back during verification closes Sinema instead of bypassing the lock.
 - The close button asks for confirmation before closing Sinema.
 
-The PIN hash is salted and stored locally. Sinema does not send the PIN to Stash.
+The PIN hash is salted and stored locally. Sinema does not send the PIN to Stash. The PIN does not lock the Stash web interface.
 
 ## Android TV launcher channels
 
-On Android TV devices, Settings shows an Android TV Channels toggle.
+On Android TV devices, `Settings` → `System` shows an Android TV Channels toggle.
 
 When enabled, Sinema can publish:
 
@@ -130,17 +155,17 @@ Channel sync happens when the main screen loads and when playback state is saved
 If your Stash server uses HTTPS with a self-signed certificate, Sinema can optionally trust it:
 
 - During setup: check `Trust self-signed certificates` on the sign-in or manual setup screen. A confirmation warning is shown before continuing.
-- Or later: Settings → Servers → `...` on a profile → `Trust self-signed certificates` (also confirmed with a warning).
+- Or later: `Settings` → `Server` → `...` on a profile → `Trust self-signed certificates` (also confirmed with a warning).
 - Web Setup does not offer the checkbox; if your server needs it, enable the toggle in Settings after setup completes.
 - The setting is per server profile and off by default. Profiles created later never inherit an earlier setup's choice.
 
 What it affects while enabled: all traffic to that server only (API calls, images, streams, subtitles) skips TLS certificate and hostname verification. Other profiles stay strict.
 
-Security note: disabling certificate verification means a man-in-the-middle on your network could impersonate the server. Only enable this on private networks you control.
+Security note: disabling certificate verification means a man-in-the-middle on your network could impersonate your server. Only enable this on private networks you control.
 
 ## Global search
 
-On Android TV devices, Settings shows a Global Search toggle (off by default).
+On Android TV devices, `Settings` → `System` shows a Global Search toggle (off by default).
 
 When enabled:
 
@@ -162,7 +187,7 @@ Sinema checks GitHub releases once per app session from the main screen.
 
 You can also check manually:
 
-1. Open `About` from the main screen bottom row.
+1. Select `About` from the main screen bottom row.
 2. Select `Check for Updates`.
 
 If a newer GitHub release has an APK asset, Sinema can download it and open Android's installer.
