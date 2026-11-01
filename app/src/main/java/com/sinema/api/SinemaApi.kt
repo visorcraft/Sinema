@@ -594,44 +594,8 @@ class SinemaApi(
     suspend fun findRandomScene(): Scene? =
         findScenesInternal(perPage = 1, sort = "random").second.firstOrNull()
 
-    suspend fun findTopLevelFolders(): List<Pair<String, String>> {
-        val idQuery = """
-            query {
-                findFolders(folder_filter: { path: { value: "/data", modifier: EQUALS } }, filter: { per_page: 1 }) {
-                    folders { id }
-                }
-            }
-        """.trimIndent()
-        val idResult = graphql(idQuery)
-        val dataFolderId = idResult.getAsJsonObject("data")
-            ?.getAsJsonObject("findFolders")
-            ?.getAsJsonArray("folders")
-            ?.firstOrNull()?.asJsonObject?.get("id")?.asString ?: return emptyList()
-
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}folder_filter: FolderFilterType) {
-                findFolders(filter: ${"$"}filter, folder_filter: ${"$"}folder_filter) {
-                    count
-                    folders { id path }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("per_page" to 500, "sort" to "path", "direction" to "ASC"),
-            "folder_filter" to mapOf("parent_folder" to mapOf("value" to listOf(dataFolderId), "modifier" to "INCLUDES", "depth" to 0))
-        )
-        val result = graphql(query, variables)
-        val folders = result.getAsJsonObject("data")
-            ?.getAsJsonObject("findFolders")
-            ?.getAsJsonArray("folders") ?: return emptyList()
-
-        return folders.map { f ->
-            val obj = f.asJsonObject
-            val path = obj.get("path").asString
-            val name = path.removePrefix("/data/")
-            Pair(name, path)
-        }
-    }
+    suspend fun findTopLevelFolders(): List<Pair<String, String>> =
+        findTopLevelFoldersPaged(page = 1, perPage = 500).second
 
     suspend fun findTopLevelFoldersPaged(page: Int = 1, perPage: Int = 500): Pair<Int, List<Pair<String, String>>> {
         val idQuery = """
