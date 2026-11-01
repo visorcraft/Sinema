@@ -6,6 +6,7 @@ enum class HomeShortcut(val label: String, val primary: Boolean = false) {
     FAVORITES("Favorites", primary = true),
     BROWSE_FOLDERS("Browse Folders"),
     GROUPS("Groups"),
+    GALLERIES("Galleries"),
     TAGS("Tags"),
     PERFORMERS("Performers"),
     STUDIOS("Studios"),

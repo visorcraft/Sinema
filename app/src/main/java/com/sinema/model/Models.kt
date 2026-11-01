@@ -67,17 +67,32 @@ data class GroupDetails(
     val scenes: List<Scene>
 )
 
+data class GalleryItem(
+    val id: String,
+    val title: String,
+    val imageCount: Int,
+    val coverImageId: String? = null,
+    val date: String? = null,
+    val details: String? = null,
+    val photographer: String? = null,
+    val studioName: String? = null,
+    val rating100: Int? = null
+) {
+    val displayTitle: String get() = title.ifBlank { "Gallery $id" }
+}
+
 /**
- * A scene saved filter stored server-side in Stash (built in the Stash web
- * UI). [sceneFilter] is the raw SceneFilterType map forwarded as-is — the
- * server validates it against its own schema version.
+ * A scene saved filter stored server-side in Stash. [sceneFilter] is the raw
+ * SceneFilterType map forwarded as-is — the server validates it against its
+ * own schema version.
  */
 data class SavedSceneFilter(
     val id: String,
     val name: String,
     val sceneFilter: Map<String, Any?>? = null,
     val sort: String? = null,
-    val direction: String? = null
+    val direction: String? = null,
+    val uiOptions: Map<String, Any?>? = null
 )
 
 /** A Stash scene marker, with just enough scene metadata to jump into playback. */

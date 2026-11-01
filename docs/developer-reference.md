@@ -103,6 +103,10 @@ Full details include:
 
 `HomeLayoutSettings.optionalRowsVersion` performs a one-time migration that hides newly introduced optional rows for existing users without preventing those rows from being enabled later.
 
+### Galleries and image viewing
+
+`GalleryGridActivity` provides paged, searchable Gallery browsing with Stash 0.24-safe fields and cover thumbnails. `GalleryImagesActivity` shows Gallery metadata and paged image cards. `ImageViewActivity` loads Gallery images in bounded pages (10,000 maximum) or accepts folder images through the existing static handoff. Authenticated full images use `GlideAuth`; pure `ImageViewerState` controls bounded zoom/pan, fit/fill, navigation, shuffle, and slideshow timing.
+
 ### Shared grids
 
 `SceneGridFragment` centralizes:
@@ -121,7 +125,7 @@ Full details include:
 
 Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sort fields. Entity sort options live in `EntityGridActivity.kt`.
 
-`SceneFilterOptions.kt` maps watched state to `play_count` and favorites to `rating100`, with per-screen persistence in `Prefs`. The Menu key remains available through `SortableScreen.handleSortMenuKey`.
+`SceneFilterOptions.kt` maps watched state to `play_count`, favorites to `rating100`, and advanced duration/date/codec/entity criteria to their Stash inputs. Entity filters support multi-select `INCLUDES`/`EXCLUDES`; tags and studios use hierarchical criteria with depth zero. `SceneFilterComposition.kt` keeps screen scope and advanced criteria ANDed when their keys overlap. Per-screen preferences serialize as JSON while retaining the legacy colon-delimited parser. `FilterDialog` provides removable chips, clear-all, and Save Current; `EntityFilterDialog` handles searchable multi-select choices. `SavedFilterActions` and the Saved Filters screen use Stash `saveFilter`/`destroySavedFilter` for create, rename, and delete. The Menu key remains available through `SortableScreen.handleSortMenuKey`.
 
 ## Playback UI
 
@@ -200,7 +204,7 @@ Build release APK:
 
 - Folder browsing assumes Stash paths are rooted at `/data`.
 - Entity and entity-scene grids append 100 items per page as the user scrolls; Play All includes only scenes loaded so far.
-- Folder views cap displayed videos/pictures at 10,000 items.
+- Folder views and full-screen Gallery loading cap displayed images at 10,000 items.
 - Play All queues up to 500 scenes.
 - Play All still requires a remote Menu key; Sort, Filter, and entity Search also have visible controls.
 - Android TV launcher artwork is only attached in API-key mode.

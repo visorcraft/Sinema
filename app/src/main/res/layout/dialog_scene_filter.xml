@@ -13,6 +13,38 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="Active filters (select to remove)"
+            android:textColor="#AAAAAA"
+            android:textSize="13sp" />
+
+        <HorizontalScrollView
+            android:id="@+id/filter_chips_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:focusable="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/filter_chips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <Button
+            android:id="@+id/filter_save"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp"
+            android:focusable="true"
+            android:text="Save as Stash filter…"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Watched"
             android:textColor="#888888"
             android:textSize="13sp" />
@@ -261,5 +293,55 @@
                 android:textColor="@android:color/white"
                 android:textSize="16sp" />
         </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Advanced"
+            android:textColor="#AAAAAA"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/filter_duration"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:focusable="true"
+            android:text="Duration: Any duration" />
+
+        <Button
+            android:id="@+id/filter_release_date"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:focusable="true"
+            android:text="Release date: Any release date" />
+
+        <Button
+            android:id="@+id/filter_codec"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:focusable="true"
+            android:text="Video codec: Any codec" />
+
+        <Button
+            android:id="@+id/filter_performers"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:focusable="true"
+            android:text="Performers: Any" />
+
+        <Button
+            android:id="@+id/filter_studios"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:focusable="true"
+            android:text="Studios: Any" />
+
+        <Button
+            android:id="@+id/filter_tags"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:focusable="true"
+            android:text="Tags: Any" />
     </LinearLayout>
 </ScrollView>

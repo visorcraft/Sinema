@@ -10,6 +10,7 @@ import com.sinema.model.EntityHeader
 import com.sinema.model.EntityItem
 import com.sinema.model.GroupDetails
 import com.sinema.model.GroupItem
+import com.sinema.model.GalleryItem
 import com.sinema.model.SavedSceneFilter
 import com.sinema.model.SceneMarkerItem
 import com.sinema.model.StatsSummary
@@ -65,6 +66,9 @@ class SinemaApi(
 
         private const val GROUP_FIELDS =
             "id name scene_count front_image_path back_image_path date director synopsis studio { name }"
+
+        private const val GALLERY_FIELDS =
+            "id title image_count date details photographer rating100 studio { name } cover { id }"
 
         /**
          * Scene filter for Recently Played.
@@ -207,7 +211,7 @@ class SinemaApi(
             "page" to page, "per_page" to perPage, "sort" to sort, "direction" to direction
         )
         if (searchTerm != null) filter["q"] = searchTerm
-        val combinedSceneFilter = (sceneFilter.orEmpty() + filters.toStashFilter())
+        val combinedSceneFilter = combineSceneFilters(sceneFilter.orEmpty(), filters.toStashFilter())
             .takeIf { it.isNotEmpty() }
         val result = graphql(query, mapOf("filter" to filter, "scene_filter" to combinedSceneFilter))
         val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes")
@@ -1076,9 +1080,99 @@ class SinemaApi(
             ?.get("name")?.takeIf { !it.isJsonNull }?.asString
     )
 
+    suspend fun findGalleries(
+        page: Int = 1,
+        perPage: Int = 100,
+        searchTerm: String? = null,
+        sort: String = "updated_at",
+        direction: String = "DESC"
+    ): Pair<Int, List<GalleryItem>> {
+        val query = """
+            query(${"$"}filter: FindFilterType) {
+                findGalleries(filter: ${"$"}filter) {
+                    count
+                    galleries { $GALLERY_FIELDS }
+                }
+            }
+        """.trimIndent()
+        val filter = mutableMapOf<String, Any?>(
+            "page" to page, "per_page" to perPage, "sort" to sort, "direction" to direction
+        )
+        if (!searchTerm.isNullOrBlank()) filter["q"] = searchTerm
+        val result = graphql(query, mapOf("filter" to filter))
+        val data = result.getAsJsonObject("data")?.getAsJsonObject("findGalleries")
+            ?: return Pair(0, emptyList())
+        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val galleries = (data.get("galleries") as? JsonArray)
+            ?.map { parseGallery(it.asJsonObject) } ?: emptyList()
+        return Pair(count, galleries)
+    }
+
+    suspend fun findGallery(galleryId: String): GalleryItem? {
+        val query = """
+            query(${"$"}id: ID!) {
+                findGallery(id: ${"$"}id) { $GALLERY_FIELDS }
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("id" to galleryId))
+        val obj = result.getAsJsonObject("data")?.get("findGallery")
+            ?.takeIf { !it.isJsonNull }?.asJsonObject ?: return null
+        return parseGallery(obj)
+    }
+
+    suspend fun findImagesForGallery(
+        galleryId: String,
+        page: Int = 1,
+        perPage: Int = 500
+    ): Pair<Int, List<ImageItem>> {
+        val query = """
+            query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
+                findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
+                    count
+                    images {
+                        id title rating100
+                        visual_files {
+                            ... on ImageFile { path size width height }
+                            ... on VideoFile { path size width height }
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
+        val variables = mapOf(
+            "filter" to mapOf(
+                "page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"
+            ),
+            "image_filter" to mapOf(
+                "galleries" to mapOf("value" to listOf(galleryId), "modifier" to "INCLUDES")
+            )
+        )
+        val result = graphql(query, variables)
+        val data = result.getAsJsonObject("data")?.getAsJsonObject("findImages")
+            ?: return Pair(0, emptyList())
+        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val images = (data.get("images") as? JsonArray)?.map { parseImage(it.asJsonObject) } ?: emptyList()
+        return Pair(count, images)
+    }
+
+    @VisibleForTesting
+    internal fun parseGallery(obj: JsonObject): GalleryItem = GalleryItem(
+        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        imageCount = obj.get("image_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+        coverImageId = obj.get("cover")?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?.get("id")?.takeIf { !it.isJsonNull }?.asString,
+        date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
+        details = obj.get("details")?.takeIf { !it.isJsonNull }?.asString?.trim(),
+        photographer = obj.get("photographer")?.takeIf { !it.isJsonNull }?.asString,
+        studioName = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
+            ?.get("name")?.takeIf { !it.isJsonNull }?.asString,
+        rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt
+    )
+
     /**
-     * Lists scene-mode saved filters stored in Stash (created via the Stash
-     * web UI). Available since Stash 0.16; safe for the 0.24+ baseline.
+     * Lists scene-mode saved filters stored in Stash. Available since Stash
+     * 0.16; safe for the 0.24+ baseline.
      */
     suspend fun findSavedSceneFilters(): List<SavedSceneFilter> {
         val query = """
@@ -1087,6 +1181,7 @@ class SinemaApi(
                     id name
                     find_filter { sort direction }
                     object_filter
+                    ui_options
                 }
             }
         """.trimIndent()
@@ -1105,6 +1200,7 @@ class SinemaApi(
                     id name
                     find_filter { sort direction }
                     object_filter
+                    ui_options
                 }
             }
         """.trimIndent()
@@ -1129,6 +1225,70 @@ class SinemaApi(
         direction = direction,
         sceneFilter = filter.sceneFilter
     )
+
+    suspend fun saveSceneFilter(
+        name: String,
+        options: com.sinema.model.SceneFilterOptions,
+        sort: String,
+        direction: String,
+        id: String? = null
+    ): SavedSceneFilter = saveSceneFilterInput(id, name, options.toStashFilter(), sort, direction)
+
+    suspend fun renameSavedSceneFilter(filter: SavedSceneFilter, name: String): SavedSceneFilter =
+        saveSceneFilterInput(
+            filter.id,
+            name,
+            filter.sceneFilter.orEmpty(),
+            filter.sort,
+            filter.direction,
+            filter.uiOptions
+        )
+
+    private suspend fun saveSceneFilterInput(
+        id: String?,
+        name: String,
+        objectFilter: Map<String, Any?>,
+        sort: String?,
+        direction: String?,
+        uiOptions: Map<String, Any?>? = null
+    ): SavedSceneFilter {
+        val query = """
+            mutation(${"$"}input: SaveFilterInput!) {
+                saveFilter(input: ${"$"}input) {
+                    id name
+                    find_filter { sort direction }
+                    object_filter
+                    ui_options
+                }
+            }
+        """.trimIndent()
+        val input = mutableMapOf<String, Any?>(
+            "mode" to "SCENES",
+            "name" to name,
+            "object_filter" to objectFilter
+        )
+        if (sort != null || direction != null) {
+            input["find_filter"] = mapOf("sort" to sort, "direction" to direction)
+        }
+        uiOptions?.let { input["ui_options"] = it }
+        id?.takeIf { it.isNotBlank() }?.let { input["id"] = it }
+        val result = graphql(query, mapOf("input" to input))
+        val obj = result.getAsJsonObject("data")?.getAsJsonObject("saveFilter")
+            ?: throw IOException("Stash did not return the saved filter")
+        return parseSavedSceneFilter(obj)
+    }
+
+    suspend fun destroySavedSceneFilter(id: String) {
+        val query = """
+            mutation(${"$"}input: DestroyFilterInput!) {
+                destroySavedFilter(input: ${"$"}input)
+            }
+        """.trimIndent()
+        val result = graphql(query, mapOf("input" to mapOf("id" to id)))
+        val destroyed = result.getAsJsonObject("data")?.get("destroySavedFilter")
+            ?.takeIf { !it.isJsonNull }?.asBoolean ?: false
+        if (!destroyed) throw IOException("Stash could not delete the saved filter")
+    }
 
     /**
      * Library-wide scene markers, optionally filtered to one tag (matches
@@ -1243,12 +1403,14 @@ class SinemaApi(
     internal fun parseSavedSceneFilter(obj: JsonObject): SavedSceneFilter {
         val findFilter = obj.get("find_filter")?.takeIf { !it.isJsonNull }?.asJsonObject
         val rawObjectFilter = obj.get("object_filter")?.takeIf { !it.isJsonNull }?.asJsonObject
+        val rawUiOptions = obj.get("ui_options")?.takeIf { !it.isJsonNull }?.asJsonObject
         return SavedSceneFilter(
             id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
             name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
             sceneFilter = rawObjectFilter?.let { gson.fromJson(it, MapType.savingFilterMap) },
             sort = findFilter?.get("sort")?.takeIf { !it.isJsonNull }?.asString,
-            direction = findFilter?.get("direction")?.takeIf { !it.isJsonNull }?.asString
+            direction = findFilter?.get("direction")?.takeIf { !it.isJsonNull }?.asString,
+            uiOptions = rawUiOptions?.let { gson.fromJson(it, MapType.savingFilterMap) }
         )
     }
 

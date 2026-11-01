@@ -164,6 +164,7 @@ class MainFragment : RowsSupportFragment() {
                         "Library" -> startActivity(Intent(requireContext(), LibraryActivity::class.java))
                         "Browse Folders" -> startActivity(Intent(requireContext(), BrowseFoldersActivity::class.java))
                         "Groups" -> startActivity(GroupGridActivity.intent(requireContext()))
+                        "Galleries" -> startActivity(GalleryGridActivity.intent(requireContext()))
                         "Tags" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.TAG))
                         "Performers" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.PERFORMER))
                         "Studios" -> startActivity(EntityGridActivity.intent(requireContext(), EntityItem.Kind.STUDIO))

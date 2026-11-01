@@ -80,12 +80,21 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
     }
 
     override fun showFilterDialog() {
-        FilterDialog.show(requireContext(), sceneFilter) { chosen ->
-            sceneFilter = chosen
-            app.prefs.setSceneFilterFor("folder", chosen)
-            activity?.refreshGridControls()
-            loadFolder()
-        }
+        FilterDialog.show(
+            requireContext(),
+            sceneFilter,
+            onChosen = { chosen ->
+                sceneFilter = chosen
+                app.prefs.setSceneFilterFor("folder", chosen)
+                activity?.refreshGridControls()
+                loadFolder()
+            },
+            onSave = { chosen ->
+                SavedFilterActions.promptSave(
+                    requireActivity(), chosen, sort.apiSort(randomSeed), sort.direction
+                )
+            }
+        )
     }
 
     override fun showGridMenu() {

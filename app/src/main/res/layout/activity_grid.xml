@@ -5,8 +5,8 @@
     android:background="#FF1B1B1B"
     android:orientation="vertical">
 
-    <!-- Optional entity detail header: image + name + scene count + tag chips.
-         Populated by EntityScenesActivity; every other grid screen leaves it gone. -->
+    <!-- Optional detail header: image + name + count + description + tag chips.
+         Populated by entity, group, and gallery detail screens. -->
     <LinearLayout
         android:id="@+id/entity_header"
         android:layout_width="match_parent"

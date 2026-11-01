@@ -119,12 +119,21 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     }
 
     override fun showFilterDialog() {
-        FilterDialog.show(requireContext(), sceneFilter) { chosen ->
-            sceneFilter = chosen
-            app.prefs.setSceneFilterFor("search", chosen)
-            activity?.refreshGridControls()
-            if (currentQuery.length >= 2) search(currentQuery)
-        }
+        FilterDialog.show(
+            requireContext(),
+            sceneFilter,
+            onChosen = { chosen ->
+                sceneFilter = chosen
+                app.prefs.setSceneFilterFor("search", chosen)
+                activity?.refreshGridControls()
+                if (currentQuery.length >= 2) search(currentQuery)
+            },
+            onSave = { chosen ->
+                SavedFilterActions.promptSave(
+                    requireActivity(), chosen, sort.apiSort(randomSeed), sort.direction
+                )
+            }
+        )
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

@@ -1,17 +1,18 @@
 package com.sinema.model
 
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
 enum class WatchFilter(val label: String) {
     ALL("All scenes"),
     WATCHED("Watched"),
     UNWATCHED("Unwatched")
 }
 
-/**
- * Resolution filter mapped to Stash's ResolutionCriterionInput. Stash
- * compares enum ranks (VERY_LOW < … < HUGE) and GREATER_THAN/LESS_THAN are
- * STRICT, so "X or better" is expressed as strictly-greater-than the next
- * lower tier — e.g. "720p or better" = GREATER_THAN WEB_HD (540p).
- */
 enum class ResolutionFilter(val label: String) {
     ANY("Any resolution"),
     UNDER_HD("Under 720p"),
@@ -20,31 +21,61 @@ enum class ResolutionFilter(val label: String) {
     FOUR_K_PLUS("4K or better")
 }
 
-/** Any / with / without for boolean-ish presence criteria. */
 enum class PresenceFilter(val label: String) {
     ANY("Any"),
     WITH("With"),
     WITHOUT("Without")
 }
 
-/** Quick-toggle cycle for the grid watch filter: All → Unwatched → Watched. */
+enum class DurationFilter(val label: String) {
+    ANY("Any duration"),
+    UNDER_10("Under 10 min"),
+    TEN_TO_THIRTY("10–30 min"),
+    THIRTY_TO_SIXTY("30–60 min"),
+    OVER_60("Over 60 min")
+}
+
+enum class ReleaseDateFilter(val label: String) {
+    ANY("Any release date"),
+    PAST_30_DAYS("Last 30 days"),
+    PAST_YEAR("Last year"),
+    OLDER_THAN_YEAR("Over a year old")
+}
+
+enum class VideoCodecFilter(val label: String, val stashValue: String) {
+    ANY("Any codec", ""),
+    H264("H.264", "h264"),
+    HEVC("HEVC", "hevc"),
+    VP9("VP9", "vp9"),
+    AV1("AV1", "av1")
+}
+
+enum class EntityFilterMode { ANY, INCLUDE, EXCLUDE }
+
+data class EntitySelection(val id: String, val name: String)
+
+data class EntityFilter(
+    val mode: EntityFilterMode = EntityFilterMode.ANY,
+    val entities: List<EntitySelection> = emptyList()
+) {
+    val isActive: Boolean get() = mode != EntityFilterMode.ANY && entities.isNotEmpty()
+
+    fun summary(label: String): String {
+        val names = entities.map { it.name }.filter { it.isNotBlank() }
+        val title = if (mode == EntityFilterMode.EXCLUDE) "Exclude ${label.lowercase()}" else label
+        val first = names.firstOrNull().orEmpty()
+        return "$title: $first" + if (names.size > 1) " +${names.size - 1}" else ""
+    }
+}
+
 fun WatchFilter.cycled(): WatchFilter = when (this) {
     WatchFilter.ALL -> WatchFilter.UNWATCHED
     WatchFilter.UNWATCHED -> WatchFilter.WATCHED
     WatchFilter.WATCHED -> WatchFilter.ALL
 }
 
-/**
- * Favorites as the user experiences it: `minStars > 0` implies every result
- * is a favorite (the rating100 criterion is shared and minStars wins).
- */
 fun SceneFilterOptions.effectiveFavorites(): Boolean = favoritesOnly || minStars > 0
 
-/**
- * Quick Favorites toggle. Off clears the whole rating criterion — including
- * a minimum-star filter — so the button never claims "off" while the query
- * still filters by rating.
- */
 fun SceneFilterOptions.toggledQuickFavorites(): SceneFilterOptions =
     if (effectiveFavorites()) copy(favoritesOnly = false, minStars = 0)
     else copy(favoritesOnly = true)
@@ -55,7 +86,13 @@ data class SceneFilterOptions(
     val resolution: ResolutionFilter = ResolutionFilter.ANY,
     val markers: PresenceFilter = PresenceFilter.ANY,
     val captions: PresenceFilter = PresenceFilter.ANY,
-    val minStars: Int = 0
+    val minStars: Int = 0,
+    val duration: DurationFilter = DurationFilter.ANY,
+    val releaseDate: ReleaseDateFilter = ReleaseDateFilter.ANY,
+    val videoCodec: VideoCodecFilter = VideoCodecFilter.ANY,
+    val performers: EntityFilter = EntityFilter(),
+    val studios: EntityFilter = EntityFilter(),
+    val tags: EntityFilter = EntityFilter()
 ) {
     val summary: String
         get() = buildList {
@@ -65,25 +102,38 @@ data class SceneFilterOptions(
             if (resolution != ResolutionFilter.ANY) add(resolution.label)
             if (markers != PresenceFilter.ANY) add("${markers.label} markers")
             if (captions != PresenceFilter.ANY) add("${captions.label} captions")
+            if (duration != DurationFilter.ANY) add(duration.label)
+            if (releaseDate != ReleaseDateFilter.ANY) add(releaseDate.label)
+            if (videoCodec != VideoCodecFilter.ANY) add(videoCodec.label)
+            if (performers.isActive) add(performers.summary("Performers"))
+            if (studios.isActive) add(studios.summary("Studios"))
+            if (tags.isActive) add(tags.summary("Tags"))
         }.joinToString(" + ").ifEmpty { WatchFilter.ALL.label }
 
-    fun toPreferenceValue(): String =
-        "${watch.name}:$favoritesOnly:$minStars:${resolution.name}:${markers.name}:${captions.name}"
+    fun toPreferenceValue(): String {
+        val root = JsonObject().apply {
+            addProperty("watch", watch.name)
+            addProperty("favoritesOnly", favoritesOnly)
+            addProperty("resolution", resolution.name)
+            addProperty("markers", markers.name)
+            addProperty("captions", captions.name)
+            addProperty("minStars", minStars)
+            addProperty("duration", duration.name)
+            addProperty("releaseDate", releaseDate.name)
+            addProperty("videoCodec", videoCodec.name)
+            add("performers", performers.toJson())
+            add("studios", studios.toJson())
+            add("tags", tags.toJson())
+        }
+        return root.toString()
+    }
 
-    fun toStashFilter(): Map<String, Any?> = buildMap {
+    fun toStashFilter(referenceDate: String = currentDate()): Map<String, Any?> = buildMap {
         when (watch) {
             WatchFilter.ALL -> Unit
-            WatchFilter.WATCHED -> put(
-                "play_count",
-                mapOf("value" to 0, "modifier" to "GREATER_THAN")
-            )
-            WatchFilter.UNWATCHED -> put(
-                "play_count",
-                mapOf("value" to 0, "modifier" to "EQUALS")
-            )
+            WatchFilter.WATCHED -> put("play_count", mapOf("value" to 0, "modifier" to "GREATER_THAN"))
+            WatchFilter.UNWATCHED -> put("play_count", mapOf("value" to 0, "modifier" to "EQUALS"))
         }
-        // favoritesOnly (rating > 0) and minStars share the rating100 criterion;
-        // minStars wins when both are set since it is the stronger bound.
         if (minStars > 0) {
             put("rating100", mapOf("value" to minStars * 20 - 1, "modifier" to "GREATER_THAN"))
         } else if (favoritesOnly) {
@@ -91,71 +141,168 @@ data class SceneFilterOptions(
         }
         when (resolution) {
             ResolutionFilter.ANY -> Unit
-            // LESS_THAN STANDARD_HD = strictly below 720p.
             ResolutionFilter.UNDER_HD -> put(
-                "resolution",
-                mapOf("value" to "STANDARD_HD", "modifier" to "LESS_THAN")
+                "resolution", mapOf("value" to "STANDARD_HD", "modifier" to "LESS_THAN")
             )
-            // Strict comparator: "720p or better" = rank > WEB_HD (540p),
-            // which is exactly STANDARD_HD and up.
             ResolutionFilter.HD_PLUS -> put(
-                "resolution",
-                mapOf("value" to "WEB_HD", "modifier" to "GREATER_THAN")
+                "resolution", mapOf("value" to "WEB_HD", "modifier" to "GREATER_THAN")
             )
-            // "1080p or better" = rank > STANDARD_HD (720p) = FULL_HD and up.
             ResolutionFilter.FULL_HD_PLUS -> put(
-                "resolution",
-                mapOf("value" to "STANDARD_HD", "modifier" to "GREATER_THAN")
+                "resolution", mapOf("value" to "STANDARD_HD", "modifier" to "GREATER_THAN")
             )
-            // "4K or better" = rank > QUAD_HD (1440p) = FOUR_K and up.
             ResolutionFilter.FOUR_K_PLUS -> put(
-                "resolution",
-                mapOf("value" to "QUAD_HD", "modifier" to "GREATER_THAN")
+                "resolution", mapOf("value" to "QUAD_HD", "modifier" to "GREATER_THAN")
             )
         }
-        // has_markers is a plain String criterion in Stash ("true"/"false").
         when (markers) {
             PresenceFilter.ANY -> Unit
             PresenceFilter.WITH -> put("has_markers", "true")
             PresenceFilter.WITHOUT -> put("has_markers", "false")
         }
-        // captions is a StringCriterionInput; presence checks ignore the value.
         when (captions) {
             PresenceFilter.ANY -> Unit
             PresenceFilter.WITH -> put("captions", mapOf("value" to "", "modifier" to "NOT_NULL"))
             PresenceFilter.WITHOUT -> put("captions", mapOf("value" to "", "modifier" to "IS_NULL"))
         }
+        when (duration) {
+            DurationFilter.ANY -> Unit
+            DurationFilter.UNDER_10 -> put("duration", mapOf("value" to 600, "modifier" to "LESS_THAN"))
+            DurationFilter.TEN_TO_THIRTY -> put(
+                "duration", mapOf("value" to 600, "value2" to 1800, "modifier" to "BETWEEN")
+            )
+            DurationFilter.THIRTY_TO_SIXTY -> put(
+                "duration", mapOf("value" to 1800, "value2" to 3600, "modifier" to "BETWEEN")
+            )
+            DurationFilter.OVER_60 -> put("duration", mapOf("value" to 3600, "modifier" to "GREATER_THAN"))
+        }
+        when (releaseDate) {
+            ReleaseDateFilter.ANY -> Unit
+            ReleaseDateFilter.PAST_30_DAYS -> put(
+                "date", mapOf("value" to shiftDate(referenceDate, Calendar.DAY_OF_YEAR, -30), "modifier" to "GREATER_THAN")
+            )
+            ReleaseDateFilter.PAST_YEAR -> put(
+                "date", mapOf("value" to shiftDate(referenceDate, Calendar.YEAR, -1), "modifier" to "GREATER_THAN")
+            )
+            ReleaseDateFilter.OLDER_THAN_YEAR -> put(
+                "date", mapOf("value" to shiftDate(referenceDate, Calendar.YEAR, -1), "modifier" to "LESS_THAN")
+            )
+        }
+        if (videoCodec != VideoCodecFilter.ANY) {
+            put("video_codec", mapOf("value" to videoCodec.stashValue, "modifier" to "EQUALS"))
+        }
+        putEntityFilter("performers", performers, hierarchical = false)
+        putEntityFilter("studios", studios, hierarchical = true)
+        putEntityFilter("tags", tags, hierarchical = true)
     }
 
     companion object {
-        /**
-         * Parses the persisted filter string. Format evolved over releases:
-         * 1.20.0 wrote "watch:favoritesOnly"; this version appends
-         * ":minStars:resolution:markers:captions". Older or malformed values
-         * fall back to defaults for the missing tail.
-         */
         fun fromPreferenceValue(value: String?): SceneFilterOptions {
-            val parts = value?.split(':')
-            if (parts.isNullOrEmpty()) return SceneFilterOptions()
+            if (value.isNullOrBlank()) return SceneFilterOptions()
+            if (value.trimStart().startsWith("{")) {
+                return try {
+                    fromJson(JsonParser.parseString(value).asJsonObject)
+                } catch (_: Exception) {
+                    SceneFilterOptions()
+                }
+            }
+            val parts = value.split(':')
             val watch = parts.getOrNull(0)
                 ?.let { name -> WatchFilter.entries.firstOrNull { it.name == name } }
                 ?: WatchFilter.ALL
             val favorites = parts.getOrNull(1)?.toBooleanStrictOrNull() ?: false
-            // Strict legacy validation: a 2-part value must carry a valid boolean.
-            if (parts.size == 2 && parts[1].toBooleanStrictOrNull() == null) {
-                return SceneFilterOptions()
-            }
+            if (parts.size == 2 && parts[1].toBooleanStrictOrNull() == null) return SceneFilterOptions()
             val minStars = parts.getOrNull(2)?.toIntOrNull()?.coerceIn(0, StarRating.MAX_STARS) ?: 0
-            val resolution = parts.getOrNull(3)
-                ?.let { name -> ResolutionFilter.entries.firstOrNull { it.name == name } }
-                ?: ResolutionFilter.ANY
-            val markers = parts.getOrNull(4)
-                ?.let { name -> PresenceFilter.entries.firstOrNull { it.name == name } }
-                ?: PresenceFilter.ANY
-            val captions = parts.getOrNull(5)
-                ?.let { name -> PresenceFilter.entries.firstOrNull { it.name == name } }
-                ?: PresenceFilter.ANY
+            val resolution = parts.getOrNull(3).enumOrDefault(ResolutionFilter.ANY)
+            val markers = parts.getOrNull(4).enumOrDefault(PresenceFilter.ANY)
+            val captions = parts.getOrNull(5).enumOrDefault(PresenceFilter.ANY)
             return SceneFilterOptions(watch, favorites, resolution, markers, captions, minStars)
         }
+
+        private fun fromJson(obj: JsonObject): SceneFilterOptions {
+            val watch = obj.string("watch").enumOrDefault(WatchFilter.ALL)
+            val favorites = obj.get("favoritesOnly")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false
+            val minStars = obj.get("minStars")?.takeIf { it.isJsonPrimitive }?.asInt
+                ?.coerceIn(0, StarRating.MAX_STARS) ?: 0
+            return SceneFilterOptions(
+                watch = watch,
+                favoritesOnly = favorites,
+                resolution = obj.string("resolution").enumOrDefault(ResolutionFilter.ANY),
+                markers = obj.string("markers").enumOrDefault(PresenceFilter.ANY),
+                captions = obj.string("captions").enumOrDefault(PresenceFilter.ANY),
+                minStars = minStars,
+                duration = obj.string("duration").enumOrDefault(DurationFilter.ANY),
+                releaseDate = obj.string("releaseDate").enumOrDefault(ReleaseDateFilter.ANY),
+                videoCodec = obj.string("videoCodec").enumOrDefault(VideoCodecFilter.ANY),
+                performers = entityFilterFromJson(obj, "performers"),
+                studios = entityFilterFromJson(obj, "studios"),
+                tags = entityFilterFromJson(obj, "tags")
+            )
+        }
     }
+}
+
+private fun EntityFilter.toJson(): JsonObject = JsonObject().apply {
+    addProperty("mode", mode.name)
+    add("entities", com.google.gson.JsonArray().apply {
+        entities.forEach { selection ->
+            add(JsonObject().apply {
+                addProperty("id", selection.id)
+                addProperty("name", selection.name)
+            })
+        }
+    })
+}
+
+private fun entityFilterFromJson(root: JsonObject, key: String): EntityFilter {
+    val element = root.get(key) ?: return EntityFilter()
+    if (element.isJsonNull) return EntityFilter()
+    if (!element.isJsonObject) throw IllegalArgumentException("$key must be an object")
+    val obj = element.asJsonObject
+    val mode = obj.string("mode").enumOrDefault(EntityFilterMode.ANY)
+    val entityArray = obj.get("entities") ?: return EntityFilter(mode)
+    if (!entityArray.isJsonArray) throw IllegalArgumentException("$key entities must be an array")
+    val entities = entityArray.asJsonArray.mapNotNull { item ->
+        if (!item.isJsonObject) return@mapNotNull null
+        val id = item.asJsonObject.string("id").orEmpty()
+        if (id.isBlank()) null else EntitySelection(id, item.asJsonObject.string("name").orEmpty())
+    }
+    return EntityFilter(mode, entities)
+}
+
+private fun JsonObject.string(key: String): String? {
+    val value = get(key) ?: return null
+    if (value.isJsonNull) return null
+    if (!value.isJsonPrimitive || !value.asJsonPrimitive.isString) {
+        throw IllegalArgumentException("$key must be a string")
+    }
+    return value.asString
+}
+
+private inline fun <reified T : Enum<T>> String?.enumOrDefault(default: T): T =
+    this?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
+
+private fun <K> MutableMap<K, Any?>.putEntityFilter(
+    key: K,
+    filter: EntityFilter,
+    hierarchical: Boolean
+) {
+    if (!filter.isActive) return
+    val criterion = mutableMapOf<String, Any?>(
+        "value" to filter.entities.map { it.id },
+        "modifier" to if (filter.mode == EntityFilterMode.EXCLUDE) "EXCLUDES" else "INCLUDES"
+    )
+    if (hierarchical) criterion["depth"] = 0
+    put(key, criterion)
+}
+
+private fun currentDate(): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+private fun shiftDate(value: String, field: Int, amount: Int): String {
+    val format = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
+    val date = format.parse(value) ?: return currentDate()
+    val calendar = Calendar.getInstance().apply {
+        time = date
+        add(field, amount)
+    }
+    return format.format(calendar.time)
 }

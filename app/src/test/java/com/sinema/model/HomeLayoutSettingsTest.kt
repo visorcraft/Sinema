@@ -93,6 +93,17 @@ class HomeLayoutSettingsTest {
     }
 
     @Test
+    fun `galleries shortcut migrates once and respects hidden choices`() {
+        val migrated = HomeLayoutSettings(
+            shortcutOrder = listOf(HomeShortcut.GROUPS),
+            hiddenShortcuts = setOf(HomeShortcut.GALLERIES)
+        ).normalized()
+        assertEquals(1, migrated.shortcutOrder.orEmpty().count { it == HomeShortcut.GALLERIES })
+        assertFalse(migrated.visibleShortcuts().contains(HomeShortcut.GALLERIES))
+        assertTrue(HomeLayoutSettings().visibleShortcuts().contains(HomeShortcut.GALLERIES))
+    }
+
+    @Test
     fun `large artwork dimensions are explicit`() {
         assertEquals(266, HomeCardSize.COMPACT.widthDp)
         assertEquals(158, HomeCardSize.COMPACT.imageHeightDp)

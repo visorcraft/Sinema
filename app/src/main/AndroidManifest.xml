@@ -117,6 +117,14 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".ui.GalleryGridActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.GalleryImagesActivity"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ui.RelatedScenesActivity"
             android:screenOrientation="landscape" />
 

@@ -89,12 +89,21 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     }
 
     override fun showFilterDialog() {
-        FilterDialog.show(requireContext(), sceneFilter) { chosen ->
-            sceneFilter = chosen
-            filterScreenKey?.let { app.prefs.setSceneFilterFor(it, chosen) }
-            activity?.refreshGridControls()
-            reload()
-        }
+        FilterDialog.show(
+            requireContext(),
+            sceneFilter,
+            onChosen = { chosen ->
+                sceneFilter = chosen
+                filterScreenKey?.let { app.prefs.setSceneFilterFor(it, chosen) }
+                activity?.refreshGridControls()
+                reload()
+            },
+            onSave = { chosen ->
+                SavedFilterActions.promptSave(
+                    requireActivity(), chosen, sort.apiSort(randomSeed), sort.direction
+                )
+            }
+        )
     }
 
     override fun showGridMenu() {

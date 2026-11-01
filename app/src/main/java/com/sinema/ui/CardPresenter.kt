@@ -12,8 +12,10 @@ import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
 import com.sinema.model.EntityItem
 import com.sinema.model.FolderItem
+import com.sinema.model.GalleryItem
 import com.sinema.model.GroupItem
 import com.sinema.model.HomeCardSize
+import com.sinema.model.ImageItem
 import com.sinema.model.Scene
 import com.sinema.model.StarRating
 import com.sinema.util.GlideAuth
@@ -109,6 +111,26 @@ class CardPresenter(
                 } else {
                     Glide.with(view.context).clear(image)
                     image.setImageResource(android.R.drawable.ic_menu_agenda)
+                    image.scaleType = ImageView.ScaleType.CENTER
+                    image.setBackgroundColor(0xFF444444.toInt())
+                }
+            }
+            is GalleryItem -> {
+                title.text = item.displayTitle
+                content.text = "${item.imageCount} " + if (item.imageCount == 1) "image" else "images"
+                heart?.visibility = if ((item.rating100 ?: 0) > 0) View.VISIBLE else View.GONE
+                checkmark?.visibility = View.GONE
+                progress?.visibility = View.GONE
+                if (item.coverImageId != null) {
+                    image.scaleType = ImageView.ScaleType.CENTER_CROP
+                    image.setBackgroundColor(0xFF333333.toInt())
+                    Glide.with(view.context)
+                        .load(GlideAuth.url(api, api.getImageThumbnailUrl(item.coverImageId)))
+                        .centerCrop()
+                        .into(image)
+                } else {
+                    Glide.with(view.context).clear(image)
+                    image.setImageResource(android.R.drawable.ic_menu_gallery)
                     image.scaleType = ImageView.ScaleType.CENTER
                     image.setBackgroundColor(0xFF444444.toInt())
                 }
@@ -209,6 +231,19 @@ class FolderCardPresenter : Presenter() {
                     }
                 }
             }
+            is ImageItem -> {
+                title.text = item.title.ifBlank { item.filename }
+                content.text = if (item.width > 0 && item.height > 0)
+                    "${item.width} × ${item.height}" else "Picture"
+                heart?.visibility = if ((item.rating100 ?: 0) > 0) View.VISIBLE else View.GONE
+                image.scaleType = ImageView.ScaleType.CENTER_CROP
+                image.setBackgroundColor(0xFF333333.toInt())
+                val api = SinemaApp.instance.api
+                Glide.with(view.context)
+                    .load(GlideAuth.url(api, api.getImageThumbnailUrl(item.id)))
+                    .centerCrop()
+                    .into(image)
+            }
         }
     }
 
@@ -283,6 +318,13 @@ class SettingsPresenter : Presenter() {
                 title.text = "🎞️ Groups"
                 content.text = "Collections of scenes"
                 image.setImageResource(android.R.drawable.ic_menu_agenda)
+                image.scaleType = ImageView.ScaleType.CENTER
+                image.setBackgroundColor(0xFF444444.toInt())
+            }
+            "Galleries" -> {
+                title.text = "🖼️ Galleries"
+                content.text = "Collections of images"
+                image.setImageResource(android.R.drawable.ic_menu_gallery)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
             }

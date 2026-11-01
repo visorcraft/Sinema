@@ -13,6 +13,7 @@ By default, the top shortcut row contains:
 - Favorites
 - Browse Folders
 - Groups
+- Galleries
 - Tags
 - Performers
 - Studios
@@ -71,11 +72,13 @@ The selected search sort and filters are saved and reused later. Filters also ap
 
 ## Saved Filters
 
-Open `Saved Filters` from the main screen to browse scene filters you saved in the Stash web UI.
+Open `Saved Filters` from the main screen to browse scene filters stored on the Stash server.
 
 - Selecting a saved filter opens a scene grid driven by the filter's own criteria, sort, and direction — exactly as Stash would run it.
 - Sort and Play All work inside the filtered grid like any other grid.
-- Filters are stored server-side; create or edit them in Stash and they appear here on the next visit.
+- Create a filter from any scene grid's Filter dialog with `Save as Stash filter…`. The current criteria and sort are saved under a name you choose. Relative release-date choices are stored as the concrete date calculated at save time, matching Stash's saved-filter model.
+- Long-press OK on a saved-filter card to rename or delete it. Deletion asks for confirmation and never deletes scenes.
+- Filters remain editable in the Stash web UI and appear here on the next visit.
 
 ## Markers
 
@@ -137,17 +140,26 @@ Selecting an item:
 
 Large folders are capped at the first 10,000 videos/pictures shown in the folder view. Sinema shows a toast when a folder is truncated.
 
+## Galleries
+
+Open `Galleries` from the main screen or Library to browse Stash Galleries. Search by name or sort by image count, title, update time, or release date. Cards show cover artwork and image counts.
+
+Selecting a Gallery opens its cover, image count, available date/photographer/studio metadata, synopsis, and image grid. Select any image for full-screen viewing, or choose `Slideshow` to load the Gallery and start automatic playback. Gallery loading is capped at 10,000 images; Sinema shows a toast when it truncates the list.
+
 ## Images
 
-Pictures in Stash folder views open in Sinema's full-screen image viewer.
+Pictures in folder views and Galleries open in Sinema's full-screen image viewer.
 
 Controls:
 
-- D-pad Right or Down: next image.
-- D-pad Left or Up: previous image.
-- Back: return to the folder.
+- D-pad Right or Down: next image; Left or Up: previous image.
+- OK: show or hide the caption and viewer status.
+- Menu: start/pause a slideshow, cycle 3/5/10/30-second delays, toggle shuffle, switch fit/fill, zoom in/out, or reset zoom.
+- While zoomed: D-pad directions pan the image; Plus/Minus or zoom keys also adjust zoom.
+- Media Next/Previous and fast-forward/rewind navigate; Play/Pause toggles the slideshow.
+- Back: return to the previous screen.
 
-The caption at the bottom shows the file name and current position in the folder image list.
+The caption shows the image title or filename and position. Fit shows the whole image; Fill crops to cover the TV screen. Shuffle preserves every image exactly once and keeps the current image in place when toggled.
 
 ## Groups
 
@@ -254,8 +266,12 @@ Scene grids (search results, favorites, folder views, and entity scene views) pr
 - Resolution: any, under 720p, 720p or better, 1080p or better, or 4K or better.
 - Markers: any, with, or without.
 - Captions: any, with, or without.
+- Duration: under 10 minutes, 10–30, 30–60, or over 60 minutes.
+- Release date: last 30 days, last year, or over a year old. Relative dates are evaluated when the query runs.
+- Video codec: H.264, HEVC, VP9, or AV1.
+- Performers, Studios, and Tags: search and select multiple entities, then include any selected entity or exclude all selected entities.
 
-Filters combine with each other and with the current sort, and are saved per screen. The Filter button label always shows the active filter summary.
+Filters combine with each other, the screen's existing scope, and the current sort, and are saved per screen. The Filter button label always shows the active filter summary. At the top of the dialog, select an active-filter chip to remove that criterion, or choose `Clear all` to reset every dimension. `Save as Stash filter…` stores the working criteria and current sort on the server without changing the grid until you choose Apply.
 
 For the two most-used filters there are quick toggles next to Filter on the same control bar: a watch button cycling All scenes → Unwatched → Watched, and a Favorites on/off button. They change the same saved filter state as the Filter dialog. While a minimum-star filter is active the Favorites button shows on (stars imply favorites); switching it off clears the whole rating filter, stars included.
 

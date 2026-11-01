@@ -100,6 +100,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **Folders** — directory-based browsing
 - **Tags / Performers / Studios** — metadata browsing and filtering
 - **Groups / Movies** — collections, ordered scenes, and legacy Stash 0.24 compatibility
+- **Galleries / Images** — covers, metadata, image grids, full-screen viewing, and slideshows
 - **Captions** — subtitle tracks (SRT/VTT)
 - **Scene Markers** — chapters for navigation
 - **Ratings** — favorites (rating100 > 0 = ❤️)
@@ -111,11 +112,12 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 - **🏠 Personalized Home** — Reorder/hide shortcuts and rows, group secondary destinations under Library, choose card sizes, pin optional rows and a saved filter, and open full grids with View All.
 - **🎞️ Groups & Collections** — Browse Stash Groups with artwork and detailed headers, play their scenes in order, shuffle, or resume progression. Legacy Movies on Stash 0.24 are supported automatically.
+- **🖼️ Galleries & Slideshows** — Browse Stash Galleries with covers and metadata, zoom and pan images, choose fit/fill, shuffle, and adjust slideshow speed.
 - **✨ Related Discovery** — More Like This recommendations ranked from shared performers, studio, and tags, plus optional personalized and unwatched-favorite-performer home rows.
 - **🏷️ Metadata Browsing** — Search, sort, and incrementally browse Tags, Performers, and Studios with scene counts and images.
 - **📁 Folder Browser** — Navigate your library by directory structure.
 - **🔍 Unified Search** — Find scenes, tags, performers, and studios together; voice search via the remote microphone where available.
-- **🎛️ Grid Controls** — D-pad-reachable sorting plus filters on scene grids: watched state, favorites, minimum rating, resolution, markers, and captions.
+- **🎛️ Grid Controls** — D-pad-reachable sorting and removable filter chips for watched state, favorites, rating, resolution, markers, captions, duration, release date, codec, and included/excluded performers, studios, or tags.
 - **⭐ Star Ratings** — Rate scenes 1–5 stars on the detail screen or from the player menu; any rating marks the scene as a favorite. Cards show their star count.
 - **👤 Entity Detail Headers** — Tags, performers, and studios open with a detail header: image, scene count, and — for performers — their tag chips.
 - **🎲 Surprise Me** — One press on the home screen jumps straight into a random scene.
@@ -128,7 +130,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **❤️ Favorites** — One-tap favorite/unfavorite via star rating, synced with Stash ratings. Folders with favorited content show a heart overlay.
 - **📺 Android TV Channels** — Optional "Watch Next" (Continue Watching) and "Recently Added" rows on the launcher home screen (opt-in, privacy-first).
 - **🔎 Global Search** — Optional participation in the Android TV system search dialog (Settings toggle, off by default). Scene suggestions deep-link straight to scene details.
-- **⭐ Saved Filters** — Use scene filters saved in the Stash web UI directly from the home screen.
+- **⭐ Saved Filters** — Create, rename, and delete server-side Stash filters from Sinema, or pin one as a Home row.
 - **📑 Marker Browser** — Every scene marker in one grid with tag filtering; select one to jump straight into playback at that timestamp.
 - **📊 Stats** — Total watch time, plays, and most-watched scenes, performers, tags, and studios.
 - **🎛️ Stream Quality** — Force direct playback or pick a transcode tier (480p/720p/1080p) from the player menu for slow servers and weak networks.

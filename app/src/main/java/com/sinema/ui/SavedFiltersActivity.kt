@@ -1,20 +1,24 @@
 package com.sinema.ui
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
+import android.util.Log
 import android.view.KeyEvent
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.model.SavedSceneFilter
 import com.sinema.model.SortOption
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
-/**
- * Lists scene saved filters stored server-side in Stash. Selecting one opens
- * its scenes in a grid driven by the filter's raw criteria.
- */
 class SavedFiltersActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,10 +39,6 @@ class SavedFiltersActivity : FragmentActivity() {
         if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 }
 
-/**
- * Maps a saved filter's sort field + direction to the grid's default sort.
- * Falls back to a field-only match, then Name A-Z.
- */
 internal fun savedFilterDefaultSort(sortField: String?, direction: String?): SortOption =
     SortOption.entries.firstOrNull { it.field == sortField && it.direction == direction }
         ?: SortOption.entries.firstOrNull { it.field == sortField }
@@ -50,13 +50,11 @@ class SavedFiltersFragment : SceneGridFragment() {
     override val paged = true
     override val canFilter = false
 
-    override fun createCardPresenter() = SavedFilterCardPresenter()
+    override fun createCardPresenter() = SavedFilterCardPresenter(::showFilterActions)
 
     override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
 
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> {
-        // Stash returns the full list in one shot; page client-side so the
-        // incremental scroll path stays exercised.
         val filters = app.api.findSavedSceneFilters()
         val pageItems = filters.drop((page - 1) * perPage).take(perPage)
         return Pair(filters.size, pageItems)
@@ -67,10 +65,77 @@ class SavedFiltersFragment : SceneGridFragment() {
             startActivity(SavedFilterScenesActivity.intent(requireContext(), item))
         }
     }
+
+    private fun showFilterActions(filter: SavedSceneFilter) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(filter.name)
+            .setItems(arrayOf("Rename", "Delete")) { dialog, which ->
+                dialog.dismiss()
+                if (which == 0) promptRename(filter) else confirmDelete(filter)
+            }
+            .show()
+    }
+
+    private fun promptRename(filter: SavedSceneFilter) {
+        val input = EditText(requireContext()).apply {
+            setText(filter.name)
+            setSelection(text.length)
+            hint = "Filter name"
+            inputType = InputType.TYPE_CLASS_TEXT
+            isFocusable = true
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle("Rename saved filter")
+            .setView(input)
+            .setPositiveButton("Rename") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isBlank()) {
+                    Toast.makeText(requireContext(), "Enter a filter name", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                lifecycleScope.launch {
+                    try {
+                        val renamed = app.api.renameSavedSceneFilter(filter, name)
+                        Toast.makeText(requireContext(), "Renamed to ‘${renamed.name}’", Toast.LENGTH_SHORT).show()
+                        reload()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e("Sinema", "Failed to rename saved filter ${filter.id}", e)
+                        Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirmDelete(filter: SavedSceneFilter) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Delete saved filter?")
+            .setMessage("Delete ‘${filter.name}’ from Stash? Scenes are not affected.")
+            .setPositiveButton("Delete") { _, _ ->
+                lifecycleScope.launch {
+                    try {
+                        app.api.destroySavedSceneFilter(filter.id)
+                        Toast.makeText(requireContext(), "Deleted ‘${filter.name}’", Toast.LENGTH_SHORT).show()
+                        reload()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e("Sinema", "Failed to delete saved filter ${filter.id}", e)
+                        Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 }
 
-/** Simple name card for a saved filter; Stash has no artwork for filters. */
-class SavedFilterCardPresenter : androidx.leanback.widget.Presenter() {
+class SavedFilterCardPresenter(
+    private val onItemLongClick: (SavedSceneFilter) -> Unit
+) : androidx.leanback.widget.Presenter() {
     override fun onCreateViewHolder(
         parent: android.view.ViewGroup
     ): androidx.leanback.widget.Presenter.ViewHolder {
@@ -89,21 +154,22 @@ class SavedFilterCardPresenter : androidx.leanback.widget.Presenter() {
         val image = view.findViewById<ImageView>(R.id.card_image)
         if (item is SavedSceneFilter) {
             title.text = item.name
-            content.text = "Scene filter"
+            content.text = "Scene filter  •  Hold OK to manage"
             image.setImageResource(android.R.drawable.ic_menu_sort_by_size)
             image.scaleType = ImageView.ScaleType.CENTER
             image.setBackgroundColor(0xFF444444.toInt())
+            view.setOnLongClickListener {
+                onItemLongClick(item)
+                true
+            }
         }
     }
 
-    override fun onUnbindViewHolder(viewHolder: androidx.leanback.widget.Presenter.ViewHolder) {}
+    override fun onUnbindViewHolder(viewHolder: androidx.leanback.widget.Presenter.ViewHolder) {
+        viewHolder.view.setOnLongClickListener(null)
+    }
 }
 
-/**
- * Scene grid driven by one saved filter's raw criteria. The activity fetches
- * the filter once and hands the fragment everything it needs via arguments,
- * so paging never re-fetches the filter definition.
- */
 class SavedFilterScenesActivity : FragmentActivity() {
     companion object {
         const val EXTRA_ID = "saved_filter_id"
@@ -169,11 +235,6 @@ class SavedFilterScenesFragment : SceneGridFragment() {
     override val canFilter = false
     override val paged = true
 
-    /**
-     * Match the saved filter's sort field AND direction (e.g. path/DESC →
-     * Name Z-A). Getter, not initializer: requireArguments() is only valid
-     * after arguments are attached.
-     */
     override val defaultSort: SortOption
         get() = savedFilterDefaultSort(
             requireArguments().getString("sort"),

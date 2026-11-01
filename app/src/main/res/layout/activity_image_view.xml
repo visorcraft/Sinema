@@ -11,18 +11,44 @@
         android:scaleType="fitCenter"
         android:contentDescription="@null" />
 
-    <TextView
-        android:id="@+id/image_caption"
+    <LinearLayout
+        android:id="@+id/image_controls"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="24dp"
+        android:orientation="vertical"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:background="#99000000"
-        android:textColor="#FFFFFFFF"
-        android:textSize="14sp" />
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="#B0000000">
+
+        <TextView
+            android:id="@+id/image_caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxWidth="1000dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/image_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textColor="#FFCCCCCC"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="OK: hide controls  •  Menu: viewer options"
+            android:textColor="#FFAAAAAA"
+            android:textSize="12sp" />
+    </LinearLayout>
 
 </FrameLayout>

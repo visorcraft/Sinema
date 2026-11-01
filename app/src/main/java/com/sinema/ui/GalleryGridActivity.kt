@@ -1,0 +1,112 @@
+package com.sinema.ui
+
+import android.app.AlertDialog
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import android.text.InputType
+import android.view.KeyEvent
+import android.widget.EditText
+import androidx.fragment.app.FragmentActivity
+import com.sinema.R
+import com.sinema.model.GalleryItem
+
+enum class GallerySortOption(val label: String, val field: String, val direction: String) {
+    COUNT_DESC("Image count", "image_count", "DESC"),
+    NAME_ASC("Name (A–Z)", "title", "ASC"),
+    NAME_DESC("Name (Z–A)", "title", "DESC"),
+    UPDATED_DESC("Recently updated", "updated_at", "DESC"),
+    DATE_DESC("Release date", "date", "DESC");
+
+    companion object {
+        fun fromName(name: String?): GallerySortOption =
+            entries.firstOrNull { it.name == name } ?: UPDATED_DESC
+    }
+}
+
+class GalleryGridActivity : FragmentActivity() {
+    companion object {
+        fun intent(context: Context): Intent = Intent(context, GalleryGridActivity::class.java)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_grid)
+        val fragment = supportFragmentManager.findFragmentById(R.id.main_frame) as? GalleryGridFragment
+            ?: GalleryGridFragment().also {
+                supportFragmentManager.beginTransaction().replace(R.id.main_frame, it).commit()
+            }
+        bindGridControls(fragment)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
+        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+}
+
+class GalleryGridFragment : SceneGridFragment() {
+    override val columns = 4
+    override val paged = true
+    override val canSearch = true
+    override val gridTitle: String
+        get() = buildString {
+            append("Galleries")
+            if (searchQuery.isNotBlank()) append(": $searchQuery")
+            append("  •  ${gallerySort.label}")
+        }
+    override val emptyMessage = "No galleries found"
+
+    private var gallerySort = GallerySortOption.UPDATED_DESC
+    private var searchQuery = ""
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        gallerySort = GallerySortOption.fromName(app.prefs.sortFor("gallery_grid"))
+        searchQuery = savedInstanceState?.getString("gallery_query").orEmpty()
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("gallery_query", searchQuery)
+    }
+
+    override fun showSortDialog() {
+        val options = GallerySortOption.entries
+        AlertDialog.Builder(requireContext())
+            .setTitle("Sort by")
+            .setSingleChoiceItems(options.map { it.label }.toTypedArray(), options.indexOf(gallerySort)) { dialog, which ->
+                dialog.dismiss()
+                gallerySort = options[which]
+                app.prefs.setSortFor("gallery_grid", gallerySort.name)
+                reload()
+            }
+            .show()
+    }
+
+    override fun showSearchDialog() {
+        val input = EditText(requireContext()).apply {
+            setText(searchQuery)
+            setSelection(text.length)
+            hint = "Name"
+            inputType = InputType.TYPE_CLASS_TEXT
+            isFocusable = true
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle("Search galleries")
+            .setView(input)
+            .setPositiveButton("Search") { _, _ ->
+                searchQuery = input.text.toString().trim()
+                reload()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
+
+    override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> =
+        app.api.findGalleries(page, perPage, searchQuery.ifBlank { null }, gallerySort.field, gallerySort.direction)
+
+    override fun onItemClicked(item: Any) {
+        if (item is GalleryItem) startActivity(GalleryImagesActivity.intent(requireContext(), item))
+    }
+}
