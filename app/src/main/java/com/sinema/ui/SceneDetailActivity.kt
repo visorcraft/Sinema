@@ -88,6 +88,12 @@ class SceneDetailActivity : FragmentActivity() {
             val show = technicalContainer.visibility != View.VISIBLE
             technicalContainer.visibility = if (show) View.VISIBLE else View.GONE
             btnTechnical.text = if (show) "Hide technical details" else "Technical details"
+            if (show) {
+                // Reveal the freshly expanded block: it renders below the
+                // fold, so scroll it into view once laid out.
+                val scroll = findViewById<android.widget.ScrollView>(R.id.detail_scroll)
+                technicalContainer.post { scroll.smoothScrollTo(0, technicalContainer.bottom) }
+            }
         }
 
         // Load screenshot — suppressed in discreet mode; the scrimmed hero

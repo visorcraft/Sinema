@@ -766,29 +766,29 @@ class SinemaApi(
             sceneFilter = RECENTLY_PLAYED_SCENE_FILTER,
             fields = SCENE_FIELDS + " last_played_at"
         ).second
-        val (withTs, withoutTs) = scenes.partition { it.lastPlayedAt != null }
-        return withTs.sortedByDescending { it.lastPlayedAt } + withoutTs
+        return recencyOrdered(scenes)
     }
 
     suspend fun findContinuePlaying(): List<Pair<Scene, Double>> {
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
-                findScenes(filter: ${"$"}filter, scene_filter: ${"$"}scene_filter) {
-                    scenes { $SCENE_FIELDS }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("per_page" to 25, "sort" to "last_played_at", "direction" to "DESC"),
-            "scene_filter" to mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN"))
-        )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes") ?: return emptyList()
-        return data.getAsJsonArray("scenes").map { obj ->
-            val scene = parseScene(obj.asJsonObject)
-            val resumeTime = obj.asJsonObject.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
-            Pair(scene, resumeTime)
-        }
+        // Same story as Recently Played: Stash's server-side
+        // last_played_at ordering is unreliable (NULL handling, and
+        // sceneSaveActivity doesn't always touch it), so request the
+        // timestamp and re-sort client-side, newest first, nulls last.
+        val scenes = findScenesInternal(
+            perPage = 100,
+            sort = "last_played_at",
+            direction = "DESC",
+            sceneFilter = mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
+            fields = SCENE_FIELDS + " last_played_at"
+        ).second
+        val ordered = recencyOrdered(scenes)
+        return ordered.take(25).map { scene -> Pair(scene, scene.resumeTime) }
+    }
+
+    /** Newest-first with null timestamps last (shared client-side ordering). */
+    private fun recencyOrdered(scenes: List<Scene>): List<Scene> {
+        val (withTs, withoutTs) = scenes.partition { it.lastPlayedAt != null }
+        return withTs.sortedByDescending { it.lastPlayedAt } + withoutTs
     }
 
     suspend fun findContinuePlayingPaged(
@@ -798,15 +798,21 @@ class SinemaApi(
         direction: String = "DESC",
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
         pathPrefixRegex: String? = null
-    ): Pair<Int, List<Scene>> = findScenesInternal(
-        page = page,
-        perPage = perPage,
-        sort = sort,
-        direction = direction,
-        sceneFilter = mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
-        filters = filters,
-        pathPrefixRegex = pathPrefixRegex
-    )
+    ): Pair<Int, List<Scene>> {
+        val result = findScenesInternal(
+            page = if (sort == "last_played_at") 1 else page,
+            perPage = if (sort == "last_played_at") PER_PAGE_ALL else perPage,
+            sort = sort,
+            direction = direction,
+            sceneFilter = mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
+            filters = filters,
+            fields = if (sort == "last_played_at") SCENE_FIELDS + " last_played_at" else SCENE_FIELDS,
+            pathPrefixRegex = pathPrefixRegex
+        )
+        if (sort != "last_played_at") return result
+        // Client-side nulls-last recency paging, like Recently Played.
+        return result.first to recentlyPlayedPage(result.second, page, perPage, direction)
+    }
 
     suspend fun findRecentlyPlayedPaged(
         page: Int,

@@ -804,10 +804,14 @@ class SinemaApiTest {
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"rating100\""))
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"play_count\""))
             val resume = requestBodies[1]
-            org.junit.Assert.assertTrue(resume, resume.contains("\"page\":3"))
-            org.junit.Assert.assertTrue(resume, resume.contains("\"per_page\":75"))
+            // Continue Playing's default recency sort fetches the complete
+            // result and slices client-side (null-timestamp-safe ordering),
+            // mirroring Recently Played.
+            org.junit.Assert.assertTrue(resume, resume.contains("\"page\":1"))
+            org.junit.Assert.assertTrue(resume, resume.contains("\"per_page\":-1"))
             org.junit.Assert.assertTrue(resume, resume.contains("\"resume_time\""))
             org.junit.Assert.assertTrue(resume, resume.contains("GREATER_THAN"))
+            org.junit.Assert.assertTrue(resume, resume.contains("last_played_at"))
             val recentlyPlayed = requestBodies[2]
             org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"page\":1"))
             org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"per_page\":-1"))
