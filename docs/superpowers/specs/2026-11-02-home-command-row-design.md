@@ -44,17 +44,17 @@ The Browse row remains visually distinct from Quick actions. Existing shortcut p
 
 Initial focus must always be safe and deterministic:
 
-- When the hero is available, initial focus may remain on the hero.
+- When the hero is available, initial focus goes to the hero.
 - When the hero is absent because of Discreet Mode, Home Settings, or unavailable Continue Playing content, initial focus goes to the first Browse command rather than Log Out.
 - If a previously focused item is being restored, restoration takes precedence over the default only when it resolves to an existing item. Fallback must never select Log Out.
 
-Quick actions does not wrap horizontally. Down enters Browse, and Up from Browse returns predictably to Quick actions using normal Leanback focus behavior and existing focus restoration. Moving between screens and refreshing rows preserves the originating command or shortcut when possible.
+Quick actions does not wrap horizontally. Down enters Browse, and Up from Browse returns predictably to Quick actions using normal Leanback focus behavior and existing focus restoration. Moving between screens and refreshing rows preserves the originating command or shortcut when that item still exists; otherwise it uses the safe fallback.
 
 After PIN unlock with no hero, the same safe Browse fallback applies, preventing an immediate accidental re-lock. The server-error state does not make Log Out unreachable.
 
 ## Implementation boundaries
 
-Reuse `RowsSupportFragment`, `ArrayObjectAdapter`, stable row IDs, `SettingsPresenter` behavior, and the existing click dispatcher. Relocate the existing settings row rather than introducing a parallel navigation system. Separate compact command presentation from user shortcut presentation only as needed to provide the approved visual hierarchy.
+Reuse `RowsSupportFragment`, `ArrayObjectAdapter`, stable row IDs, and the existing click dispatcher. Relocate the existing settings row rather than introducing a parallel navigation system. Use a dedicated compact command presenter for Quick actions and retain `SettingsPresenter` for Browse and Retry Connection.
 
 Keep `HomeShortcut`, saved shortcut order, hidden shortcuts, content-row order, and hidden rows unchanged. Reuse the existing settings row ID and string-based command keys so focus restoration remains stable. No new dependency, Compose migration, left rail, global navigation rewrite, or Stash API change is included.
 
