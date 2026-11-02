@@ -208,8 +208,9 @@ class SinemaApi(
         sceneFilter: Map<String, Any?>? = null,
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
         fields: String = SCENE_FIELDS,
-        // Alpha jump: anchored path-prefix regex ("^B"); callers pass [A-Z0-9] only.
-        pathPrefixRegex: String? = null
+        // Alpha jump: anchored title/path regex ("^B"); callers pass [A-Z0-9] only.
+        pathPrefixRegex: String? = null,
+        alphaField: String = "path"
     ): Pair<Int, List<Scene>> {
         val query = """
             query(${"$"}filter: FindFilterType, ${"$"}scene_filter: SceneFilterType) {
@@ -227,7 +228,7 @@ class SinemaApi(
         pathPrefixRegex?.takeIf { it.isNotBlank() }?.let {
             combinedSceneFilter = combineSceneFilters(
                 combinedSceneFilter,
-                mapOf("path" to mapOf("value" to it, "modifier" to "MATCHES_REGEX"))
+                mapOf(alphaField to mapOf("value" to it, "modifier" to "MATCHES_REGEX"))
             )
         }
         combinedSceneFilter.takeIf { it.isNotEmpty() }
@@ -545,7 +546,8 @@ class SinemaApi(
         direction: String,
         unwatchedOnly: Boolean = false,
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
-        pathPrefixRegex: String? = null
+        pathPrefixRegex: String? = null,
+        alphaField: String = "path"
     ): Pair<Int, List<Scene>> = findScenesInternal(
         page = page,
         perPage = perPage,
@@ -556,7 +558,8 @@ class SinemaApi(
             if (unwatchedOnly) put("play_count", mapOf("value" to 0, "modifier" to "EQUALS"))
         },
         filters = filters,
-        pathPrefixRegex = pathPrefixRegex
+        pathPrefixRegex = pathPrefixRegex,
+        alphaField = alphaField
     )
 
     suspend fun findRecentScenesPaged(
@@ -565,14 +568,16 @@ class SinemaApi(
         sort: String = "created_at",
         direction: String = "DESC",
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
-        pathPrefixRegex: String? = null
+        pathPrefixRegex: String? = null,
+        alphaField: String = "path"
     ): Pair<Int, List<Scene>> = findScenesInternal(
         page = page,
         perPage = perPage,
         sort = sort,
         direction = direction,
         filters = filters,
-        pathPrefixRegex = pathPrefixRegex
+        pathPrefixRegex = pathPrefixRegex,
+        alphaField = alphaField
     )
 
     suspend fun findRecentlyReleasedPaged(
@@ -581,9 +586,10 @@ class SinemaApi(
         sort: String = "date",
         direction: String = "DESC",
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
-        pathPrefixRegex: String? = null
+        pathPrefixRegex: String? = null,
+        alphaField: String = "path"
     ): Pair<Int, List<Scene>> =
-        findRecentScenesPaged(page, perPage, sort, direction, filters, pathPrefixRegex)
+        findRecentScenesPaged(page, perPage, sort, direction, filters, pathPrefixRegex, alphaField)
 
     /**
      * One random scene from the whole library, for the "Surprise Me" card.
@@ -769,7 +775,8 @@ class SinemaApi(
         sort: String = "last_played_at",
         direction: String = "DESC",
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
-        pathPrefixRegex: String? = null
+        pathPrefixRegex: String? = null,
+        alphaField: String = "path"
     ): Pair<Int, List<Scene>> {
         val result = findScenesInternal(
             page = if (sort == "last_played_at") 1 else page,
@@ -779,7 +786,8 @@ class SinemaApi(
             sceneFilter = mapOf("resume_time" to mapOf("value" to 0, "modifier" to "GREATER_THAN")),
             filters = filters,
             fields = if (sort == "last_played_at") SCENE_FIELDS + " last_played_at" else SCENE_FIELDS,
-            pathPrefixRegex = pathPrefixRegex
+            pathPrefixRegex = pathPrefixRegex,
+        alphaField = alphaField
         )
         if (sort != "last_played_at") return result
         // Client-side nulls-last recency paging, like Recently Played.
@@ -792,7 +800,8 @@ class SinemaApi(
         sort: String = "last_played_at",
         direction: String = "DESC",
         filters: com.sinema.model.SceneFilterOptions = com.sinema.model.SceneFilterOptions(),
-        pathPrefixRegex: String? = null
+        pathPrefixRegex: String? = null,
+        alphaField: String = "path"
     ): Pair<Int, List<Scene>> {
         val result = findScenesInternal(
             // Stash's per_page = 0 means "LIMIT 0" (count only), and paging a
@@ -805,7 +814,8 @@ class SinemaApi(
             sceneFilter = RECENTLY_PLAYED_SCENE_FILTER,
             filters = filters,
             fields = SCENE_FIELDS + " last_played_at",
-            pathPrefixRegex = pathPrefixRegex
+            pathPrefixRegex = pathPrefixRegex,
+        alphaField = alphaField
         )
         if (sort != "last_played_at") return result
         // Stash orders null timestamps unpredictably, so recency paging must

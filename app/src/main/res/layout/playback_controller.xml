@@ -114,6 +114,19 @@
             android:textSize="18sp" />
     </LinearLayout>
 
+    <Button
+        android:id="@+id/playback_skip_marker"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="96dp"
+        android:background="@drawable/bg_primary_button"
+        android:focusable="true"
+        android:minWidth="220dp"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@id/exo_center_controls"
         android:layout_width="wrap_content"

@@ -708,4 +708,41 @@ class SinemaApiTest {
             server.stop(0)
         }
     }
+
+    @Test
+    fun `alpha jump can filter titles instead of paths`() {
+        var requestBody = ""
+        val server = com.sun.net.httpserver.HttpServer.create(
+            java.net.InetSocketAddress("127.0.0.1", 0), 0
+        )
+        server.createContext("/graphql") { exchange ->
+            requestBody = exchange.requestBody.bufferedReader().readText()
+            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
+            val bytes = response.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        try {
+            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+            kotlinx.coroutines.runBlocking {
+                api.findRecentScenesPaged(
+                    page = 1,
+                    perPage = 25,
+                    sort = "title",
+                    direction = "ASC",
+                    pathPrefixRegex = "^A",
+                    alphaField = "title"
+                )
+            }
+            org.junit.Assert.assertTrue(
+                requestBody,
+                requestBody.contains("\"title\":{\"value\":\"^A\",\"modifier\":\"MATCHES_REGEX\"}")
+            )
+        } finally {
+            server.stop(0)
+        }
+    }
 }

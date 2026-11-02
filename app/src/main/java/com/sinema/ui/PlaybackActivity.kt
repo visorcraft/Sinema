@@ -85,11 +85,15 @@ class PlaybackActivity : FragmentActivity() {
     private val prefs by lazy { SinemaApp.instance.prefs }
     private val renderersFactory by lazy { PlaybackRenderersFactory(this) }
     private var isPaused = false
+    private var scrubbing = false
+    private var lastMarkerPositionMs: Long? = null
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { playerView.hideController() }
+    private val hideMarkerSkipRunnable = Runnable { hideMarkerSkip() }
     private val progressRunnable = object : Runnable {
         override fun run() {
             updatePlaybackText()
+            updateMarkerSkip()
             handler.postDelayed(this, 500L)
         }
     }
@@ -113,7 +117,11 @@ class PlaybackActivity : FragmentActivity() {
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
-        if (SceneIntents.autoResumeFrom(intent) && sceneId.isNotEmpty()) {
+        if (SceneIntents.restoreSessionFrom(intent) && sceneId.isNotEmpty()) {
+            resumePromptResolved = true
+            autoResumePending = true
+            resolveAutoResume(preservePosition = true)
+        } else if (SceneIntents.autoResumeFrom(intent) && sceneId.isNotEmpty()) {
             autoResumePending = true
             resolveAutoResume()
         } else {
@@ -164,8 +172,8 @@ class PlaybackActivity : FragmentActivity() {
         if (promptResume) showResumePrompt()
     }
 
-    /** Fetch scene metadata, then resume Watch Next playback silently. */
-    private fun resolveAutoResume() {
+    /** Fetch scene metadata before silent Watch Next or stored-session playback. */
+    private fun resolveAutoResume(preservePosition: Boolean = false) {
         val targetId = sceneId
         lifecycleScope.launch {
             try {
@@ -174,7 +182,7 @@ class PlaybackActivity : FragmentActivity() {
                     sceneTitle = d.scene.displayTitle
                     videoWidth = d.scene.width
                     videoHeight = d.scene.height
-                    resumePositionMs = (d.scene.resumeTime * 1000).toLong()
+                    if (!preservePosition) resumePositionMs = (d.scene.resumeTime * 1000).toLong()
                     captions = d.scene.captions
                     markers = d.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
                 }
@@ -186,7 +194,7 @@ class PlaybackActivity : FragmentActivity() {
                 android.util.Log.w("Sinema", "Auto-resume fetch failed for $targetId", e)
             }
             autoResumePending = false
-            // Watch Next means "continue" — never prompt on this entry path.
+            // Watch Next and explicit session restoration never re-prompt.
             resumePromptResolved = true
             if (isFinishing || isDestroyed) return@launch
             if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return@launch
@@ -194,8 +202,38 @@ class PlaybackActivity : FragmentActivity() {
         }
     }
 
+    private fun persistPlaybackSession() {
+        if (sceneId.isBlank()) return
+        if (prefs.incognitoMode || incognitoLatchSceneId == sceneId) {
+            prefs.playbackSessionJson = ""
+            return
+        }
+        val exo = player
+        val positionMs = (exo?.currentPosition ?: resumePositionMs).coerceAtLeast(0L)
+        val durationMs = exo?.duration ?: 0L
+        if (!com.sinema.util.PlaybackSessionRestore.shouldPersist(positionMs) ||
+            (durationMs > 0L && durationMs - positionMs < 30_000L)
+        ) {
+            prefs.playbackSessionJson = ""
+            return
+        }
+        val snapshot = PlaybackQueue.snapshot()
+        val restoreQueue = PlaybackQueue.isActive && snapshot.items.getOrNull(snapshot.index)?.id == sceneId
+        prefs.playbackSessionJson = com.sinema.util.PlaybackSessionCodec.encode(
+            com.sinema.util.PlaybackSession(
+                profileId = prefs.activeProfileId,
+                sceneId = sceneId,
+                title = sceneTitle,
+                positionMs = positionMs,
+                queueItems = if (restoreQueue) snapshot.items else emptyList(),
+                queueIndex = if (restoreQueue) snapshot.index else -1
+            )
+        )
+    }
+
     override fun onPause() {
         super.onPause()
+        persistPlaybackSession()
         savePlayback()
         hideSeekPreview()
         dismissPlaybackDialogs()
@@ -404,14 +442,23 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun bindPlaybackControls() {
         if (!::playerView.isInitialized) return
+        SubtitleAppearance.apply(playerView, prefs)
         playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
         playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).apply {
             setSceneMarkers(markers)
             setKeyTimeIncrements(seekPreset.backwardMs, seekPreset.forwardMs)
             scrubPreviewListener = object : MarkerTimeBar.ScrubPreviewListener {
-                override fun onPreviewStart(positionMs: Long) = showSeekPreview(positionMs)
+                override fun onPreviewStart(positionMs: Long) {
+                    scrubbing = true
+                    hideMarkerSkip()
+                    showSeekPreview(positionMs)
+                }
                 override fun onPreviewMove(positionMs: Long) = showSeekPreview(positionMs)
-                override fun onPreviewStop() = hideSeekPreview()
+                override fun onPreviewStop() {
+                    scrubbing = false
+                    lastMarkerPositionMs = player?.currentPosition
+                    hideSeekPreview()
+                }
             }
         }
         playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
@@ -624,8 +671,16 @@ class PlaybackActivity : FragmentActivity() {
         val dataSourceFactory = OkHttpDataSource.Factory(app.api.okHttpClient())
             .setDefaultRequestProperties(app.api.mediaAuthHeaders())
 
+        val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(this)
+        val preferredLanguages = com.sinema.model.SubtitleLanguage.fromCode(prefs.subtitleLanguage).code
+            .takeIf { it.isNotBlank() }?.let { arrayOf(it) } ?: emptyArray()
+        trackSelector.parameters = trackSelector.parameters.buildUpon()
+            .setPreferredTextLanguages(*preferredLanguages)
+            .build()
+
         player = ExoPlayer.Builder(this)
             .setRenderersFactory(renderersFactory)
+            .setTrackSelector(trackSelector)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
             .also { exo ->
@@ -734,6 +789,7 @@ class PlaybackActivity : FragmentActivity() {
                                 extendEndlessMix()
                                 return
                             }
+                            prefs.playbackSessionJson = ""
                             if (wasActive) finish()
                             return
                         }
@@ -743,8 +799,48 @@ class PlaybackActivity : FragmentActivity() {
             }
     }
 
+    private fun hideMarkerSkip() {
+        handler.removeCallbacks(hideMarkerSkipRunnable)
+        if (::playerView.isInitialized) {
+            playerView.findViewById<View>(R.id.playback_skip_marker)?.visibility = View.GONE
+            playerView.controllerShowTimeoutMs = hideDelayMs.toInt()
+        }
+    }
+
+    private fun updateMarkerSkip() {
+        val exo = player ?: return
+        val currentMs = exo.currentPosition
+        val previousMs = lastMarkerPositionMs
+        lastMarkerPositionMs = currentMs
+        if (scrubbing || !exo.isPlaying) {
+            hideMarkerSkip()
+            return
+        }
+        if (previousMs == null) return
+        val marker = MarkerSkipState.entered(previousMs, currentMs, markers) ?: return
+        if (MarkerSkipState.nextAfter(currentMs, markers) == null) return
+        val button = playerView.findViewById<android.widget.Button>(R.id.playback_skip_marker) ?: return
+        button.text = getString(
+            R.string.playback_skip_marker,
+            marker.first.ifBlank { getString(R.string.playback_marker_generic) }
+        )
+        button.setOnClickListener {
+            val nowMs = player?.currentPosition ?: currentMs
+            MarkerSkipState.nextAfter(nowMs, markers)?.let { targetMs -> player?.seekTo(targetMs) }
+            lastMarkerPositionMs = player?.currentPosition
+            hideMarkerSkip()
+        }
+        button.visibility = View.VISIBLE
+        playerView.controllerShowTimeoutMs = 6_000
+        playerView.showController()
+        handler.removeCallbacks(hideMarkerSkipRunnable)
+        handler.postDelayed(hideMarkerSkipRunnable, 6_000L)
+    }
+
     private fun releasePlayer() {
         handler.removeCallbacks(videoOutputTimeout)
+        hideMarkerSkip()
+        lastMarkerPositionMs = null
         player?.release()
         player = null
     }
@@ -1040,6 +1136,9 @@ class PlaybackActivity : FragmentActivity() {
             playCountSent = false
             startTimeMs = System.currentTimeMillis()
             releasePlayer()
+            // The next lifecycle pause stores the new scene once it has a
+            // meaningful position; never leave the outgoing scene restorable.
+            prefs.playbackSessionJson = ""
             // Never prepare a player while stopped — the fetch can straddle
             // onStop (which releases the player); onStart then re-inits with
             // the already-swapped sceneId.

@@ -16,6 +16,8 @@ object PlaybackQueue {
         val playCount: Int = 0
     )
 
+    data class Snapshot(val items: List<Item>, val index: Int)
+
     private var items: List<Item> = emptyList()
     private var index: Int = -1
 
@@ -121,6 +123,11 @@ object PlaybackQueue {
         items = newItems.toList()
         index = if (items.isEmpty()) -1 else startAt.coerceIn(-1, items.size - 1)
     }
+
+    @Synchronized
+    fun snapshot(): Snapshot = Snapshot(items.toList(), index)
+
+    fun restore(snapshot: Snapshot) = start(snapshot.items, snapshot.index)
 
     @Synchronized
     fun clear() = clearInternal()

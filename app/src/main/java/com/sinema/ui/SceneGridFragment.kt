@@ -47,12 +47,12 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open val sortScreenKey: String? = null
     /** Long-press "Assign tags" availability (Untagged triage grid). */
     protected open val canAssignTags: Boolean = false
-    /** Alpha jump: "Jump to letter" entry filters grids by path prefix. */
+    /** Alpha jump: filter by title for title sorts and by path otherwise. */
     protected open val supportsAlphaJump: Boolean = false
     protected var alphaPrefix: String? = null
 
     /** Anchored regex for the active alpha filter, or null when off. */
-    protected fun alphaPathRegex(): String? =
+    protected fun alphaRegex(): String? =
         alphaPrefix?.takeIf { it.isNotBlank() }?.let { prefix ->
             if (prefix == "0-9") "^[0-9]" else "^$prefix"
         }
@@ -123,7 +123,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 onRateAll = { showRateAllDialog() },
                 onJumpToLetter = if (supportsAlphaJump) {
                     { showAlphaJumpDialog() }
-                } else null
+                } else null,
+                onBackToTop = { scrollToTop() }
             )
         } else {
             showSortDialog()
@@ -511,22 +512,73 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     grid.setPadding(hPad, vPad, hPad, vPad)
                     grid.clipToPadding = false
                 }
-                attachPagination(grid)
+                attachGridNavigation(grid)
             }
         }
     }
 
+    private val positionHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val hidePosition = Runnable {
+        activity?.findViewById<View>(R.id.grid_position)?.visibility = View.GONE
+    }
+
     override fun onDestroyView() {
+        positionHandler.removeCallbacks(hidePosition)
+        activity?.findViewById<View>(R.id.grid_position)?.visibility = View.GONE
         pagingGrid = null
         super.onDestroyView()
     }
 
-    private fun attachPagination(grid: VerticalGridView) {
-        if (!paged || pagingGrid === grid) return
+    override fun pageBy(direction: Int): Boolean {
+        val grid = gridView ?: return false
+        if (gridAdapter.size() == 0) return false
+        val positions = (0 until grid.childCount).map { index ->
+            grid.getChildAdapterPosition(grid.getChildAt(index))
+        }.filter { it >= 0 }
+        if (positions.isEmpty()) return false
+        val distance = grid.childCount.coerceAtLeast(columns)
+        val target = if (direction > 0) {
+            (positions.max() + distance).coerceAtMost(gridAdapter.size() - 1)
+        } else {
+            (positions.min() - distance).coerceAtLeast(0)
+        }
+        setSelectedPosition(target)
+        grid.post { showGridPosition(grid) }
+        return true
+    }
+
+    override fun scrollToTop(): Boolean {
+        val grid = gridView ?: return false
+        if (gridAdapter.size() == 0) return false
+        setSelectedPosition(0)
+        grid.post { showGridPosition(grid) }
+        return true
+    }
+
+    private fun showGridPosition(grid: RecyclerView) {
+        val positions = (0 until grid.childCount).map { index ->
+            grid.getChildAdapterPosition(grid.getChildAt(index))
+        }.filter { it >= 0 }
+        if (positions.isEmpty()) return
+        val label = GridNavigation.positionLabel(
+            positions.min(), positions.max(), pageState.totalCount,
+            template = getString(R.string.grid_position_range)
+        )
+        val positionView = activity?.findViewById<android.widget.TextView>(R.id.grid_position) ?: return
+        positionView.text = label
+        positionView.visibility = View.VISIBLE
+        positionHandler.removeCallbacks(hidePosition)
+        positionHandler.postDelayed(hidePosition, 1_500L)
+    }
+
+    private fun attachGridNavigation(grid: VerticalGridView) {
+        if (pagingGrid === grid) return
         pagingGrid = grid
         grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (dy <= 0 || loadingPage || !pageState.canLoadMore) return
+                if (dy == 0) return
+                showGridPosition(recyclerView)
+                if (!paged || dy <= 0 || loadingPage || !pageState.canLoadMore) return
                 val lastVisible = (0 until recyclerView.childCount).maxOfOrNull { index ->
                     recyclerView.getChildAdapterPosition(recyclerView.getChildAt(index))
                 } ?: return
@@ -535,12 +587,25 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         })
     }
 
+    private fun renderLoadState(state: GridLoadState) {
+        val overlay = activity?.findViewById<View>(R.id.grid_state_overlay) ?: return
+        overlay.visibility = if (state.visible) View.VISIBLE else View.GONE
+        activity?.findViewById<View>(R.id.grid_state_progress)?.visibility =
+            if (state.showProgress) View.VISIBLE else View.GONE
+        activity?.findViewById<android.widget.TextView>(R.id.grid_state_message)?.text = state.message
+        val retry = activity?.findViewById<android.widget.Button>(R.id.grid_state_retry)
+        retry?.visibility = if (state.showRetry) View.VISIBLE else View.GONE
+        retry?.setOnClickListener { reload() }
+        if (state.showRetry) retry?.post { retry.requestFocus() }
+    }
+
     protected fun reload(): Job? {
         updateTitle()
         loadJob?.cancel()
         val generation = ++loadGeneration
         pageState.reset()
         loadingPage = true
+        renderLoadState(GridLoadState.loading(gridAdapter.size() > 0))
         var oldIndex = gridView?.focusedChild
             ?.let { gridView!!.getChildAdapterPosition(it) } ?: -1
         var oldKey: String? = null
@@ -558,9 +623,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 gridAdapter.clear()
                 items.forEach { gridAdapter.add(it) }
                 pageState.record(count, items.size, gridAdapter.size())
-                if (items.isEmpty()) {
-                    Toast.makeText(requireContext(), emptyMessage, Toast.LENGTH_SHORT).show()
-                }
+                renderLoadState(GridLoadState.loaded(gridAdapter.size(), emptyMessage))
                 if (oldIndex >= 0) {
                     val newIndex = FocusRestore.positionAfterReload(oldKey, oldIndex,
                         (0 until gridAdapter.size()).map { FocusRestore.keyOf(gridAdapter.get(it)!!) })
@@ -574,7 +637,15 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 throw e
             } catch (e: Exception) {
                 Log.e("Sinema", "Failed to load first page for $gridTitle", e)
-                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                val message = e.message ?: getString(R.string.grid_unknown_error)
+                if (gridAdapter.size() > 0) {
+                    Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
+                } else {
+                    renderLoadState(GridLoadState.failed(
+                        hasContent = false,
+                        message = getString(R.string.grid_load_failed, message)
+                    ))
+                }
             } finally {
                 if (generation == loadGeneration) loadingPage = false
             }

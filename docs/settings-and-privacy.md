@@ -4,7 +4,7 @@ Open `Settings` from the bottom row of the main screen, then choose a category:
 
 - **Server**: connection details and server profiles.
 - **Home**: Home Settings and Ambient Gallery.
-- **Playback**: stream quality, aspect ratio, seek buttons, and looping defaults.
+- **Playback**: stream quality, aspect ratio, seek buttons, subtitle appearance and language, and looping defaults.
 - **Privacy**: PIN lock, Discreet Mode, Incognito, and screenshot blocking.
 - **System**: Android TV Channels and Global Search.
 
@@ -79,6 +79,10 @@ Open `Settings` → `Playback` to choose:
 - **Stream quality**: Auto, direct only, or a transcoded resolution.
 - **Aspect ratio**: Auto, 16:9, 4:3, or 9:16.
 - **Seek buttons**: the rewind/forward increments used by player buttons and timeline scrubbing.
+- **Subtitle size**: Small, Normal, Large, or Extra Large.
+- **Subtitle background**: Off, 50%, 80%, or 100% black opacity.
+- **Subtitle position**: Low, Middle, or High.
+- **Preferred subtitles**: Auto or a preferred language; selects a matching track when available without forcing captions on.
 - **Loop current scene**: repeat one scene instead of advancing through a queue.
 
 These settings use the same saved choices as the player controls. Choosing a recovery stream after a playback failure is temporary and does not change these defaults.
@@ -88,7 +92,7 @@ These settings use the same saved choices as the player controls. Choosing a rec
 Open `Settings` → `Privacy` for local privacy controls:
 
 - **Discreet Mode** uses neutral labels and hides artwork until cards are focused. It does not change Stash metadata.
-- **Incognito** pauses resume, play-count, Watch Next, and search-history writes from this device.
+- **Incognito** pauses resume, play-count, Watch Next, and search-history writes from this device. Enabling it also clears the restorable playback-session snapshot and prevents new snapshots until it is disabled.
 - **Block Screenshots** blocks screenshots and recents thumbnails throughout Sinema on this device.
 
 ## PIN lock
@@ -204,6 +208,7 @@ Sensitive values are stored in `EncryptedSharedPreferences` when AndroidX Securi
 - Session cookies.
 - Stash username/password for session sign-in.
 - Server profiles.
+- Interrupted playback-session details: scene title, local position, queue, queue index, and profile association.
 
 If encrypted preferences are unavailable on the device, Sinema falls back to regular shared preferences and logs an error.
 

@@ -91,7 +91,11 @@ Enable `Ambient Gallery` in `Settings` → `Home` and leave the home screen idle
 
 ### Jumping big grids
 
-In View All grids, press Menu → `🔤 Jump to letter…` and pick a letter (or `0-9`) to filter the grid to scenes whose file path starts with it; `All` clears the filter. The letter shows next to the title and combines with sorting, filtering, and paging.
+In View All grids, press Menu → `🔤 Jump to letter…` and pick a letter (or `0-9`). Title sorts filter by scene title; other sorts filter by file path. `All` clears the filter, which combines with sorting, filtering, and paging. Title A–Z and Z–A are available alongside the existing path-based Name sorts.
+
+Page Up and Page Down scroll one visible screen at a time. Menu → `↑ Back to top` returns to the first card. While scrolling, a temporary indicator shows the visible result range and server total.
+
+Grids show inline loading and empty-state messages. A failed first load offers a D-pad-accessible `Retry`; failed refreshes or page loads keep the scenes already on screen.
 
 ### Favorite entities
 
@@ -332,7 +336,7 @@ Play All behavior:
 - Starts playback from the first visible scene.
 - Advances automatically when a scene ends.
 - Caps the queue at 500 scenes and shows a toast when it truncates the queue.
-- Does not persist the queue after the app process ends.
+- Saves an encrypted, profile-scoped session snapshot so Home can explicitly restore the scene, local position, and queue after an app restart. Incognito clears and suppresses these snapshots.
 
 `Shuffle Play` in the same menu queues the loaded scenes in random order.
 

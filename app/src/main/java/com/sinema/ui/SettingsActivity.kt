@@ -408,6 +408,35 @@ class SettingsFragment : Fragment() {
             }
             addDescription(layout, "Sets the rewind and forward increments used by the player and timeline.")
 
+            lateinit var subtitleSizeButton: Button
+            subtitleSizeButton = addButton(layout, subtitleSizeLabel()) {
+                val next = com.sinema.model.SubtitleSize.fromName(app.prefs.subtitleSize).next()
+                app.prefs.subtitleSize = next.name
+                subtitleSizeButton.text = subtitleSizeLabel()
+            }
+
+            lateinit var subtitleBackgroundButton: Button
+            subtitleBackgroundButton = addButton(layout, subtitleBackgroundLabel()) {
+                val next = com.sinema.model.SubtitleBackground.fromName(app.prefs.subtitleBackground).next()
+                app.prefs.subtitleBackground = next.name
+                subtitleBackgroundButton.text = subtitleBackgroundLabel()
+            }
+
+            lateinit var subtitlePositionButton: Button
+            subtitlePositionButton = addButton(layout, subtitlePositionLabel()) {
+                val next = com.sinema.model.SubtitlePosition.fromName(app.prefs.subtitlePosition).next()
+                app.prefs.subtitlePosition = next.name
+                subtitlePositionButton.text = subtitlePositionLabel()
+            }
+
+            lateinit var subtitleLanguageButton: Button
+            subtitleLanguageButton = addButton(layout, subtitleLanguageLabel()) {
+                val next = com.sinema.model.SubtitleLanguage.fromCode(app.prefs.subtitleLanguage).next()
+                app.prefs.subtitleLanguage = next.code
+                subtitleLanguageButton.text = subtitleLanguageLabel()
+            }
+            addDescription(layout, "Subtitle appearance applies to player views. Preferred language selects a matching track when available; it does not force captions on.")
+
             addToggle(
                 layout,
                 "Loop current scene",
@@ -427,6 +456,18 @@ class SettingsFragment : Fragment() {
 
     private fun seekPresetLabel(): String =
         "Seek buttons: ${SeekPreset.fromName(app.prefs.playbackSeekPreset).label}"
+
+    private fun subtitleSizeLabel(): String =
+        "Subtitle size: ${com.sinema.model.SubtitleSize.fromName(app.prefs.subtitleSize).label}"
+
+    private fun subtitleBackgroundLabel(): String =
+        "Subtitle background: ${com.sinema.model.SubtitleBackground.fromName(app.prefs.subtitleBackground).label}"
+
+    private fun subtitlePositionLabel(): String =
+        "Subtitle position: ${com.sinema.model.SubtitlePosition.fromName(app.prefs.subtitlePosition).label}"
+
+    private fun subtitleLanguageLabel(): String =
+        "Preferred subtitles: ${com.sinema.model.SubtitleLanguage.fromCode(app.prefs.subtitleLanguage).label}"
 
     private fun autoLockLabel(): String = when (app.prefs.autoLockMinutes) {
         0 -> "Auto-Lock: never"

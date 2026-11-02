@@ -125,7 +125,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **🖼️ Galleries** — Browse Stash Galleries with covers, image counts, search, sorting, metadata, and paged image grids.
 - **🏷️ Metadata Browsing & Favorites** — Search, sort, and incrementally browse Tags, Performers, and Studios with images, scene counts, detail headers, and performer tag chips. Favorite entities from cards or detail headers, or shuffle-play their loaded unwatched scenes.
 - **📁 Folder Browser** — Navigate directories, subfolders, videos, and pictures, with folder counts, artwork, and favorite indicators.
-- **🎛️ Advanced Grid Controls** — D-pad-reachable sorting, quick watched/favorite toggles, removable filter chips for rating, resolution, markers, captions, duration, release date, codec, and included/excluded performers, studios, or tags, plus A–Z/0–9 path-prefix jumping in View All grids.
+- **🎛️ Advanced Grid Controls** — Inline loading, empty, and retry states; title/path-aware A–Z/0–9 jumping; Page Up/Down scrolling, Back to top, result ranges, quick watched/favorite toggles, and removable filters for rating, resolution, markers, captions, duration, release date, codec, and metadata.
 - **🎬 Cinematic Scene Details & Card Actions** — Full-width artwork, expandable synopsis, metadata chips, chapter thumbnails, linked Galleries, collapsible technical details, resume/play, one-tap favorite and watched toggles, Play from here, and Continue Playing removal.
 - **⭐ Ratings, Favorites & O Counter** — Rate 1–5 stars from details or playback, clear ratings, see favorite/progress overlays, and record or display Stash O counts.
 - **⏳ Finish Watching** — Triage partially watched scenes with progress bars, mark them watched or clear their resume points, and use bulk actions or Play All; scenes within 30 seconds of the end are treated as finished.
@@ -137,13 +137,14 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 ### Playback and images
 
 - **▶️ Resume & Watch Progress** — Resume positions, play counts, and watch history sync with Stash. Scene cards show watched checkmarks and partial-playback progress bars.
+- **🔄 Interrupted Session Restore** — After an app restart, explicitly restore the current scene, local position, and queue on the same server profile. Restoration is PIN-aware, discreet-friendly, and disabled by Incognito.
 - **🎮 Remote-First Player** — Marker-aware timeline, configurable quick seek, remaining time, frame previews while scrubbing, playback speed, looping, and D-pad/media-key controls.
-- **📑 Chapters with Thumbnails** — Jump between scene markers using a chapter dialog, timeline ticks, player buttons, or media keys.
+- **📑 Chapters with Thumbnails** — Jump between scene markers using a chapter dialog, timeline ticks, player buttons, media keys, or a contextual Skip button when entering a marker.
 - **⏭️ Editable Queues & Up Next** — Play All, Shuffle Play, and Play from here with automatic advance. Jump to an upcoming scene, reorder or remove items, shuffle the remainder, keep only unwatched scenes, or exit the queue.
 - **♾️ Endless Mix** — Automatically refill an exhausted queue with fresh unwatched favorites, falling back to recent unwatched scenes and avoiding repeats from the same session.
 - **🎛️ Stream Quality & Compatibility** — Auto direct playback with compatible transcoding fallbacks, direct-only mode, and forced 480p/720p/1080p transcodes, including aligned-HLS handling for affected Allwinner devices.
 - **🛟 Playback Recovery** — After a terminal stream failure, retry at the preserved position, try temporary 720p transcoding or direct playback for the current scene, or leave playback without losing the queue during retries.
-- **📝 Subtitles & Audio Tracks** — Select SRT, VTT, or supported ASS/SSA captions and available audio tracks using the same authentication as video streams.
+- **📝 Subtitles & Audio Tracks** — Select authenticated SRT, VTT, or supported ASS/SSA captions and audio tracks, with persistent size, background, position, and preferred-language controls.
 - **📐 Aspect Ratio** — Choose Auto, 16:9, 4:3, or 9:16 without cropping; playback defaults are also available under categorized Settings.
 - **🔎 Full-Screen Image Viewer** — Fit/fill, zoom and pan, shuffle, adjustable slideshows, captions, and D-pad/media-key navigation for folder images and Galleries.
 

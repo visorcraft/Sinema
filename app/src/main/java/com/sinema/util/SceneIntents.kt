@@ -29,6 +29,7 @@ object SceneIntents {
     private const val KEY_MARKER_SECONDS = "marker_seconds"
     private const val KEY_RESUME_MS = "resume_position_ms"
     private const val KEY_AUTO_RESUME = "auto_resume"
+    private const val KEY_RESTORE_SESSION = "restore_session"
 
     fun detail(context: Context, scene: Scene): Intent =
         Intent(context, SceneDetailActivity::class.java).apply {
@@ -104,6 +105,11 @@ object SceneIntents {
      */
     fun playbackAutoResume(context: Context, sceneId: String): Intent =
         playback(context, sceneId).putExtra(KEY_AUTO_RESUME, true)
+
+    internal fun playbackRestored(context: Context, session: PlaybackSession): Intent =
+        playback(context, session.sceneId, session.positionMs).putExtra(KEY_RESTORE_SESSION, true)
+
+    fun restoreSessionFrom(intent: Intent): Boolean = intent.getBooleanExtra(KEY_RESTORE_SESSION, false)
 
     fun autoResumeFrom(intent: Intent): Boolean = intent.getBooleanExtra(KEY_AUTO_RESUME, false)
 

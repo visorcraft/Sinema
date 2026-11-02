@@ -136,6 +136,18 @@ class PlaybackQueueTest {
     }
 
     @Test
+    fun `snapshot restores current queue index`() {
+        PlaybackQueue.start(listOf(item("a"), item("b")), startAt = 1)
+        val snapshot = PlaybackQueue.snapshot()
+
+        PlaybackQueue.clear()
+        PlaybackQueue.restore(snapshot)
+
+        assertEquals("b", PlaybackQueue.current()?.id)
+        assertTrue(PlaybackQueue.remaining().isEmpty())
+    }
+
+    @Test
     fun `empty queue is inert`() {
         PlaybackQueue.start(emptyList(), startAt = 0)
 

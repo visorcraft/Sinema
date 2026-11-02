@@ -2,7 +2,8 @@ package com.sinema.ui
 
 internal class GridPageState(private val paged: Boolean) {
     private var page = 0
-    private var totalCount = 0
+    var totalCount = 0
+        private set
     private var loadedCount = 0
     private var lastBatchEmpty = true
 

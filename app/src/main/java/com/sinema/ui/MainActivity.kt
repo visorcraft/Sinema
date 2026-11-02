@@ -31,6 +31,8 @@ class MainActivity : FragmentActivity() {
     private val app get() = SinemaApp.instance
     private var waitingForPin = false
     private var lastInteractionMs = 0L
+    private var sessionRestoreOffered = false
+    private var sessionRestoreDialog: android.app.AlertDialog? = null
     private val ambientHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val ambientCheck = object : Runnable {
         override fun run() {
@@ -65,27 +67,29 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Wipe saved fragment state to prevent zombie fragment restoration
         savedInstanceState?.remove("android:support_fragments")
+        sessionRestoreOffered = savedInstanceState?.getBoolean(STATE_RESTORE_OFFERED) ?: false
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        
+
         // Check if API key is configured - if not, go to setup
         if (!app.prefs.isConfigured) {
             startActivity(Intent(this, SetupActivity::class.java))
             finish()
             return
         }
-        
+
         // Check if PIN is required and not verified
         if (app.prefs.hasPinSet() && !app.pinVerifiedThisSession) {
             waitingForPin = true
             startActivity(Intent(this, PinActivity::class.java))
             return
         }
-        
+
         supportFragmentManager.beginTransaction()
             .replace(R.id.main_frame, MainFragment())
             .commitNowAllowingStateLoss()
         startAmbientWatch()
+        maybeOfferPlaybackSessionRestore()
     }
 
     override fun onResume() {
@@ -108,14 +112,56 @@ class MainActivity : FragmentActivity() {
                 .replace(R.id.main_frame, MainFragment())
                 .commitNowAllowingStateLoss()
             startAmbientWatch()
+            maybeOfferPlaybackSessionRestore()
         } else if (waitingForPin && !app.pinVerifiedThisSession) {
             // PIN was cancelled/failed — PinActivity calls finishAffinity on back
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(STATE_RESTORE_OFFERED, sessionRestoreOffered)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onDestroy() {
+        sessionRestoreDialog?.dismiss()
         ambientHandler.removeCallbacks(ambientCheck)
         super.onDestroy()
+    }
+
+    private fun maybeOfferPlaybackSessionRestore() {
+        if (sessionRestoreOffered || intent?.data != null || app.decoySession || isFinishing) return
+        sessionRestoreOffered = true
+        val session = com.sinema.util.PlaybackSessionCodec.decode(app.prefs.playbackSessionJson) ?: return
+        if (!com.sinema.util.PlaybackSessionRestore.isEligible(
+                session,
+                activeProfileId = app.prefs.activeProfileId,
+                hasPin = app.prefs.hasPinSet(),
+                pinVerified = app.pinVerifiedThisSession,
+                incognito = app.prefs.incognitoMode
+            )
+        ) return
+        val message = if (app.prefs.discreetMode || session.title.isBlank()) {
+            getString(R.string.playback_restore_message_neutral)
+        } else {
+            getString(R.string.playback_restore_message, session.title)
+        }
+        sessionRestoreDialog = android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.playback_restore_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.playback_restore_action) { _, _ ->
+                if (session.queueItems.isNotEmpty()) {
+                    com.sinema.util.PlaybackQueue.restore(
+                        com.sinema.util.PlaybackQueue.Snapshot(session.queueItems, session.queueIndex)
+                    )
+                } else {
+                    com.sinema.util.PlaybackQueue.clear()
+                }
+                startActivity(SceneIntents.playbackRestored(this, session))
+            }
+            .setNegativeButton(R.string.playback_restore_not_now, null)
+            .setOnDismissListener { sessionRestoreDialog = null }
+            .show()
     }
 
     private fun startAmbientWatch() {
@@ -130,6 +176,7 @@ class MainActivity : FragmentActivity() {
         if (lockMs <= 0 || idleMs < lockMs) return
         app.pinVerifiedThisSession = false
         waitingForPin = true
+        sessionRestoreDialog?.dismiss()
         startActivity(Intent(this, PinActivity::class.java))
         lastInteractionMs = android.os.SystemClock.elapsedRealtime()
     }
@@ -137,6 +184,7 @@ class MainActivity : FragmentActivity() {
     companion object {
         private const val AMBIENT_IDLE_MS = 5 * 60_000L
         private const val AMBIENT_CHECK_MS = 30_000L
+        private const val STATE_RESTORE_OFFERED = "restore_offered"
     }
 }
 

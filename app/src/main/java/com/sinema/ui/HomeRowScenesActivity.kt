@@ -57,27 +57,28 @@ class HomeRowScenesFragment : SceneGridFragment() {
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> {
         val sortField = sort.apiSort(randomSeed)
         val direction = sort.direction
-        val prefix = alphaPathRegex()
+        val prefix = alphaRegex()
+        val field = GridNavigation.alphaField(sort)
         val result = when (row) {
             HomeContentRow.CONTINUE_PLAYING -> app.api.findContinuePlayingPaged(
-                page, perPage, sortField, direction, sceneFilter, prefix
+                page, perPage, sortField, direction, sceneFilter, prefix, field
             )
             HomeContentRow.RECENTLY_PLAYED -> app.api.findRecentlyPlayedPaged(
-                page, perPage, sortField, direction, sceneFilter, prefix
+                page, perPage, sortField, direction, sceneFilter, prefix, field
             )
             HomeContentRow.RECENTLY_ADDED -> app.api.findRecentScenesPaged(
-                page, perPage, sortField, direction, sceneFilter, prefix
+                page, perPage, sortField, direction, sceneFilter, prefix, field
             )
             HomeContentRow.FAVORITES -> app.api.findFavoriteScenesPaged(
                 page, perPage, sortField, direction, unwatchedOnly = false, filters = sceneFilter,
-                pathPrefixRegex = prefix
+                pathPrefixRegex = prefix, alphaField = field
             )
             HomeContentRow.UNWATCHED_FAVORITES -> app.api.findFavoriteScenesPaged(
                 page, perPage, sortField, direction, unwatchedOnly = true, filters = sceneFilter,
-                pathPrefixRegex = prefix
+                pathPrefixRegex = prefix, alphaField = field
             )
             HomeContentRow.RECENTLY_RELEASED -> app.api.findRecentlyReleasedPaged(
-                page, perPage, sortField, direction, sceneFilter, prefix
+                page, perPage, sortField, direction, sceneFilter, prefix, field
             )
             HomeContentRow.SAVED_FILTER -> throw IllegalArgumentException("Saved filters use SavedFilterScenesActivity")
             HomeContentRow.GROUPS -> throw IllegalArgumentException("Groups use GroupGridActivity")

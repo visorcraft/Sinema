@@ -15,7 +15,8 @@ object GridMenuDialog {
         onShuffle: () -> Unit = onPlayAll,
         onMarkAllWatched: (() -> Unit)? = null,
         onRateAll: (() -> Unit)? = null,
-        onJumpToLetter: (() -> Unit)? = null
+        onJumpToLetter: (() -> Unit)? = null,
+        onBackToTop: (() -> Unit)? = null
     ) {
         // Pair each label with its action up front so the localized label is
         // never used as an identity key.
@@ -28,6 +29,7 @@ object GridMenuDialog {
             onMarkAllWatched?.let { add(context.getString(R.string.grid_menu_mark_all_watched) to Runnable(it)) }
             onRateAll?.let { add(context.getString(R.string.grid_menu_rate_all) to Runnable(it)) }
             onJumpToLetter?.let { add(context.getString(R.string.grid_menu_jump_letter) to Runnable(it)) }
+            onBackToTop?.let { add(context.getString(R.string.grid_menu_back_to_top) to Runnable(it)) }
         }
         AlertDialog.Builder(context)
             .setTitle(context.getString(R.string.grid_menu_title))

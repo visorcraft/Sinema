@@ -4,6 +4,8 @@ package com.sinema.model
 enum class SortOption(val label: String, val field: String, val direction: String) {
     PATH_ASC("Name (A–Z)", "path", "ASC"),
     PATH_DESC("Name (Z–A)", "path", "DESC"),
+    TITLE_ASC("Title (A–Z)", "title", "ASC"),
+    TITLE_DESC("Title (Z–A)", "title", "DESC"),
     ADDED_DESC("Recently added", "created_at", "DESC"),
     UPDATED_DESC("Recently updated", "updated_at", "DESC"),
     LAST_PLAYED_DESC("Recently played", "last_played_at", "DESC"),

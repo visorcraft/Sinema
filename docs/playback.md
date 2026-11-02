@@ -12,6 +12,8 @@ You can start playback from:
 
 Play starts the Stash scene stream from the beginning. Resume starts from the saved Stash resume position.
 
+After an app restart, Sinema can also restore an interrupted scene, its local playback position, and its queue. Home offers `Resume previous session?` instead of auto-playing. Restoration requires the same server profile and, when configured, PIN verification. Discreet Mode hides the scene title in the prompt; Incognito clears and suppresses stored sessions.
+
 ## Resume and watch tracking
 
 Sinema saves playback activity back to Stash when playback pauses or stops.
@@ -40,7 +42,7 @@ Common controls:
 - Back: leave playback and save progress.
 - Rewind/forward buttons: quick-seek using the selected preset. Choose `Seek` in the action row or `Seek buttons` in the playback menu to cycle through −10s/+30s, −30s/+60s, and −60s/+60s. The choice is remembered.
 - Timeline: focus the seek bar and use D-pad Left/Right to scrub (Left uses the preset's rewind amount, Right its forward amount). Marker positions appear as ticks.
-- Marker jumps: previous/next marker buttons flank play/pause; the action-row marker button also jumps to the next marker. Media keys Previous/Next do the same. The chapters dialog (Menu → Chapters) shows each marker's frame thumbnail and timestamp.
+- Marker jumps: previous/next marker buttons flank play/pause; the action-row marker button also jumps to the next marker. Media keys Previous/Next do the same. The chapters dialog (Menu → Chapters) shows each marker's frame thumbnail and timestamp. Entering a marker during normal playback also offers a temporary `Skip` button that jumps to the following marker. Scrubbing does not trigger it; a quick seek that lands at a marker may offer it.
 - O counter: Menu → `🔥 O +1` records an O in Stash for the scene playing.
 - Resume prompt: opening a scene with saved progress ≥ 10 seconds asks whether to resume at that position or start over. Back leaves playback paused with controls shown.
 - Scrub preview: while actively scrubbing, Sinema shows a timestamp and an authenticated Stash frame near that position. Requests are throttled to five-second buckets; the image is hidden if the server cannot provide it.
@@ -51,7 +53,7 @@ Common controls:
 
 ## Queue playback
 
-`Play All` (grid menu), `Play from here` and favorite/watched toggles (long-press a card), and `Shuffle Play` all seed the in-process queue (up to 500 scenes). Playback auto-advances through the queue; exiting mid-scene keeps the current video playing and simply stops advancing afterward.
+`Play All` (grid menu), `Play from here` and favorite/watched toggles (long-press a card), and `Shuffle Play` all seed the active queue (up to 500 scenes). Playback auto-advances through the queue; exiting mid-scene keeps the current video playing and simply stops advancing afterward.
 
 ## Subtitles
 
@@ -63,7 +65,7 @@ Supported caption types:
 - VTT.
 - ASS/SSA, when ExoPlayer can render them.
 
-Use the CC button in the player controls to enable, disable, or switch subtitle tracks.
+Use the CC button in the player controls to enable, disable, or switch subtitle tracks. `Settings` → `Playback` provides persistent text size, background opacity, vertical position, and preferred-language controls. The preferred language selects a matching track when available but does not force captions on.
 
 Subtitle requests use the same media auth headers as streams, so they work with both API-key and session sign-in modes.
 
@@ -127,7 +129,7 @@ If a scene has no markers, the chapter controls do nothing.
 
 ## Play All and autoplay
 
-Play All creates an in-process queue from the visible scenes on the current grid.
+Play All creates an active queue from the visible scenes on the current grid.
 
 Behavior:
 
@@ -135,10 +137,10 @@ Behavior:
 - When playback reaches the end, Sinema saves activity for the finished scene.
 - Sinema loads captions and markers for the next queued scene.
 - Playback continues automatically.
-- When the queue finishes, playback closes.
-- Finishing playback, such as pressing Back out of the player, clears the queue.
+- When the queue finishes, playback closes and the restorable session is cleared.
+- Finishing playback, such as pressing Back out of the player, clears the active queue but leaves an encrypted session snapshot for explicit restoration.
 
-The queue is intentionally temporary. It is not saved across process death or device reboot.
+Session snapshots include the scene, local position, queue, queue index, and server profile. Home offers restoration after an app restart or device reboot; playback never resumes automatically. Incognito clears and suppresses snapshots, and a different server profile cannot restore them.
 
 ## Allwinner compatibility streaming
 

@@ -34,6 +34,9 @@ class RelatedScenesActivity : FragmentActivity() {
         bindGridControls(fragment)
         findViewById<Button>(R.id.btn_grid_sort).visibility = View.GONE
     }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean =
+        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 }
 
 class RelatedScenesFragment : SceneGridFragment() {

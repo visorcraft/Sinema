@@ -22,12 +22,21 @@ interface SortableScreen {
     val quickFavoritesLabel: String get() = "♡ Favorites"
     fun toggleQuickWatch() {}
     fun toggleQuickFavorites() {}
+    fun pageBy(direction: Int): Boolean = false
+    fun scrollToTop(): Boolean = false
 }
 
 fun FragmentActivity.handleSortMenuKey(keyCode: Int): Boolean {
-    if (keyCode != KeyEvent.KEYCODE_MENU) return false
-    (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)?.showGridMenu()
-    return true
+    val screen = supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen
+    return when (keyCode) {
+        KeyEvent.KEYCODE_MENU -> {
+            screen?.showGridMenu()
+            true
+        }
+        KeyEvent.KEYCODE_PAGE_UP -> screen?.pageBy(-1) == true
+        KeyEvent.KEYCODE_PAGE_DOWN -> screen?.pageBy(1) == true
+        else -> false
+    }
 }
 
 fun FragmentActivity.bindGridControls(screen: SortableScreen) {

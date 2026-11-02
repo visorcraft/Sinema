@@ -79,11 +79,32 @@ class Prefs(context: Context) {
         get() = prefs.getString("playback_seek_preset", "") ?: ""
         set(value) = prefs.edit().putString("playback_seek_preset", value).apply()
 
+    var subtitleSize: String
+        get() = prefs.getString("subtitle_size", "") ?: ""
+        set(value) = prefs.edit().putString("subtitle_size", value).apply()
+
+    var subtitleBackground: String
+        get() = prefs.getString("subtitle_background", "") ?: ""
+        set(value) = prefs.edit().putString("subtitle_background", value).apply()
+
+    var subtitlePosition: String
+        get() = prefs.getString("subtitle_position", "") ?: ""
+        set(value) = prefs.edit().putString("subtitle_position", value).apply()
+
+    var subtitleLanguage: String
+        get() = prefs.getString("subtitle_language", "") ?: ""
+        set(value) = prefs.edit().putString("subtitle_language", value).apply()
+
     // Privacy: neutral card labels until focused, no watch-history writes,
     // and FLAG_SECURE (blocks screenshots + recents thumbnails).
     var discreetMode: Boolean by bool("discreet_mode", false)
 
-    var incognitoMode: Boolean by bool("incognito_mode", false)
+    var incognitoMode: Boolean
+        get() = prefs.getBoolean("incognito_mode", false)
+        set(value) {
+            prefs.edit().putBoolean("incognito_mode", value).apply()
+            if (value) playbackSessionJson = ""
+        }
 
     var blockScreenshots: Boolean by bool("block_screenshots", false)
 
@@ -91,6 +112,10 @@ class Prefs(context: Context) {
 
     /** Endless Mix: auto-extend an exhausted queue with fresh candidates. */
     var endlessMix: Boolean by bool("endless_mix", false)
+
+    var playbackSessionJson: String
+        get() = getSecureString("playback_session")
+        set(value) = putSecureString("playback_session", value)
 
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
