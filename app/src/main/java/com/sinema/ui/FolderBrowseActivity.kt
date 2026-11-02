@@ -8,16 +8,11 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.leanback.app.VerticalGridSupportFragment
 import androidx.leanback.widget.*
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
-import com.sinema.model.SceneFilterOptions
 import com.sinema.model.SortOption
-import com.sinema.model.cycled
-import com.sinema.model.effectiveFavorites
-import com.sinema.model.toggledQuickFavorites
 import com.sinema.util.FolderHelper
 import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException

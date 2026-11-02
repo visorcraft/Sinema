@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="detail_art_width">400dp</dimen>
-    <dimen name="detail_art_height">225dp</dimen>
     <dimen name="detail_hero_height">420dp</dimen>
 </resources>

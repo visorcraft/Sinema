@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
 import android.widget.TextView
-import androidx.fragment.app.FragmentActivity
 import com.sinema.SinemaApp
 
 /**

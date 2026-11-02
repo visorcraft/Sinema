@@ -1,7 +1,6 @@
 package com.sinema.ui
 
 import android.os.Bundle
-import androidx.fragment.app.FragmentActivity
 import com.sinema.R
 
 /**

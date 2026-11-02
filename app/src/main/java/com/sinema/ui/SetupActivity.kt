@@ -5,7 +5,6 @@ import android.net.ConnectivityManager
 import android.net.LinkAddress
 import android.os.Bundle
 import android.widget.*
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.sinema.SinemaApp
 import kotlinx.coroutines.Dispatchers

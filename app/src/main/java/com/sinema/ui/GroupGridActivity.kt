@@ -1,13 +1,9 @@
 package com.sinema.ui
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.text.InputType
 import android.view.KeyEvent
-import android.widget.EditText
-import androidx.fragment.app.FragmentActivity
 import com.sinema.R
 import com.sinema.model.GroupItem
 

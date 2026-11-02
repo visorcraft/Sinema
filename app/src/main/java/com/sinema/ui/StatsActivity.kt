@@ -6,10 +6,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.fragment.app.FragmentActivity
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
-import androidx.leanback.widget.FocusHighlight
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
@@ -18,7 +16,6 @@ import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.EntityPlayCount
-import com.sinema.model.EntityItem
 import com.sinema.model.Scene
 import com.sinema.model.ScenePlayStats
 import com.sinema.model.StatsSummary

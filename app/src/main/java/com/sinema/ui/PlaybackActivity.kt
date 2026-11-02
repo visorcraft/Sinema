@@ -10,7 +10,6 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -1154,13 +1153,7 @@ class PlaybackActivity : SinemaActivity() {
         endlessJob = lifecycleScope.launch {
             try {
                 endlessPlayedIds.add(sceneId)
-                var candidates = app.api.findFavoriteScenesPaged(
-                    page = 1, perPage = 100, sort = "random", direction = "DESC", unwatchedOnly = true
-                ).second.filter { it.id !in endlessPlayedIds }
-                if (candidates.isEmpty()) {
-                    candidates = app.api.findRecentScenesPaged(page = 1, perPage = 100)
-                        .second.filter { !it.isWatched && it.id !in endlessPlayedIds }
-                }
+                val candidates = app.api.findMixCandidates(endlessPlayedIds)
                 if (candidates.isEmpty()) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
                         if (!isFinishing) {

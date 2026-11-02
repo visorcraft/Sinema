@@ -7,7 +7,6 @@
     <string name="playback_next_marker">Next marker</string>
     <string name="playback_quality">Quality</string>
     <string name="playback_rate">Rate</string>
-    <string name="global_search_label">Sinema</string>
     <string name="global_search_hint">Search your Stash scenes</string>
     <string name="global_search_settings_description">Scenes from your Stash server</string>
 </resources>

@@ -1,13 +1,11 @@
 package com.sinema.ui
 
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.sinema.SinemaApp
 import com.sinema.util.TimeFormat

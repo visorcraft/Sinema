@@ -1534,6 +1534,21 @@ class SinemaApi(
             filters = filters
         )
 
+    /**
+     * Candidates for Tonight's Mix / Endless Mix: random unwatched
+     * favorites, falling back to recent unwatched scenes.
+     */
+    suspend fun findMixCandidates(excludedIds: Set<String> = emptySet()): List<Scene> {
+        var candidates = findFavoriteScenesPaged(
+            page = 1, perPage = 100, sort = "random", direction = "DESC", unwatchedOnly = true
+        ).second.filter { it.id !in excludedIds }
+        if (candidates.isEmpty()) {
+            candidates = findRecentScenesPaged(page = 1, perPage = 100)
+                .second.filter { !it.isWatched && it.id !in excludedIds }
+        }
+        return candidates
+    }
+
     /** Stash server version string ("unknown" when the query fails). */
     suspend fun getServerVersion(): String {
         val query = """query { version { version } }"""

@@ -520,22 +520,6 @@ class SinemaApiTest {
     }
 
     @Test
-    fun `recently-played client sort puts null timestamps last`() {
-        // Mirrors findRecentlyPlayed's partition + sortedByDescending so a
-        // future rewrite cannot drop the nulls-last guarantee.
-        data class Row(val id: String, val lastPlayedAt: String?)
-        val rows = listOf(
-            Row("null-a", null),
-            Row("newer", "2026-07-18T12:00:00Z"),
-            Row("older", "2026-01-01T00:00:00Z"),
-            Row("null-b", null)
-        )
-        val (withTs, withoutTs) = rows.partition { it.lastPlayedAt != null }
-        val sorted = withTs.sortedByDescending { it.lastPlayedAt } + withoutTs
-        assertEquals(listOf("newer", "older", "null-a", "null-b"), sorted.map { it.id })
-    }
-
-    @Test
     fun `unfavorite sends explicit null rating`() {
         withGraphqlServer("""{"data":{"sceneUpdate":{"id":"42","rating100":100}}}""") { api, requestBody ->
             kotlinx.coroutines.runBlocking { api.setSceneRating("42", null) }

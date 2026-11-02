@@ -9,7 +9,6 @@ import androidx.leanback.app.VerticalGridSupportFragment
 import androidx.leanback.widget.FocusHighlight
 import androidx.leanback.widget.VerticalGridPresenter
 import androidx.leanback.widget.ArrayObjectAdapter
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp

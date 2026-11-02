@@ -3,10 +3,8 @@ package com.sinema.ui
 import android.content.Intent
 import android.os.Bundle
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
 import androidx.leanback.app.VerticalGridSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
-import androidx.leanback.widget.FocusHighlight
 import androidx.leanback.widget.VerticalGridPresenter
 import com.sinema.R
 import com.sinema.SinemaApp

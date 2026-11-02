@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import java.security.MessageDigest
 import java.security.SecureRandom
 

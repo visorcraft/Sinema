@@ -5,7 +5,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.fragment.app.FragmentActivity
 import com.sinema.SinemaApp
 import com.sinema.model.HomeContentRow
 import com.sinema.model.HomeShortcut

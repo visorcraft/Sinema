@@ -8,7 +8,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.fragment.app.FragmentActivity
 import com.bumptech.glide.Glide
 import com.sinema.R
 import com.sinema.SinemaApp

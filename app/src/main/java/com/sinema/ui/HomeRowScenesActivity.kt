@@ -4,10 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
-import androidx.fragment.app.FragmentActivity
 import com.sinema.R
 import com.sinema.model.HomeContentRow
-import com.sinema.model.SortOption
 
 class HomeRowScenesActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

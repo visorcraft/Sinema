@@ -1,6 +1,5 @@
 package com.sinema.ui
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -10,13 +9,10 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.fragment.app.FragmentActivity
-import com.bumptech.glide.Glide
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.GroupItem
 import com.sinema.model.Scene
-import com.sinema.util.GlideAuth
 import com.sinema.util.loadAuth
 import com.sinema.util.SceneIntents
 import java.io.IOException

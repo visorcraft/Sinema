@@ -2,7 +2,6 @@ package com.sinema.ui
 
 import android.os.Bundle
 import android.view.KeyEvent
-import androidx.fragment.app.FragmentActivity
 import com.sinema.R
 import com.sinema.model.SortOption
 

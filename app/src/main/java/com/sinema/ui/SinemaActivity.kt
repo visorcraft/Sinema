@@ -2,7 +2,6 @@ package com.sinema.ui
 
 import android.content.Context
 import android.content.res.Configuration
-import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import androidx.core.content.ContextCompat

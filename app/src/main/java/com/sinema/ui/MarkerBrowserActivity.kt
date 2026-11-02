@@ -7,11 +7,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.fragment.app.FragmentActivity
 import androidx.leanback.widget.Presenter
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
-import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
 import com.sinema.model.EntityItem
 import com.sinema.model.MarkerSortOption

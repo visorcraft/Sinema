@@ -1,6 +1,5 @@
 package com.sinema.ui
 
-import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -9,7 +8,6 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.*
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
@@ -500,20 +498,14 @@ class MainFragment : RowsSupportFragment() {
         if (tonightMixJob?.isActive == true) return
         tonightMixJob = lifecycleScope.launch {
             try {
-                var candidates = app.api.findFavoriteScenesPaged(
-                    page = 1, perPage = 100, sort = "random", direction = "DESC", unwatchedOnly = true
-                ).second
+                val candidates = app.api.findMixCandidates()
                 if (candidates.isEmpty()) {
-                    candidates = app.api.findRecentScenesPaged(page = 1, perPage = 100)
-                        .second.filter { !it.isWatched }
-                }
-                if (candidates.isEmpty()) {
-                    if (isAdded) Toast.makeText(requireContext(), "No unwatched scenes found", Toast.LENGTH_SHORT).show()
+                    if (isAdded) Toast.makeText(requireContext(), getString(com.sinema.R.string.tonight_mix_none_unwatched), Toast.LENGTH_SHORT).show()
                     return@launch
                 }
                 val mix = TonightMix.select(candidates)
                 if (mix.isEmpty()) {
-                    if (isAdded) Toast.makeText(requireContext(), "Nothing to play", Toast.LENGTH_SHORT).show()
+                    if (isAdded) Toast.makeText(requireContext(), getString(com.sinema.R.string.tonight_mix_nothing), Toast.LENGTH_SHORT).show()
                     return@launch
                 }
                 SceneIntents.playAll(requireContext(), mix)

@@ -10,7 +10,6 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.sinema.R
@@ -202,7 +201,7 @@ class EntityScenesFragment : SceneGridFragment() {
             .mapNotNull { gridAdapter.get(it) as? com.sinema.model.Scene }
             .filter { !it.isWatched }
         if (unwatched.isEmpty()) {
-            android.widget.Toast.makeText(requireContext(), "No unwatched scenes loaded", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(requireContext(), getString(com.sinema.R.string.entity_no_unwatched), android.widget.Toast.LENGTH_SHORT).show()
             return
         }
         com.sinema.util.SceneIntents.playAll(requireContext(), unwatched, shuffle = true)
