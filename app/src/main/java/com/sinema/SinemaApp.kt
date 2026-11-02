@@ -9,11 +9,17 @@ import kotlinx.coroutines.SupervisorJob
 
 class SinemaApp : Application() {
     lateinit var prefs: Prefs
-    lateinit var api: SinemaApi
+    @Volatile lateinit var api: SinemaApi
     var pinVerifiedThisSession = false
     /** Decoy PIN unlocked the blank shell for this process. */
     var decoySession = false
     var updateCheckedThisSession = false
+    @Volatile var lastInteractionMs: Long = android.os.SystemClock.elapsedRealtime()
+        private set
+
+    fun noteUserInteraction() {
+        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
+    }
 
     /** Small ring buffer of recent user-facing errors for the server dashboard. */
     private val recentErrorsBuffer = ArrayDeque<String>()
@@ -36,12 +42,8 @@ class SinemaApp : Application() {
         instance = this
         prefs = Prefs(this)
         prefs.migrateToProfilesIfNeeded()
-        api = SinemaApi(
-            prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode,
-            allowSelfSigned = prefs.activeProfile?.allowSelfSigned == true
-        )
-        configureApi()
-        configureGlideTransport()
+        api = buildConfiguredApi()
+        configureGlideTransport(api)
         // FLAG_SECURE must cover every activity, including ones opened before
         // the setting flips — re-apply on each start.
         registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
@@ -50,7 +52,9 @@ class SinemaApp : Application() {
             }
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
             override fun onActivityResumed(activity: android.app.Activity) {}
-            override fun onActivityPaused(activity: android.app.Activity) {}
+            override fun onActivityPaused(activity: android.app.Activity) {
+                noteUserInteraction()
+            }
             override fun onActivityStopped(activity: android.app.Activity) {}
             override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
             override fun onActivityDestroyed(activity: android.app.Activity) {}
@@ -73,12 +77,31 @@ class SinemaApp : Application() {
     }
 
     fun refreshApi() {
-        api.updateConfig(
-            prefs.serverUrl, prefs.apiKey, prefs.sessionCookie, prefs.authMode,
+        api = buildConfiguredApi()
+        configureGlideTransport(api)
+    }
+
+    private fun buildConfiguredApi(): SinemaApi {
+        val originatingProfileId = prefs.activeProfileId
+        return SinemaApi(
+            prefs.serverUrl.trimEnd('/'), prefs.apiKey, prefs.sessionCookie, prefs.authMode,
             allowSelfSigned = prefs.activeProfile?.allowSelfSigned == true
-        )
-        configureApi()
-        configureGlideTransport()
+        ).also { newApi ->
+            newApi.stashUsername = prefs.stashUsername
+            newApi.stashPassword = prefs.stashPassword
+            newApi.onSessionRefreshed = { cookie ->
+                synchronized(prefs) {
+                    val result = com.sinema.util.routeSessionRefresh(
+                        profiles = prefs.profiles,
+                        activeProfileId = prefs.activeProfileId,
+                        originatingProfileId = originatingProfileId,
+                        cookie = cookie
+                    )
+                    prefs.profiles = result.profiles
+                    if (result.updateActiveCookie) prefs.sessionCookie = cookie
+                }
+            }
+        }
     }
 
     /**
@@ -86,7 +109,7 @@ class SinemaApp : Application() {
      * from a self-signed server load once the profile opts in. Replaced on
      * every refresh because OkHttpClient instances are immutable.
      */
-    private fun configureGlideTransport() {
+    private fun configureGlideTransport(api: SinemaApi) {
         try {
             com.bumptech.glide.Glide.get(this).registry.replace(
                 com.bumptech.glide.load.model.GlideUrl::class.java,
@@ -95,24 +118,6 @@ class SinemaApp : Application() {
             )
         } catch (e: Exception) {
             android.util.Log.w("Sinema", "Could not install Glide OkHttp transport", e)
-        }
-    }
-
-    private fun configureApi() {
-        api.stashUsername = prefs.stashUsername
-        api.stashPassword = prefs.stashPassword
-        api.onSessionRefreshed = { cookie ->
-            prefs.sessionCookie = cookie
-            // Also update the active profile's cookie so it survives profile switches.
-            // Synchronize against UI-driven mutations via the prefs object monitor.
-            synchronized(prefs) {
-                val activeId = prefs.activeProfileId
-                if (activeId.isNotBlank()) {
-                    prefs.profiles = prefs.profiles.map {
-                        if (it.id == activeId) it.copy(sessionCookie = cookie) else it
-                    }
-                }
-            }
         }
     }
 

@@ -133,12 +133,12 @@ class Prefs(context: Context) {
 
     // Server profiles (stored in secure prefs)
     var profiles: List<com.sinema.model.ServerProfile>
-        get() = ProfileCodec.fromJson(getSecureString("server_profiles"))
-        set(value) = putSecureString("server_profiles", ProfileCodec.toJson(value))
+        get() = synchronized(this) { ProfileCodec.fromJson(getSecureString("server_profiles")) }
+        set(value) = synchronized(this) { putSecureString("server_profiles", ProfileCodec.toJson(value)) }
 
     var activeProfileId: String
-        get() = prefs.getString("active_profile_id", "") ?: ""
-        set(value) = prefs.edit().putString("active_profile_id", value).apply()
+        get() = synchronized(this) { prefs.getString("active_profile_id", "") ?: "" }
+        set(value) = synchronized(this) { prefs.edit().putString("active_profile_id", value).apply() }
 
     val activeProfile: com.sinema.model.ServerProfile?
         get() = profiles.firstOrNull { it.id == activeProfileId }
@@ -176,34 +176,19 @@ class Prefs(context: Context) {
 
     /** Persist the active profile's fields back into the legacy accessors. */
     fun applyProfile(p: com.sinema.model.ServerProfile) {
-        serverUrl = p.serverUrl
-        apiKey = p.apiKey
-        sessionCookie = p.sessionCookie
-        authMode = p.authMode
-        stashUsername = p.stashUsername
-        stashPassword = p.stashPassword
-        activeProfileId = p.id
+        synchronized(this) {
+            serverUrl = p.serverUrl
+            apiKey = p.apiKey
+            sessionCookie = p.sessionCookie
+            authMode = p.authMode
+            stashUsername = p.stashUsername
+            stashPassword = p.stashPassword
+            activeProfileId = p.id
+        }
     }
 
     val isConfigured: Boolean
         get() = apiKey.isNotBlank() || sessionCookie.isNotBlank()
-
-
-
-
-
-
-    fun getResumePosition(sceneId: String): Long {
-        return prefs.getLong("resume_$sceneId", 0L)
-    }
-
-    fun setResumePosition(sceneId: String, positionMs: Long) {
-        prefs.edit().putLong("resume_$sceneId", positionMs).apply()
-    }
-
-    fun clearResumePosition(sceneId: String) {
-        prefs.edit().remove("resume_$sceneId").apply()
-    }
 
     fun sortFor(screen: String): String =
         prefs.getString("sort_$screen", "") ?: ""

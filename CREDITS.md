@@ -14,6 +14,7 @@ Sinema is maintained by VisorCraft LLC and depends on the work of several open-s
 - [Kotlin and kotlinx.coroutines](https://kotlinlang.org/): Kotlin language/runtime and coroutine support.
 - [Gradle](https://gradle.org/) and the [Android Gradle Plugin](https://developer.android.com/build): Android build tooling.
 - [JUnit](https://junit.org/junit4/) and [Hamcrest](http://hamcrest.org/): unit test framework and assertions.
+- [Robolectric](https://robolectric.org/): Android activity and fragment regression tests running on the JVM.
 
 ## Current Direct Dependency Versions
 
@@ -32,5 +33,6 @@ Sinema is maintained by VisorCraft LLC and depends on the work of several open-s
 - AndroidX Security Crypto 1.1.0
 - AndroidX TVProvider 1.1.0
 - JUnit 4.13.2
+- Robolectric 4.15.1
 
 See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for license details.

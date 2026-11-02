@@ -178,18 +178,7 @@ class MarkerBrowserFragment : SceneGridFragment() {
      * Pages through every tag so long-tail tags stay selectable; capped as a
      * guard against pathologically huge libraries.
      */
-    private suspend fun loadAllTags(): List<EntityItem> {
-        val all = mutableListOf<EntityItem>()
-        var page = 1
-        val perPage = 100
-        while (page <= 20) { // hard cap: 2000 tags
-            val (count, items) = app.api.findEntities(EntityItem.Kind.TAG, page = page, perPage = perPage)
-            all += items
-            if (items.isEmpty() || all.size >= count) break
-            page++
-        }
-        return all
-    }
+    private suspend fun loadAllTags(): List<EntityItem> = app.api.findAllTags()
 
     override fun onItemClicked(item: Any) {
         if (item is SceneMarkerItem) {

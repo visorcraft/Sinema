@@ -1,6 +1,7 @@
 package com.sinema.util
 
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.graphics.BitmapFactory
@@ -9,15 +10,14 @@ import android.provider.BaseColumns
 import android.util.Log
 import androidx.tvprovider.media.tv.PreviewChannel
 import androidx.tvprovider.media.tv.PreviewChannelHelper
-import androidx.tvprovider.media.tv.PreviewProgram
 import androidx.tvprovider.media.tv.TvContractCompat
-import androidx.tvprovider.media.tv.WatchNextProgram
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.Scene
 
 object TvChannels {
     private const val CHANNEL_NAME = "Sinema — Recently Added"
+    private const val PROGRAM_TITLE_COLUMN = "title"
     private const val MAX_WATCH_NEXT = 10
     private const val MAX_RECENT = 20
 
@@ -25,7 +25,6 @@ object TvChannels {
         val app = SinemaApp.instance
         if (!app.prefs.channelsEnabled) return
         try {
-            val helper = PreviewChannelHelper(context)
             val resolver = context.contentResolver
             val uri = TvContractCompat.WatchNextPrograms.CONTENT_URI
             // Delete only our own Watch Next entries (prefix with "sinema:")
@@ -43,16 +42,19 @@ object TvChannels {
             continuePairs.take(MAX_WATCH_NEXT).forEach { (scene, resumeSec) ->
                 // /play/ resumes playback directly — the point of Watch Next.
                 val intentUri = Uri.parse("com.sinema://app/play/${scene.id}")
-                val builder = WatchNextProgram.Builder()
-                    .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
-                    .setType(TvContractCompat.PreviewProgramColumns.TYPE_MOVIE)
-                    .setTitle(scene.title)
-                    .setDurationMillis((scene.duration * 1000).toInt())
-                    .setLastPlaybackPositionMillis((resumeSec * 1000).toInt())
-                    .setIntentUri(intentUri)
-                    .setInternalProviderId("sinema:${scene.id}")
-
-                helper.publishWatchNextProgram(builder.build())
+                val values = ContentValues().apply {
+                    put(
+                        TvContractCompat.WatchNextPrograms.COLUMN_WATCH_NEXT_TYPE,
+                        TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE
+                    )
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_TYPE, TvContractCompat.PreviewProgramColumns.TYPE_MOVIE)
+                    put(PROGRAM_TITLE_COLUMN, scene.title)
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_DURATION_MILLIS, (scene.duration * 1000).toInt())
+                    put(TvContractCompat.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS, (resumeSec * 1000).toInt())
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTENT_URI, intentUri.toString())
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID, "sinema:${scene.id}")
+                }
+                resolver.insert(uri, values)
             }
         } catch (e: Exception) {
             Log.e("Sinema", "Failed to sync Watch Next", e)
@@ -83,15 +85,15 @@ object TvChannels {
 
             scenes.take(MAX_RECENT).forEach { scene ->
                 val intentUri = Uri.parse("com.sinema://app/scene/${scene.id}")
-                val builder = PreviewProgram.Builder()
-                    .setChannelId(channelId)
-                    .setType(TvContractCompat.PreviewProgramColumns.TYPE_MOVIE)
-                    .setTitle(scene.title)
-                    .setDurationMillis((scene.duration * 1000).toInt())
-                    .setIntentUri(intentUri)
-                    .setInternalProviderId("sinema:${scene.id}")
-
-                helper.publishPreviewProgram(builder.build())
+                val values = ContentValues().apply {
+                    put(TvContractCompat.PreviewPrograms.COLUMN_CHANNEL_ID, channelId)
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_TYPE, TvContractCompat.PreviewProgramColumns.TYPE_MOVIE)
+                    put(PROGRAM_TITLE_COLUMN, scene.title)
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_DURATION_MILLIS, (scene.duration * 1000).toInt())
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTENT_URI, intentUri.toString())
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID, "sinema:${scene.id}")
+                }
+                resolver.insert(programsUri, values)
             }
         } catch (e: Exception) {
             Log.e("Sinema", "Failed to sync Recently Added channel", e)

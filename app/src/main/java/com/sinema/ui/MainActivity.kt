@@ -28,17 +28,12 @@ import kotlin.coroutines.cancellation.CancellationException
 class MainActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private var waitingForPin = false
-    private var lastInteractionMs = 0L
     private var sessionRestoreOffered = false
     private var sessionRestoreDialog: android.app.AlertDialog? = null
     private val ambientHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val ambientCheck = object : Runnable {
         override fun run() {
-            val idle = android.os.SystemClock.elapsedRealtime() - lastInteractionMs
-            // Auto-lock: re-ask for the PIN after the configured idle time.
-            // No window-focus gate — an expired lock must fire even under an
-            // open dialog, and time spent in other activities counts as idle
-            // because lastInteractionMs only tracks home interactions.
+            val idle = android.os.SystemClock.elapsedRealtime() - app.lastInteractionMs
             maybeAutoLock(idle)
             if (app.prefs.ambientGallery &&
                 !app.prefs.discreetMode &&
@@ -50,16 +45,10 @@ class MainActivity : SinemaActivity() {
                 idle >= AMBIENT_IDLE_MS
             ) {
                 startActivity(Intent(this@MainActivity, AmbientActivity::class.java))
-                // Reset so exiting the gallery buys a fresh idle window.
-                lastInteractionMs = android.os.SystemClock.elapsedRealtime()
+                app.noteUserInteraction()
             }
             ambientHandler.postDelayed(this, AMBIENT_CHECK_MS)
         }
-    }
-
-    override fun onUserInteraction() {
-        super.onUserInteraction()
-        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,13 +81,12 @@ class MainActivity : SinemaActivity() {
 
     override fun onResume() {
         super.onResume()
-        // A successful PIN return must not immediately re-lock off the stale
-        // pre-PIN idle timestamp — only other activities count as idle time.
         val returningFromPinSuccess = waitingForPin && app.pinVerifiedThisSession
-        if (!returningFromPinSuccess) {
-            maybeAutoLock(android.os.SystemClock.elapsedRealtime() - lastInteractionMs)
+        if (returningFromPinSuccess) {
+            app.noteUserInteraction()
+        } else {
+            maybeAutoLock(android.os.SystemClock.elapsedRealtime() - app.lastInteractionMs)
         }
-        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
         // A decoy session must never fall through to the real library.
         if (app.decoySession && !isFinishing) {
             startActivity(Intent(this, DecoyActivity::class.java))
@@ -109,16 +97,21 @@ class MainActivity : SinemaActivity() {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_frame, MainFragment())
                 .commitNowAllowingStateLoss()
-            startAmbientWatch()
             maybeOfferPlaybackSessionRestore()
-        } else if (waitingForPin && !app.pinVerifiedThisSession) {
-            // PIN was cancelled/failed — PinActivity calls finishAffinity on back
+        }
+        if (!waitingForPin && (!app.prefs.hasPinSet() || app.pinVerifiedThisSession)) {
+            startAmbientWatch()
         }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean(STATE_RESTORE_OFFERED, sessionRestoreOffered)
         super.onSaveInstanceState(outState)
+    }
+
+    override fun onStop() {
+        ambientHandler.removeCallbacks(ambientCheck)
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -163,20 +156,25 @@ class MainActivity : SinemaActivity() {
     }
 
     private fun startAmbientWatch() {
-        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
         ambientHandler.removeCallbacks(ambientCheck)
         ambientHandler.postDelayed(ambientCheck, AMBIENT_CHECK_MS)
     }
 
     private fun maybeAutoLock(idleMs: Long) {
-        val lockMs = app.prefs.autoLockMinutes * 60_000L
-        if (!app.prefs.hasPinSet() || !app.pinVerifiedThisSession || app.decoySession) return
-        if (lockMs <= 0 || idleMs < lockMs) return
+        if (!shouldAutoLock(
+                isResumed = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED),
+                hasPin = app.prefs.hasPinSet(),
+                pinVerified = app.pinVerifiedThisSession,
+                decoySession = app.decoySession,
+                lockMinutes = app.prefs.autoLockMinutes,
+                idleMs = idleMs
+            )
+        ) return
         app.pinVerifiedThisSession = false
         waitingForPin = true
         sessionRestoreDialog?.dismiss()
         startActivity(Intent(this, PinActivity::class.java))
-        lastInteractionMs = android.os.SystemClock.elapsedRealtime()
+        app.noteUserInteraction()
     }
 
     companion object {

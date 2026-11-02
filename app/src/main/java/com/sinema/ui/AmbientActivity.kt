@@ -56,6 +56,11 @@ class AmbientActivity : SinemaActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                finish()
+            }
+        })
         val density = resources.displayMetrics.density
         val root = FrameLayout(this).apply { setBackgroundColor(0xFF000000.toInt()) }
         front = ImageView(this).apply {
@@ -194,8 +199,4 @@ class AmbientActivity : SinemaActivity() {
         super.onDestroy()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        finish()
-    }
 }

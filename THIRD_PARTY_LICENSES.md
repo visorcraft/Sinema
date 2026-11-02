@@ -38,6 +38,7 @@ The resolved dependency graph can be inspected with:
 | Android Gradle Plugin | 9.2.1 | Apache-2.0 |
 | Kotlin stdlib, resolved by AGP | 2.2.21 | Apache-2.0 |
 | JUnit | 4.13.2 | Eclipse Public License 1.0 |
+| Robolectric | 4.15.1 | Apache-2.0 |
 | Hamcrest Core | 1.3 | BSD License |
 
 ## Notable Transitive Dependencies

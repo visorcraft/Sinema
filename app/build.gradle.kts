@@ -20,8 +20,8 @@ android {
         applicationId = "com.sinema"
         minSdk = 24
         targetSdk = 36
-        versionCode = 54
-        versionName = "1.40.0"
+        versionCode = 55
+        versionName = "1.41.0"
     }
 
     buildTypes {
@@ -37,8 +37,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     lint {
-        abortOnError = false
+        abortOnError = true
         warningsAsErrors = false
     }
 }
@@ -83,4 +87,5 @@ dependencies {
     baselineProfile(project(":baselineprofile"))
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.15.1")
 }

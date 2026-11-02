@@ -15,9 +15,7 @@ import java.net.URL
 
 data class ReleaseInfo(
     val tagName: String,
-    val versionCode: Int,
-    val apkUrl: String?,
-    val body: String
+    val apkUrl: String?
 )
 
 object UpdateChecker {
@@ -62,7 +60,6 @@ object UpdateChecker {
             val json = conn.inputStream.bufferedReader().readText()
             val release = JSONObject(json)
             val tagName = release.getString("tag_name")
-            val body = release.optString("body", "")
 
             // Parse version from tag: "v1.2" -> "1.2" (also supports patch: "v1.9.1")
             val remoteVersionName = tagName.removePrefix("v")
@@ -78,7 +75,7 @@ object UpdateChecker {
                 }
             }
 
-            val info = ReleaseInfo(tagName, 0, apkUrl, body)
+            val info = ReleaseInfo(tagName, apkUrl)
 
             // Compare version names (e.g., "1.1" vs "1.2")
             val currentVersionName = try {

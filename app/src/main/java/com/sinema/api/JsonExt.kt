@@ -19,9 +19,6 @@ fun JsonObject.optInt(key: String, default: Int = 0): Int =
 fun JsonObject.optDouble(key: String, default: Double = 0.0): Double =
     get(key)?.takeIf { !it.isJsonNull }?.asDouble ?: default
 
-fun JsonObject.optLong(key: String, default: Long = 0L): Long =
-    get(key)?.takeIf { !it.isJsonNull }?.asLong ?: default
-
 fun JsonObject.optObject(key: String): JsonObject? =
     get(key)?.takeIf { !it.isJsonNull }?.asJsonObject
 

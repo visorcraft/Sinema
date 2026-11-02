@@ -260,7 +260,6 @@ class SinemaApi(
                 mapOf(alphaField to mapOf("value" to it, "modifier" to "MATCHES_REGEX"))
             )
         }
-        combinedSceneFilter.takeIf { it.isNotEmpty() }
         val result = graphql(query, mapOf("filter" to filter, "scene_filter" to combinedSceneFilter))
         val data = result.getAsJsonObject("data")?.getAsJsonObject("findScenes")
             ?: return Pair(0, emptyList())
@@ -374,7 +373,18 @@ class SinemaApi(
             filters = filters
         )
 
-    suspend fun findImagesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<ImageItem>> {
+    suspend fun findImagesByPath(pathPrefix: String, page: Int = 1, perPage: Int = 100): Pair<Int, List<ImageItem>> =
+        findImagesInternal(
+            page = page,
+            perPage = perPage,
+            imageFilter = mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+        )
+
+    private suspend fun findImagesInternal(
+        page: Int,
+        perPage: Int,
+        imageFilter: Map<String, Any?>
+    ): Pair<Int, List<ImageItem>> {
         val query = """
             query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
                 findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
@@ -390,14 +400,11 @@ class SinemaApi(
             }
         """.trimIndent()
         val variables = mapOf(
-            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
-            "image_filter" to mapOf("path" to mapOf("value" to pathPrefixRegex(pathPrefix), "modifier" to "MATCHES_REGEX"))
+            "filter" to findFilter(page, perPage, "path", "ASC"),
+            "image_filter" to imageFilter
         )
         val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data").getAsJsonObject("findImages")
-        val count = data.get("count").asInt
-        val images = data.getAsJsonArray("images").map { parseImage(it.asJsonObject) }
-        return Pair(count, images)
+        return parsePaged(result, "findImages", "images", ::parseImage)
     }
 
     suspend fun getImageCountForPath(pathPrefix: String): Int {
@@ -435,31 +442,17 @@ class SinemaApi(
             ?.firstOrNull()?.asJsonObject?.get("id")?.asString
     }
 
-    suspend fun findImagesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<ImageItem>> {
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
-                findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
-                    count
-                    images {
-                        id title rating100
-                        visual_files {
-                            ... on ImageFile { path size width height }
-                            ... on VideoFile { path size width height }
-                        }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf("page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"),
-            "image_filter" to mapOf("path" to mapOf("value" to "^${Regex.escape(folderPath.trimEnd('/'))}/[^/]+$", "modifier" to "MATCHES_REGEX"))
+    suspend fun findImagesInFolderDirect(folderPath: String, page: Int = 1, perPage: Int = 500): Pair<Int, List<ImageItem>> =
+        findImagesInternal(
+            page = page,
+            perPage = perPage,
+            imageFilter = mapOf(
+                "path" to mapOf(
+                    "value" to "^${Regex.escape(folderPath.trimEnd('/'))}/[^/]+$",
+                    "modifier" to "MATCHES_REGEX"
+                )
+            )
         )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findImages") ?: return Pair(0, emptyList())
-        val count = data.get("count").asInt
-        val images = data.getAsJsonArray("images").map { parseImage(it.asJsonObject) }
-        return Pair(count, images)
-    }
 
     private fun parseImage(obj: JsonObject): ImageItem {
         val files = obj.getAsJsonArray("visual_files")
@@ -626,9 +619,6 @@ class SinemaApi(
      */
     suspend fun findRandomScene(): Scene? =
         findScenesInternal(perPage = 1, sort = "random").second.firstOrNull()
-
-    suspend fun findTopLevelFolders(): List<Pair<String, String>> =
-        findTopLevelFoldersPaged(page = 1, perPage = 500).second
 
     suspend fun findTopLevelFoldersPaged(page: Int = 1, perPage: Int = 500): Pair<Int, List<Pair<String, String>>> {
         val idQuery = """
@@ -1000,6 +990,18 @@ class SinemaApi(
         findEntitiesInternal(kind, page, perPage, searchTerm, sort, direction, includeRatings = false)
     }
 
+    suspend fun findAllTags(perPage: Int = 100, maxPages: Int = 20): List<EntityItem> {
+        val all = mutableListOf<EntityItem>()
+        var page = 1
+        while (page <= maxPages) {
+            val (count, items) = findEntities(EntityItem.Kind.TAG, page = page, perPage = perPage)
+            all += items
+            if (items.isEmpty() || all.size >= count) break
+            page++
+        }
+        return all
+    }
+
     private suspend fun findEntitiesInternal(
         kind: EntityItem.Kind,
         page: Int,
@@ -1238,36 +1240,13 @@ class SinemaApi(
         galleryId: String,
         page: Int = 1,
         perPage: Int = 500
-    ): Pair<Int, List<ImageItem>> {
-        val query = """
-            query(${"$"}filter: FindFilterType, ${"$"}image_filter: ImageFilterType) {
-                findImages(filter: ${"$"}filter, image_filter: ${"$"}image_filter) {
-                    count
-                    images {
-                        id title rating100
-                        visual_files {
-                            ... on ImageFile { path size width height }
-                            ... on VideoFile { path size width height }
-                        }
-                    }
-                }
-            }
-        """.trimIndent()
-        val variables = mapOf(
-            "filter" to mapOf(
-                "page" to page, "per_page" to perPage, "sort" to "path", "direction" to "ASC"
-            ),
-            "image_filter" to mapOf(
-                "galleries" to mapOf("value" to listOf(galleryId), "modifier" to "INCLUDES")
-            )
+    ): Pair<Int, List<ImageItem>> = findImagesInternal(
+        page = page,
+        perPage = perPage,
+        imageFilter = mapOf(
+            "galleries" to mapOf("value" to listOf(galleryId), "modifier" to "INCLUDES")
         )
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findImages")
-            ?: return Pair(0, emptyList())
-        val count = data.optInt("count", 0)
-        val images = (data.get("images") as? JsonArray)?.map { parseImage(it.asJsonObject) } ?: emptyList()
-        return Pair(count, images)
-    }
+    )
 
     @VisibleForTesting
     internal fun parseGallery(obj: JsonObject): GalleryItem = GalleryItem(

@@ -204,6 +204,8 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 | Lifecycle Runtime KTX | **2.11.0** |
 | Security Crypto | **1.1.0** |
 | TVProvider | **1.1.0** |
+| JUnit (tests) | **4.13.2** |
+| Robolectric (Android JVM tests) | **4.15.1** |
 
 ---
 

@@ -15,6 +15,11 @@ import com.sinema.SinemaApp
 class DecoyActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                moveTaskToBack(true)
+            }
+        })
         setContentView(TextView(this).apply {
             text = "No content available"
             gravity = Gravity.CENTER
@@ -47,9 +52,4 @@ class DecoyActivity : SinemaActivity() {
             .show()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        // Never finish back into the real library.
-        moveTaskToBack(true)
-    }
 }

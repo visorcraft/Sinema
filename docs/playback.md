@@ -24,6 +24,7 @@ Rules:
 - If playback stops more than 30 seconds before the end, Sinema saves `resume_time`.
 - If playback stops within the last 30 seconds, Sinema clears `resume_time`.
 - If a scene finishes and at least five seconds were played, Sinema increments the Stash play count once for that viewing.
+- Play duration counts active playback only; paused intervals are excluded, and repeated saves do not resend already reported time.
 
 These Stash fields drive the home screen:
 

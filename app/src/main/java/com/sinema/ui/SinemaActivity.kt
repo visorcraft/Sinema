@@ -29,6 +29,11 @@ abstract class SinemaActivity : FragmentActivity() {
         super.attachBaseContext(newBase.createConfigurationContext(configuration))
     }
 
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        SinemaApp.instance.noteUserInteraction()
+    }
+
     override fun onResume() {
         super.onResume()
         val prefs = SinemaApp.instance.prefs

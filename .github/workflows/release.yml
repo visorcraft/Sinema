@@ -3,7 +3,7 @@
 #
 # Tag-triggered release pipeline. Each push of a `v*` tag verifies
 # that the tag matches `versionName` in app/build.gradle.kts, runs
-# lint, builds the release APK + AAB, generates sha256sums.txt, and
+# unit tests and lint, builds the release APK + AAB, generates sha256sums.txt, and
 # attaches everything to a new GitHub Release with auto-generated
 # notes. No `${{ github.event.* }}` interpolations are used: this
 # workflow is safe against injection from PR titles, branch names,
@@ -89,6 +89,9 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 -d > debug.keystore
           keytool -list -keystore debug.keystore -storepass android \
             -alias androiddebugkey >/dev/null
+
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       - name: Run lint (release variant)
         run: ./gradlew lintRelease --no-daemon

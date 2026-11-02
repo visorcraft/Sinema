@@ -43,12 +43,12 @@ fun FragmentActivity.bindGridControls(screen: SortableScreen) {
     findViewById<Button>(R.id.btn_grid_sort)?.setOnClickListener { screen.showSortDialog() }
     findViewById<Button>(R.id.btn_grid_filter)?.apply {
         visibility = if (screen.canFilter) View.VISIBLE else View.GONE
-        text = "Filter: ${screen.filterLabel}"
+        if (screen.canFilter) text = "Filter: ${screen.filterLabel}"
         setOnClickListener { screen.showFilterDialog() }
     }
     findViewById<Button>(R.id.btn_grid_watch)?.apply {
         visibility = if (screen.canQuickFilter) View.VISIBLE else View.GONE
-        text = screen.quickWatchLabel
+        if (screen.canQuickFilter) text = screen.quickWatchLabel
         setOnClickListener {
             screen.toggleQuickWatch()
             refreshGridControls()
@@ -56,7 +56,7 @@ fun FragmentActivity.bindGridControls(screen: SortableScreen) {
     }
     findViewById<Button>(R.id.btn_grid_fav)?.apply {
         visibility = if (screen.canQuickFilter) View.VISIBLE else View.GONE
-        text = screen.quickFavoritesLabel
+        if (screen.canQuickFilter) text = screen.quickFavoritesLabel
         setOnClickListener {
             screen.toggleQuickFavorites()
             refreshGridControls()
@@ -70,7 +70,11 @@ fun FragmentActivity.bindGridControls(screen: SortableScreen) {
 
 fun FragmentActivity.refreshGridControls() {
     val screen = supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen ?: return
-    findViewById<Button>(R.id.btn_grid_filter)?.text = "Filter: ${screen.filterLabel}"
-    findViewById<Button>(R.id.btn_grid_watch)?.text = screen.quickWatchLabel
-    findViewById<Button>(R.id.btn_grid_fav)?.text = screen.quickFavoritesLabel
+    if (screen.canFilter) {
+        findViewById<Button>(R.id.btn_grid_filter)?.text = "Filter: ${screen.filterLabel}"
+    }
+    if (screen.canQuickFilter) {
+        findViewById<Button>(R.id.btn_grid_watch)?.text = screen.quickWatchLabel
+        findViewById<Button>(R.id.btn_grid_fav)?.text = screen.quickFavoritesLabel
+    }
 }

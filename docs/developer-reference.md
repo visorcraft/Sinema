@@ -196,6 +196,8 @@ Run unit tests:
 ./gradlew :app:testDebugUnitTest
 ```
 
+The suite includes pure Kotlin tests and Robolectric activity/fragment smoke tests, including cold-launch grid coverage. No emulator is required.
+
 Run lint:
 
 ```bash

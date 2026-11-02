@@ -69,11 +69,17 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     private lateinit var pageState: GridPageState
     private var pagingGrid: VerticalGridView? = null
 
-    override val filterLabel: String get() = filterController.value.summary
+    override val filterLabel: String
+        get() = if (::filterController.isInitialized) filterController.value.summary
+        else super<SortableScreen>.filterLabel
 
     override val canQuickFilter: Boolean get() = canFilter
-    override val quickWatchLabel: String get() = filterController.watchLabel
-    override val quickFavoritesLabel: String get() = filterController.favoritesLabel
+    override val quickWatchLabel: String
+        get() = if (::filterController.isInitialized) filterController.watchLabel
+        else super<SortableScreen>.quickWatchLabel
+    override val quickFavoritesLabel: String
+        get() = if (::filterController.isInitialized) filterController.favoritesLabel
+        else super<SortableScreen>.quickFavoritesLabel
 
     override fun toggleQuickWatch() = filterController.toggleWatch()
     override fun toggleQuickFavorites() = filterController.toggleFavorites()
@@ -321,16 +327,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     private fun showAssignTagsDialog(scene: Scene) {
         lifecycleScope.launch {
             try {
-                val tags = mutableListOf<com.sinema.model.EntityItem>()
-                var page = 1
-                while (page <= 20) { // cap: 2000 tags
-                    val (count, items) = app.api.findEntities(
-                        com.sinema.model.EntityItem.Kind.TAG, page = page, perPage = 100
-                    )
-                    tags += items
-                    if (items.isEmpty() || tags.size >= count) break
-                    page++
-                }
+                val tags = app.api.findAllTags()
                 if (!isAdded) return@launch
                 if (tags.isEmpty()) {
                     Toast.makeText(requireContext(), getString(R.string.untagged_no_tags), Toast.LENGTH_SHORT).show()

@@ -31,6 +31,11 @@ class PinActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pin)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (mode == Mode.VERIFY) finishAffinity() else finish()
+            }
+        })
 
         mode = when {
             intent.getBooleanExtra("setup_mode", false) -> Mode.SETUP
@@ -220,19 +225,10 @@ class PinActivity : SinemaActivity() {
             KeyEvent.KEYCODE_7 -> { addDigit("7"); return true }
             KeyEvent.KEYCODE_8 -> { addDigit("8"); return true }
             KeyEvent.KEYCODE_9 -> { addDigit("9"); return true }
-            KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_BACK -> {
+            KeyEvent.KEYCODE_DEL -> {
                 handleBackspace(); return true
             }
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onBackPressed() {
-        // Prevent back button from bypassing PIN
-        if (mode == Mode.VERIFY) {
-            finishAffinity()
-        } else {
-            super.onBackPressed()
-        }
     }
 }

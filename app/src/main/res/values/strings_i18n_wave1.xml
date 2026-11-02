@@ -29,7 +29,6 @@
     <string name="server_title">Server</string>
     <string name="server_loading">Loading…</string>
     <string name="server_stash_version">Stash version</string>
-    <string name="server_unknown">unknown</string>
     <string name="server_scenes">Scenes</string>
     <string name="server_entities">Performers · Tags · Studios</string>
     <string name="server_plays">Plays</string>
@@ -53,7 +52,6 @@
     <string name="grid_cancel">Cancel</string>
     <string name="grid_retry">Retry</string>
     <string name="grid_load_failed">Couldn’t load this view: %1$s</string>
-    <string name="grid_unknown_error">Unknown error</string>
     <string name="playback_restore_title">Resume previous session?</string>
     <string name="playback_restore_message">Continue %1$s where you left off?</string>
     <string name="playback_restore_message_neutral">Continue where you left off?</string>

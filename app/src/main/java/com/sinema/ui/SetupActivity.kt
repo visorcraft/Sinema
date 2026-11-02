@@ -13,22 +13,22 @@ import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
 import java.net.NetworkInterface
-import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 
 class SetupActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
-    private var httpServer: ServerSocket? = null
-    private var serverThread: Thread? = null
-    private var webSetupToken: String? = null
+    private var webSetupServer: WebSetupServer? = null
     private val isAddProfile get() = intent.getBooleanExtra("add_profile", false)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                stopHttpServer()
+                showMenuScreen()
+            }
+        })
         showMenuScreen()
     }
 
@@ -564,9 +564,8 @@ class SetupActivity : SinemaActivity() {
                 return@setOnClickListener
             }
             
-            val token = generateShortSetupToken()
-            webSetupToken = token
-            startHttpServer(serverUrl, token)
+            val token = generateSetupToken()
+            if (!startHttpServer(serverUrl, token)) return@setOnClickListener
             
             instructionText.text = "Open http://$ip:8888 on your phone or computer\nSetup code: $token"
             instructionText.visibility = android.view.View.VISIBLE
@@ -629,151 +628,32 @@ class SetupActivity : SinemaActivity() {
         return null
     }
     
-    private fun startHttpServer(serverUrl: String, setupToken: String) {
+    private fun startHttpServer(serverUrl: String, setupToken: String): Boolean {
         stopHttpServer()
-        
-        serverThread = Thread {
-            try {
-                httpServer = ServerSocket(8888)
-                
-                while (!Thread.currentThread().isInterrupted) {
-                    val client = httpServer?.accept() ?: break
-                    
-                    Thread clientHandler@{
-                        try {
-                            val reader = BufferedReader(InputStreamReader(client.getInputStream()))
-                            val writer = PrintWriter(client.getOutputStream(), true)
-                            
-                            val requestLine = reader.readLine() ?: return@clientHandler
-                            
-                            // Read headers to find Content-Length
-                            var contentLength = 0
-                            var line: String?
-                            while (reader.readLine().also { line = it } != null && line!!.isNotEmpty()) {
-                                if (line!!.startsWith("Content-Length:", ignoreCase = true)) {
-                                    contentLength = line!!.substring(15).trim().toIntOrNull() ?: 0
-                                }
-                            }
-                            
-                            if (requestLine.startsWith("GET")) {
-                                // Serve the HTML form
-                                val html = """
-                                    <!DOCTYPE html>
-                                    <html>
-                                    <head>
-                                        <meta name="viewport" content="width=device-width, initial-scale=1">
-                                        <title>Sinema Setup</title>
-                                        <style>
-                                            body { font-family: sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background: #1b1b1b; color: #fff; }
-                                            h1 { color: #2AABE0; }
-                                            label { display: block; margin-top: 20px; margin-bottom: 8px; color: #ccc; }
-                                            input { width: 100%; padding: 12px; font-size: 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; box-sizing: border-box; }
-                                            button { margin-top: 30px; width: 100%; padding: 14px; font-size: 18px; background: #2AABE0; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-                                            button:hover { background: #1a9bd0; }
-                                        </style>
-                                    </head>
-                                    <body>
-                                        <h1>Sinema Setup</h1>
-                                        <form method="POST" action="/">
-                                            <label for="serverUrl">Server URL:</label>
-                                            <input type="text" id="serverUrl" name="serverUrl" value="$serverUrl" required>
-                                            
-                                            <label for="apiKey">API Key:</label>
-                                            <input type="text" id="apiKey" name="apiKey" required>
-                                            <input type="hidden" name="setupToken" value="$setupToken">
-                                            
-                                            <button type="submit">Save</button>
-                                        </form>
-                                    </body>
-                                    </html>
-                                """.trimIndent()
-                                
-                                writer.println("HTTP/1.1 200 OK")
-                                writer.println("Content-Type: text/html")
-                                writer.println("Content-Length: ${html.toByteArray().size}")
-                                writer.println()
-                                writer.println(html)
-                            } else if (requestLine.startsWith("POST")) {
-                                // Read POST body
-                                val bodyChars = CharArray(contentLength)
-                                var totalRead = 0
-                                while (totalRead < contentLength) {
-                                    val read = reader.read(bodyChars, totalRead, contentLength - totalRead)
-                                    if (read <= 0) break
-                                    totalRead += read
-                                }
-                                val body = String(bodyChars, 0, totalRead)
-                                
-                                // Parse form data
-                                val params = body.split("&").associate {
-                                    val parts = it.split("=", limit = 2)
-                                    java.net.URLDecoder.decode(parts[0], "UTF-8") to 
-                                    java.net.URLDecoder.decode(parts.getOrNull(1) ?: "", "UTF-8")
-                                }
-                                
-                                val newServerUrl = params["serverUrl"]?.trim()?.trimEnd('/')
-                                val apiKey = params["apiKey"]?.trim()
-                                val postedToken = params["setupToken"]?.trim()
-                                
-                                if (postedToken != setupToken) {
-                                    writer.println("HTTP/1.1 403 Forbidden")
-                                    writer.println()
-                                    writer.flush()
-                                    client.close()
-                                    return@clientHandler
-                                }
-                                
-                                if (newServerUrl != null && apiKey != null && 
-                                    newServerUrl.isNotEmpty() && apiKey.isNotEmpty()) {
-                                    
-                                    runOnUiThread {
-                                        app.prefs.serverUrl = newServerUrl
-                                        app.prefs.apiKey = apiKey
-                                        app.prefs.authMode = "apikey"
-                                        app.prefs.sessionCookie = ""
-                                        app.prefs.stashUsername = ""
-                                        app.prefs.stashPassword = ""
-                                        app.refreshApi()
-                                        
-                                        Toast.makeText(this, "Setup complete!", Toast.LENGTH_SHORT).show()
-                                        stopHttpServer()
-                                        finishWithSuccess()
-                                    }
-                                    
-                                    val successHtml = """
-                                        <!DOCTYPE html>
-                                        <html>
-                                        <head><title>Success</title>
-                                        <style>body{font-family:sans-serif;text-align:center;padding:50px;background:#1b1b1b;color:#fff;}h1{color:#2AABE0;}</style>
-                                        </head>
-                                        <body><h1>✓ Setup Complete!</h1><p>You can close this page now.</p></body>
-                                        </html>
-                                    """.trimIndent()
-                                    
-                                    writer.println("HTTP/1.1 200 OK")
-                                    writer.println("Content-Type: text/html")
-                                    writer.println("Content-Length: ${successHtml.toByteArray().size}")
-                                    writer.println()
-                                    writer.println(successHtml)
-                                } else {
-                                    writer.println("HTTP/1.1 400 Bad Request")
-                                    writer.println()
-                                }
-                            }
-                            
-                            writer.flush()
-                            client.close()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }.start()
+        return try {
+            webSetupServer = WebSetupServer.start(serverUrl, setupToken, onComplete = { newServerUrl, apiKey ->
+                runOnUiThread {
+                    if (webSetupServer == null || isFinishing || isDestroyed) return@runOnUiThread
+                    app.prefs.serverUrl = newServerUrl
+                    app.prefs.apiKey = apiKey
+                    app.prefs.authMode = "apikey"
+                    app.prefs.sessionCookie = ""
+                    app.prefs.stashUsername = ""
+                    app.prefs.stashPassword = ""
+                    app.refreshApi()
+
+                    Toast.makeText(this, "Setup complete!", Toast.LENGTH_SHORT).show()
+                    stopHttpServer()
+                    finishWithSuccess()
                 }
-            } catch (e: Exception) {
-                if (!Thread.currentThread().isInterrupted) {
-                    e.printStackTrace()
-                }
-            }
-        }.apply { start() }
+            })
+            true
+        } catch (e: java.io.IOException) {
+            webSetupServer = null
+            android.util.Log.w("Sinema", "Could not start Web Setup server", e)
+            Toast.makeText(this, "Could not start Web Setup: ${e.message}", Toast.LENGTH_LONG).show()
+            false
+        }
     }
     
 
@@ -801,20 +681,12 @@ class SetupActivity : SinemaActivity() {
             .show()
     }
 
-    private fun generateShortSetupToken(): String {
-        val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        return (1..6).map { alphabet.random() }.joinToString("")
-    }
-
     private fun stopHttpServer() {
         try {
-            serverThread?.interrupt()
-            httpServer?.close()
-            httpServer = null
-            serverThread = null
-            webSetupToken = null
+            webSetupServer?.close()
+            webSetupServer = null
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("Sinema", "Could not stop Web Setup server", e)
         }
     }
     
@@ -957,10 +829,5 @@ class SetupActivity : SinemaActivity() {
             }
         }
     }
-    
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {
-        // Don't allow back button to skip setup
-        showMenuScreen()
-    }
+
 }

@@ -26,7 +26,12 @@ import java.util.ArrayList
  * Extension video renderers are not built here. Sinema leaves the extension
  * renderer mode at its default, off.
  */
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@androidx.annotation.OptIn(
+    markerClass = [
+        androidx.media3.common.util.UnstableApi::class,
+        androidx.media3.common.util.ExperimentalApi::class
+    ]
+)
 class PlaybackRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
     init {
         setEnableDecoderFallback(true)

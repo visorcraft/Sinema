@@ -47,8 +47,9 @@ class PlaybackActivity : SinemaActivity() {
     private var forceAlignedHls = false
     private var hasVideoOutput = false
     private var resumePositionMs: Long = 0L
-    private var startTimeMs: Long = 0L
-    private var playCountSent = false
+    @Volatile private var watchClock = PlaybackWatchClock()
+    private val saveQueue = PlaybackSaveQueue(SinemaApp.instance.appScope)
+    private val playCountSentSceneIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private var captions: List<CaptionRef> = emptyList()
     private var markers: List<Pair<String, Double>> = emptyList()
     private val chaptersDialog = DialogSlot()
@@ -66,7 +67,7 @@ class PlaybackActivity : SinemaActivity() {
     private var resumePromptResolved = false
     /** Paused with the resume prompt outstanding (Back keeps it outstanding). */
     private var resumeAwaitingChoice = false
-    /** Watch Next entry: fetch resume position before the first start. */
+    /** First start: resolve metadata (and resume position when needed) before building the player. */
     private var autoResumePending = false
     /** Scene viewed (partly) under incognito — stays unrecorded. */
     private var incognitoLatchSceneId: String? = null
@@ -124,7 +125,8 @@ class PlaybackActivity : SinemaActivity() {
             autoResumePending = true
             resolveAutoResume()
         } else {
-            loadSceneTitle()
+            autoResumePending = true
+            loadInitialMetadata()
         }
         // A scene begun under incognito stays unrecorded even if the user
         // turns incognito off before leaving it.
@@ -147,8 +149,8 @@ class PlaybackActivity : SinemaActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Watch Next deep links resolve their own resume position first; the
-        // coroutine owns the first start.
+        // Every first start resolves full scene metadata before the player is
+        // built; the coroutine owns that initial start.
         if (autoResumePending) return
         beginPlaybackSession()
     }
@@ -156,7 +158,10 @@ class PlaybackActivity : SinemaActivity() {
     private fun beginPlaybackSession(promptAllowed: Boolean = true) {
         startPlayback(promptAllowed)
         handler.post(progressRunnable)
-        startTimeMs = System.currentTimeMillis()
+        watchClock.onIsPlayingChanged(
+            player?.isPlaying == true,
+            android.os.SystemClock.elapsedRealtime()
+        )
     }
 
     private fun startPlayback(promptAllowed: Boolean = true) {
@@ -274,6 +279,7 @@ class PlaybackActivity : SinemaActivity() {
             val nearEnd = duration > 0 && duration - pos < 30_000
             resumePositionMs = if (nearEnd) 0L else pos.coerceAtLeast(0L)
         }
+        watchClock.onIsPlayingChanged(false, android.os.SystemClock.elapsedRealtime())
         releasePlayer()
         if (isFinishing) PlaybackQueue.clear()
     }
@@ -281,6 +287,7 @@ class PlaybackActivity : SinemaActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(hideRunnable)
         handler.removeCallbacks(progressRunnable)
+        saveQueue.close()
         super.onDestroy()
     }
 
@@ -291,47 +298,45 @@ class PlaybackActivity : SinemaActivity() {
         // happened *while* incognito was on unrecorded even if the user turns
         // it off again before leaving this scene.
         if (SinemaApp.instance.prefs.incognitoMode || incognitoLatchSceneId == sceneId) return
-        // Snapshot the id now: auto-advance reassigns sceneId synchronously
-        // after this call, but the save below runs asynchronously, so reading
-        // the field there could attribute the save to the next scene.
+        // Snapshot scene state now: a queue switch must not move the save to a
+        // different scene, API client, or watch clock while the write is queued.
         val savedSceneId = sceneId
         if (savedSceneId.isEmpty()) return
+        val savedWatchClock = watchClock
+        val nowMs = android.os.SystemClock.elapsedRealtime()
+        savedWatchClock.onIsPlayingChanged(exo.isPlaying, nowMs)
+        val totalPlayedMs = savedWatchClock.totalMs(nowMs)
         val pos = exo.currentPosition
         val duration = exo.duration
-        val playDurationMs = System.currentTimeMillis() - startTimeMs
         val app = SinemaApp.instance
 
-        // Calculate resume time in seconds
         val resumeTimeSec = if (duration > 0 && (duration - pos) < 30_000) {
-            // Finished — clear resume
             0.0
         } else if (pos > 5_000) {
             pos / 1000.0
         } else {
-            return // Watched less than 5 seconds, don't save anything
+            return
         }
 
-        val playDurationSec = playDurationMs / 1000.0
-
-        // Only increment play count once per viewing, when finishing
-        // (resume cleared) — repeated pauses near the end must not
-        // re-increment.
-        val shouldIncrement = resumeTimeSec == 0.0 && playDurationSec > 5 && !playCountSent
-        if (shouldIncrement) playCountSent = true
-
-        // Run in the app scope: lifecycleScope is cancelled when the
-        // activity is destroyed (the common back-press exit), which would
-        // drop the save mid-flight and lose resume/watched state.
+        // The app-scope FIFO drains after activity destruction without dropping
+        // progress or allowing an older position to overwrite a newer one.
         val appCtx = applicationContext
-        app.appScope.launch {
+        val api = app.api
+        val profileId = app.prefs.activeProfileId
+        saveQueue.enqueue {
             try {
-                app.api.saveSceneActivity(savedSceneId, resumeTimeSec, playDurationSec)
+                val playDurationMs = savedWatchClock.pendingMs(nowMs)
+                api.saveSceneActivity(savedSceneId, resumeTimeSec, playDurationMs / 1000.0)
+                savedWatchClock.markReported(playDurationMs)
+                val shouldIncrement = resumeTimeSec == 0.0 && totalPlayedMs > 5_000L &&
+                    savedSceneId !in playCountSentSceneIds
                 if (shouldIncrement) {
-                    app.api.incrementPlayCount(savedSceneId)
+                    api.incrementPlayCount(savedSceneId)
+                    playCountSentSceneIds.add(savedSceneId)
                 }
-                // Refresh Watch Next after saving playback state
-                if (resumeTimeSec > 0) {
-                    val continuePairs = app.api.findContinuePlaying()
+                // Refresh Watch Next only if the originating server is still active.
+                if (resumeTimeSec > 0 && app.prefs.activeProfileId == profileId) {
+                    val continuePairs = api.findContinuePlaying()
                     com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -419,20 +424,28 @@ class PlaybackActivity : SinemaActivity() {
         )
     }
 
-    private fun loadSceneTitle() {
+    private fun loadInitialMetadata() {
         val requestedScene = sceneId
         lifecycleScope.launch {
             try {
                 val details = SinemaApp.instance.api.findSceneFull(requestedScene)
                 if (sceneId == requestedScene) {
-                    sceneTitle = details?.scene?.displayTitle ?: ""
-                    updatePlaybackText()
+                    details?.let { d ->
+                        sceneTitle = d.scene.displayTitle
+                        videoWidth = d.scene.width
+                        videoHeight = d.scene.height
+                        applySceneMetadata(d)
+                    }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                android.util.Log.w("Sinema", "Could not load playback title for $requestedScene", e)
+                android.util.Log.w("Sinema", "Could not load playback metadata for $requestedScene", e)
             }
+            autoResumePending = false
+            if (sceneId != requestedScene || isFinishing || isDestroyed) return@launch
+            if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return@launch
+            beginPlaybackSession()
         }
     }
 
@@ -713,6 +726,7 @@ class PlaybackActivity : SinemaActivity() {
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        watchClock.onIsPlayingChanged(isPlaying, android.os.SystemClock.elapsedRealtime())
                         if (isPlaying) {
                             // Any playback start (prompt choice or manual
                             // controller press) resolves the resume prompt.
@@ -772,7 +786,7 @@ class PlaybackActivity : SinemaActivity() {
                         // Subsequent loop iterations re-fire STATE_ENDED; skip savePlayback
                         // because its finished-clear branch would overwrite the user's actual
                         // resume position with "completed".
-                        if (exo.repeatMode == Player.REPEAT_MODE_ONE && playCountSent) return
+                        if (exo.repeatMode == Player.REPEAT_MODE_ONE && sceneId in playCountSentSceneIds) return
                         savePlayback()
                         // Skip the queue advance when loop-one is on; Media3's
                         // auto-seek-to-0 will replay this video and the
@@ -1124,8 +1138,7 @@ class PlaybackActivity : SinemaActivity() {
             forceAlignedHls = false
             hasVideoOutput = false
             resumePositionMs = 0L
-            playCountSent = false
-            startTimeMs = System.currentTimeMillis()
+            watchClock = PlaybackWatchClock()
             releasePlayer()
             // The next lifecycle pause stores the new scene once it has a
             // meaningful position; never leave the outgoing scene restorable.
@@ -1255,30 +1268,28 @@ class PlaybackActivity : SinemaActivity() {
         )
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            val seekWithDpad = PlaybackKeyRouting.shouldSeekToAdjacentMarker(
-                controllerVisible = isControllerVisible,
-                hasMarkers = markers.isNotEmpty(),
-                playerSurfaceFocused = playerView.isFocused
-            )
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_MENU -> { showPlayerMenu(); return true }
-                KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
-                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (seekWithDpad) {
-                        seekToAdjacentMarker(true); return true
-                    }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        val seekWithDpad = PlaybackKeyRouting.shouldSeekToAdjacentMarker(
+            controllerVisible = isControllerVisible,
+            hasMarkers = markers.isNotEmpty(),
+            playerSurfaceFocused = playerView.isFocused
+        )
+        when (keyCode) {
+            KeyEvent.KEYCODE_MENU -> { showPlayerMenu(); return true }
+            KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (seekWithDpad) {
+                    seekToAdjacentMarker(true); return true
                 }
-                KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (seekWithDpad) {
-                        seekToAdjacentMarker(false); return true
-                    }
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (seekWithDpad) {
+                    seekToAdjacentMarker(false); return true
                 }
             }
         }
-        return super.dispatchKeyEvent(event)
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onUserInteraction() {
