@@ -52,17 +52,17 @@ class PlaybackActivity : FragmentActivity() {
     private var playCountSent = false
     private var captions: List<CaptionRef> = emptyList()
     private var markers: List<Pair<String, Double>> = emptyList()
-    private var chaptersDialog: android.app.AlertDialog? = null
-    private var aspectRatioDialog: android.app.AlertDialog? = null
-    private var playerMenuDialog: android.app.AlertDialog? = null
-    private var rateDialog: android.app.AlertDialog? = null
-    private var streamQualityDialog: android.app.AlertDialog? = null
-    private var resumePromptDialog: android.app.AlertDialog? = null
-    private var upNextDialog: android.app.AlertDialog? = null
+    private val chaptersDialog = DialogSlot()
+    private val aspectRatioDialog = DialogSlot()
+    private val playerMenuDialog = DialogSlot()
+    private val rateDialog = DialogSlot()
+    private val streamQualityDialog = DialogSlot()
+    private val resumePromptDialog = DialogSlot()
+    private val upNextDialog = DialogSlot()
     /** Scenes already played in the current Endless Mix session. */
     private val endlessPlayedIds = mutableSetOf<String>()
     private var endlessJob: kotlinx.coroutines.Job? = null
-    private var playbackErrorDialog: android.app.AlertDialog? = null
+    private val playbackErrorDialog = DialogSlot()
     /** True once the user picked Resume/Start-over or started playback manually. */
     private var resumePromptResolved = false
     /** Paused with the resume prompt outstanding (Back keeps it outstanding). */
@@ -245,24 +245,14 @@ class PlaybackActivity : FragmentActivity() {
         listOf(
             aspectRatioDialog, chaptersDialog, playerMenuDialog, rateDialog,
             streamQualityDialog, upNextDialog, playbackErrorDialog
-        ).forEach { dialog ->
-            dialog?.dismiss()
-        }
-        aspectRatioDialog = null
-        chaptersDialog = null
-        playerMenuDialog = null
-        rateDialog = null
-        streamQualityDialog = null
-        upNextDialog = null
-        playbackErrorDialog = null
+        ).forEach { it.dismiss() }
         rateFetchJob?.cancel()
         rateFetchJob = null
-        resumePromptDialog?.let { dialog ->
+        resumePromptDialog.dialog?.let { dialog ->
             suppressingPromptDismiss = true
-            dialog.dismiss()
+            resumePromptDialog.dismiss()
             suppressingPromptDismiss = false
         }
-        resumePromptDialog = null
     }
 
     override fun onStop() {
@@ -848,33 +838,33 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     private fun showAspectRatioDialog() {
-        if (aspectRatioDialog?.isShowing == true) return
+        if (aspectRatioDialog.isShowing) return
         val dialog = AspectRatioDialog.show(this, aspectRatio) { chosen ->
             aspectRatio = chosen
             prefs.playbackAspectRatio = chosen.name
             playerView.playbackAspectRatio = chosen
         }
-        aspectRatioDialog = dialog
+        aspectRatioDialog.dialog = dialog
         dialog.setOnDismissListener {
-            if (aspectRatioDialog === dialog) aspectRatioDialog = null
+            aspectRatioDialog.dismissIf(dialog)
             playerView.requestFocus()
         }
     }
 
     private fun showStreamQualityDialog() {
-        if (streamQualityDialog?.isShowing == true) return
+        if (streamQualityDialog.isShowing) return
         val dialog = StreamQualityDialog.show(this, streamQuality) { chosen ->
             if (chosen != streamQuality) applyStreamQuality(chosen)
         }
-        streamQualityDialog = dialog
+        streamQualityDialog.dialog = dialog
         dialog.setOnDismissListener {
-            if (streamQualityDialog === dialog) streamQualityDialog = null
+            streamQualityDialog.dismissIf(dialog)
             playerView.requestFocus()
         }
     }
 
     private fun showPlaybackRecovery(error: androidx.media3.common.PlaybackException) {
-        if (playbackErrorDialog?.isShowing == true) return
+        if (playbackErrorDialog.isShowing) return
         if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) ||
             isFinishing || isDestroyed
         ) return
@@ -896,16 +886,15 @@ class PlaybackActivity : FragmentActivity() {
             .setNegativeButton("Back") { _, _ -> finish() }
             .setCancelable(false)
             .create()
-        playbackErrorDialog = dialog
+        playbackErrorDialog.dialog = dialog
         dialog.setOnDismissListener {
-            if (playbackErrorDialog === dialog) playbackErrorDialog = null
+            playbackErrorDialog.dismissIf(dialog)
         }
         dialog.show()
     }
 
     private fun recoverPlayback(temporaryQuality: PlaybackStreamQuality? = null) {
-        playbackErrorDialog?.dismiss()
-        playbackErrorDialog = null
+        playbackErrorDialog.dismiss()
         val selection = recoveryQualitySelection(streamQuality, recoveryQualityRestore, temporaryQuality)
         streamQuality = selection.quality
         recoveryQualityRestore = selection.restoreAfterScene
@@ -931,19 +920,19 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun showChapters() {
         if (markers.isEmpty()) return
-        if (chaptersDialog?.isShowing == true) return
+        if (chaptersDialog.isShowing) return
         val scene = sceneId
-        chaptersDialog = android.app.AlertDialog.Builder(this)
+        chaptersDialog.show(android.app.AlertDialog.Builder(this)
             .setTitle("Chapters")
             .setAdapter(ChapterListAdapter(this, SinemaApp.instance.api, scene, markers)) { _, which ->
                 markers.getOrNull(which)?.let { player?.seekTo((it.second * 1000).toLong()) }
             }
             .setOnDismissListener { playerView.requestFocus() }
-            .show()
+        )
     }
 
     private fun showPlayerMenu() {
-        if (playerMenuDialog?.isShowing == true) return
+        if (playerMenuDialog.isShowing) return
         val incognito = SinemaApp.instance.prefs.incognitoMode
         // Label→action pairs: localized labels are never identity keys.
         val entries = buildList {
@@ -980,17 +969,17 @@ class PlaybackActivity : FragmentActivity() {
             add(getString(R.string.playback_menu_quality) to Runnable { showStreamQualityDialog() })
             add(getString(R.string.playback_menu_seek) to Runnable { cycleSeekPreset() })
         }
-        playerMenuDialog = android.app.AlertDialog.Builder(this)
+        playerMenuDialog.show(android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.playback_menu_title))
             .setItems(entries.map { it.first }.toTypedArray()) { dialog, which ->
                 dialog.dismiss()
                 entries[which].second.run()
             }
             .setOnDismissListener {
-                if (playerMenuDialog === it) playerMenuDialog = null
+                playerMenuDialog.dialog?.let { d -> playerMenuDialog.dismissIf(d) }
                 playerView.requestFocus()
             }
-            .show()
+        )
     }
 
     private var rateFetchJob: kotlinx.coroutines.Job? = null
@@ -1023,7 +1012,7 @@ class PlaybackActivity : FragmentActivity() {
     private fun showRateDialog() {
         val current = sceneId
         if (current.isEmpty()) return
-        if (rateDialog?.isShowing == true || rateFetchJob?.isActive == true) return
+        if (rateDialog.isShowing || rateFetchJob?.isActive == true) return
         rateFetchJob = lifecycleScope.launch {
             var stars = 0
             try {
@@ -1041,7 +1030,7 @@ class PlaybackActivity : FragmentActivity() {
             val options = (0..StarRating.MAX_STARS).map { count ->
                 if (count == 0) "No rating" else StarRating.glyphs(count)
             }
-            rateDialog = android.app.AlertDialog.Builder(this@PlaybackActivity)
+            rateDialog.show(android.app.AlertDialog.Builder(this@PlaybackActivity)
                 .setTitle("Rate scene")
                 .setSingleChoiceItems(options.toTypedArray(), stars) { dialog, which ->
                     dialog.dismiss()
@@ -1064,10 +1053,10 @@ class PlaybackActivity : FragmentActivity() {
                     }
                 }
                 .setOnDismissListener {
-                    if (rateDialog === it) rateDialog = null
+                    rateDialog.dialog?.let { d -> rateDialog.dismissIf(d) }
                     playerView.requestFocus()
                 }
-                .show()
+        )
         }
     }
 
@@ -1092,12 +1081,9 @@ class PlaybackActivity : FragmentActivity() {
         if (saveCurrent) savePlayback()
         // Any switch invalidates an open Up Next dialog's snapshot and the
         // chapters list (it belongs to the outgoing scene).
-        upNextDialog?.dismiss()
-        upNextDialog = null
-        playbackErrorDialog?.dismiss()
-        playbackErrorDialog = null
-        chaptersDialog?.dismiss()
-        chaptersDialog = null
+        upNextDialog.dismiss()
+        playbackErrorDialog.dismiss()
+        chaptersDialog.dismiss()
         // Serialize switches: a superseded jump must not interleave metadata
         // or sceneId updates with a newer one.
         sceneSwitchJob?.cancel()
@@ -1200,10 +1186,10 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     private fun showResumePrompt() {
-        if (resumePromptDialog?.isShowing == true) return
+        if (resumePromptDialog.isShowing) return
         val exo = player ?: return
         val at = com.sinema.util.TimeFormat.formatMs(resumePositionMs)
-        resumePromptDialog = android.app.AlertDialog.Builder(this)
+        resumePromptDialog.show(android.app.AlertDialog.Builder(this)
             .setTitle("Resume playback")
             .setMessage("Resume at $at or start over?")
             .setPositiveButton("Resume") { _, _ ->
@@ -1226,11 +1212,11 @@ class PlaybackActivity : FragmentActivity() {
                 if (!suppressingPromptDismiss) playerView.showController()
                 playerView.requestFocus()
             }
-            .show()
+        )
     }
 
     private fun showUpNextDialog() {
-        if (upNextDialog?.isShowing == true) return
+        if (upNextDialog.isShowing) return
         val remaining = PlaybackQueue.remaining()
         if (remaining.isEmpty()) {
             Toast.makeText(this, getString(R.string.up_next_empty), Toast.LENGTH_SHORT).show()
@@ -1240,12 +1226,12 @@ class PlaybackActivity : FragmentActivity() {
             // Resolve by stable id through the live queue.
             if (PlaybackQueue.current()?.id == target.id) return@UpNextAdapter
             PlaybackQueue.jumpToItem(target.id)?.let {
-                upNextDialog?.dismiss()
+                upNextDialog.dismiss()
                 playSceneNow(it.id, it.title, saveCurrent = true)
             } ?: Toast.makeText(this, getString(R.string.up_next_not_in_queue), Toast.LENGTH_SHORT).show()
         }
         adapter.refresh()
-        upNextDialog = android.app.AlertDialog.Builder(this)
+        upNextDialog.show(android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.up_next_title, remaining.size))
             .setAdapter(adapter, null)
             .setNegativeButton("Unwatched only") { _, _ ->
@@ -1269,7 +1255,7 @@ class PlaybackActivity : FragmentActivity() {
                 updatePlaybackText()
             }
             .setOnDismissListener { playerView.requestFocus() }
-            .show()
+        )
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
