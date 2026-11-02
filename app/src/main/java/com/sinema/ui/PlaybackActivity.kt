@@ -172,6 +172,12 @@ class PlaybackActivity : FragmentActivity() {
         if (promptResume) showResumePrompt()
     }
 
+    /** Maps full-scene metadata (captions, markers) shared by every switch path. */
+    private fun applySceneMetadata(details: com.sinema.model.SceneDetails) {
+        captions = details.scene.captions
+        markers = details.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
+    }
+
     /** Fetch scene metadata before silent Watch Next or stored-session playback. */
     private fun resolveAutoResume(preservePosition: Boolean = false) {
         val targetId = sceneId
@@ -183,8 +189,7 @@ class PlaybackActivity : FragmentActivity() {
                     videoWidth = d.scene.width
                     videoHeight = d.scene.height
                     if (!preservePosition) resumePositionMs = (d.scene.resumeTime * 1000).toLong()
-                    captions = d.scene.captions
-                    markers = d.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
+                    applySceneMetadata(d)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -1094,11 +1099,10 @@ class PlaybackActivity : FragmentActivity() {
             var nextTitle = fallbackTitle
             try {
                 val details = app.api.findSceneFull(nextId)
-                captions = details?.scene?.captions ?: emptyList()
-                markers = details?.markers?.map { it.title.ifBlank { it.primaryTag } to it.seconds } ?: emptyList()
                 nextWidth = details?.scene?.width ?: 0
                 nextHeight = details?.scene?.height ?: 0
                 nextTitle = details?.scene?.displayTitle ?: fallbackTitle
+                details?.let { applySceneMetadata(it) }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

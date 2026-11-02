@@ -241,59 +241,59 @@ class Prefs(context: Context) {
     }
 
 
-    fun hasPinSet(): Boolean {
-        return prefs.getString("pin_hash", null) != null
-    }
+    // ------------------------------------------------------------------
+    // PIN credentials: primary and decoy share one salted-hash store,
+    // parameterized by key prefix. The primary PIN keeps its legacy
+    // salt-less verification path for pre-salt installs.
+    // ------------------------------------------------------------------
 
-    fun setPinHash(pin: String) {
+    private fun hasCredential(prefix: String) = prefs.getString(prefix + "_hash", null) != null
+
+    private fun setCredential(prefix: String, pin: String) {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val saltHex = salt.joinToString("") { "%02x".format(it) }
-        val hash = hashPin(pin, salt)
         prefs.edit()
-            .putString("pin_salt", saltHex)
-            .putString("pin_hash", hash)
+            .putString(prefix + "_salt", saltHex)
+            .putString(prefix + "_hash", hashPin(pin, salt))
             .apply()
     }
 
-    fun verifyPin(pin: String): Boolean {
-        val storedHash = prefs.getString("pin_hash", null) ?: return false
-        val saltHex = prefs.getString("pin_salt", null)
+    private fun verifyCredential(prefix: String, pin: String): Boolean {
+        val storedHash = prefs.getString(prefix + "_hash", null) ?: return false
+        val saltHex = prefs.getString(prefix + "_salt", null)
         val salt = if (saltHex != null) {
             saltHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        } else if (prefix == "pin") {
+            ByteArray(0) // legacy pre-salt primary PIN
         } else {
-            ByteArray(0)
+            return false
         }
         return storedHash == hashPin(pin, salt)
     }
 
+    private fun removeCredential(prefix: String) {
+        prefs.edit().remove(prefix + "_hash").remove(prefix + "_salt").apply()
+    }
+
+    fun hasPinSet(): Boolean = hasCredential("pin")
+
+    fun setPinHash(pin: String) = setCredential("pin", pin)
+
+    fun verifyPin(pin: String): Boolean = verifyCredential("pin", pin)
+
     fun removePin() {
-        prefs.edit().remove("pin_hash").remove("pin_salt").apply()
+        removeCredential("pin")
         removeDecoyPin()
     }
 
-    // Decoy PIN: entering it unlocks a blank shell instead of the library.
-    fun hasDecoyPinSet(): Boolean = prefs.getString("decoy_pin_hash", null) != null
+    /** Decoy PIN: entering it unlocks a blank shell instead of the library. */
+    fun hasDecoyPinSet(): Boolean = hasCredential("decoy_pin")
 
-    fun setDecoyPinHash(pin: String) {
-        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val saltHex = salt.joinToString("") { "%02x".format(it) }
-        val hash = hashPin(pin, salt)
-        prefs.edit()
-            .putString("decoy_pin_salt", saltHex)
-            .putString("decoy_pin_hash", hash)
-            .apply()
-    }
+    fun setDecoyPinHash(pin: String) = setCredential("decoy_pin", pin)
 
-    fun verifyDecoyPin(pin: String): Boolean {
-        val storedHash = prefs.getString("decoy_pin_hash", null) ?: return false
-        val saltHex = prefs.getString("decoy_pin_salt", null) ?: return false
-        val salt = saltHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        return storedHash == hashPin(pin, salt)
-    }
+    fun verifyDecoyPin(pin: String): Boolean = verifyCredential("decoy_pin", pin)
 
-    fun removeDecoyPin() {
-        prefs.edit().remove("decoy_pin_hash").remove("decoy_pin_salt").apply()
-    }
+    fun removeDecoyPin() = removeCredential("decoy_pin")
 
     /** Auto-lock: re-ask for the PIN after this many idle minutes (0 = never). */
     var autoLockMinutes: Int
