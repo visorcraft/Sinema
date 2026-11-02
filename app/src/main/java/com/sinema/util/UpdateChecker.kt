@@ -84,12 +84,16 @@ object UpdateChecker {
             // Compare version names (e.g., "1.1" vs "1.2")
             val currentVersionName = try {
                 context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) { "0" }
 
             Log.d(TAG, "Current: $currentVersionName, Remote: $remoteVersionName ($tagName)")
 
             if (compareVersions(remoteVersionName, currentVersionName) > 0) info else null
-        } catch (e: Exception) {
+        } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
             Log.e(TAG, "Update check failed", e)
             null
         }
@@ -128,6 +132,8 @@ object UpdateChecker {
                 withContext(Dispatchers.Main) {
                     installApk(context, apkFile)
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Download failed", e)
                 withContext(Dispatchers.Main) {

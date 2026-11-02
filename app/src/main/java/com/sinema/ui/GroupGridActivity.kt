@@ -88,8 +88,6 @@ class GroupGridFragment : SceneGridFragment() {
         }
     }
 
-    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
-
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> =
         app.api.findGroups(page, perPage, searchQuery.ifBlank { null }, groupSort.field, groupSort.direction)
 

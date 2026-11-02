@@ -84,8 +84,6 @@ class MarkerBrowserFragment : SceneGridFragment() {
 
     override fun createCardPresenter(): Presenter = MarkerCardPresenter(app.api)
 
-    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
-
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> =
         app.api.findSceneMarkers(
             page = page,

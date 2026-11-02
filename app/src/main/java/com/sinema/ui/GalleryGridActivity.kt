@@ -89,8 +89,6 @@ class GalleryGridFragment : SceneGridFragment() {
         }
     }
 
-    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
-
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> =
         app.api.findGalleries(page, perPage, searchQuery.ifBlank { null }, gallerySort.field, gallerySort.direction)
 

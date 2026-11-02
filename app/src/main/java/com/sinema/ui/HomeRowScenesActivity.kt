@@ -52,8 +52,6 @@ class HomeRowScenesFragment : SceneGridFragment() {
     override val defaultSort get() = row.defaultSort
     override val supportsAlphaJump get() = row != HomeContentRow.UNWATCHED_PERFORMERS
 
-    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
-
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> {
         val sortField = sort.apiSort(randomSeed)
         val direction = sort.direction

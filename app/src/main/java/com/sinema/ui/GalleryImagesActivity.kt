@@ -118,8 +118,6 @@ class GalleryImagesFragment : SceneGridFragment() {
 
     override fun createCardPresenter() = FolderCardPresenter()
 
-    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
-
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> =
         app.api.findImagesForGallery(requireArguments().getString("id").orEmpty(), page, perPage)
 

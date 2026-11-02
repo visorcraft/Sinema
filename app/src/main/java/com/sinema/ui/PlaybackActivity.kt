@@ -340,6 +340,8 @@ class PlaybackActivity : FragmentActivity() {
                     val continuePairs = app.api.findContinuePlaying()
                     com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 android.util.Log.e("Sinema", "Failed to save playback state", e)
             }

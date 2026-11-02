@@ -137,17 +137,15 @@ class SceneDetailActivity : FragmentActivity() {
                         app.api.incrementPlayCount(scene.id)
                     }
                     detailState.applyWatchedToggle(wasWatched)
-                    runOnUiThread {
-                        bindWatchedButton()
-                        Toast.makeText(this@SceneDetailActivity,
-                            if (wasWatched) "Marked as unwatched" else "Marked as watched",
-                            Toast.LENGTH_SHORT).show()
-                    }
+                    bindWatchedButton()
+                    Toast.makeText(this@SceneDetailActivity,
+                        if (wasWatched) "Marked as unwatched" else "Marked as watched",
+                        Toast.LENGTH_SHORT).show()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e("Sinema", "Mark Watched/Unwatched FAILED for scene ${scene.id}", e)
-                    runOnUiThread {
-                        Toast.makeText(this@SceneDetailActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
+                    Toast.makeText(this@SceneDetailActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -197,19 +195,15 @@ class SceneDetailActivity : FragmentActivity() {
                 try {
                     app.api.sceneIncrementO(scene.id)
                     detailState.applyOIncrement()
-                    runOnUiThread {
-                        bindMeta(scene)
-                        Toast.makeText(this@SceneDetailActivity,
-                            "O × ${scene.oCounter}", Toast.LENGTH_SHORT).show()
-                    }
+                    bindMeta(scene)
+                    Toast.makeText(this@SceneDetailActivity,
+                        "O × ${scene.oCounter}", Toast.LENGTH_SHORT).show()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     Log.e("Sinema", "O count failed for ${scene.id}", e)
-                    runOnUiThread {
-                        Toast.makeText(this@SceneDetailActivity,
-                            "Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
+                    Toast.makeText(this@SceneDetailActivity,
+                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }

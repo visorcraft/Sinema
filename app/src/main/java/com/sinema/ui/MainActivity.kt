@@ -641,6 +641,23 @@ class MainFragment : RowsSupportFragment() {
         groupsState, discoveryState, unwatchedPerformersState
     ).any { !it.items.isNullOrEmpty() }
 
+    /**
+     * Shared load-failure handling. @return true when the caller should
+     * abort (401 routed to setup).
+     */
+    private fun handleAuthOrShowError(e: Exception): Boolean {
+        val message = e.message ?: "Unknown error"
+        return if (message.contains("401")) {
+            Toast.makeText(requireContext(), "Authentication failed. Please sign in again.", Toast.LENGTH_LONG).show()
+            startActivity(Intent(requireContext(), SetupActivity::class.java))
+            requireActivity().finish()
+            true
+        } else {
+            Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
+            false
+        }
+    }
+
     private fun loadContent(force: Boolean = false) {
         if (isLoading) return
         // Quick round-trips (settings, detail screens) within the TTL keep
@@ -810,15 +827,7 @@ class MainFragment : RowsSupportFragment() {
 
                 firstError?.let { e ->
                     if (!isAdded) return@let
-                    val message = e.message ?: "Unknown error"
-                    if (message.contains("401")) {
-                        Toast.makeText(requireContext(), "Authentication failed. Please sign in again.", Toast.LENGTH_LONG).show()
-                        startActivity(Intent(requireContext(), SetupActivity::class.java))
-                        requireActivity().finish()
-                        return@launch
-                    } else {
-                        Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
-                    }
+                    if (handleAuthOrShowError(e)) return@launch
                 }
 
             } catch (e: Exception) {
@@ -837,15 +846,7 @@ class MainFragment : RowsSupportFragment() {
                 serverErrorActive = shouldShowServerErrorRow(hadError = true, anyContentLoaded())
                 reconcileHomeRows()
                 if (!isAdded) return@launch
-                val message = e.message ?: "Unknown error"
-                if (message.contains("401")) {
-                    Toast.makeText(requireContext(), "Authentication failed. Please sign in again.", Toast.LENGTH_LONG).show()
-                    startActivity(Intent(requireContext(), SetupActivity::class.java))
-                    requireActivity().finish()
-                    return@launch
-                } else {
-                    Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
-                }
+                if (handleAuthOrShowError(e)) return@launch
             } finally {
                 isLoading = false
                 // Stamp even failures: a dead server should not be re-hit on
@@ -889,6 +890,8 @@ class MainFragment : RowsSupportFragment() {
                     if (update != null && isAdded && activity?.isFinishing == false) {
                         com.sinema.util.UpdateChecker.promptUpdate(requireActivity(), update)
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e("Sinema", "Update check failed", e)
                 }

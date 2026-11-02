@@ -52,8 +52,6 @@ class SavedFiltersFragment : SceneGridFragment() {
 
     override fun createCardPresenter() = SavedFilterCardPresenter(::showFilterActions)
 
-    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
-
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> {
         val filters = app.api.findSavedSceneFilters()
         val pageItems = filters.drop((page - 1) * perPage).take(perPage)

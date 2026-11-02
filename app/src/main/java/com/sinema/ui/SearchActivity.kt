@@ -284,10 +284,10 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
             val header = if (index == 0) HeaderItem("Scenes ($sceneCount)") else HeaderItem("")
             rowsAdapter.add(ListRow(header, listAdapter))
         }
-        addEntityRow("Tags", results.tags)
-        addEntityRow("Performers", results.performers)
-        addEntityRow("Studios", results.studios)
-        addGroupRow(results.groups)
+        addCardRow("Tags", results.tags)
+        addCardRow("Performers", results.performers)
+        addCardRow("Studios", results.studios)
+        addCardRow("Groups", results.groups)
     }
 
     /** Empty-query home: re-runnable recent searches plus a clear action. */
@@ -301,20 +301,12 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         rowsAdapter.add(ListRow(HeaderItem("Recent searches"), listAdapter))
     }
 
-    private fun addEntityRow(label: String, result: Pair<Int, List<EntityItem>>) {
+    private fun addCardRow(label: String, result: Pair<Int, List<Any>>) {
         val (count, items) = result
         if (items.isEmpty()) return
         val listAdapter = ArrayObjectAdapter(CardPresenter(app.api))
         items.forEach { listAdapter.add(it) }
         rowsAdapter.add(ListRow(HeaderItem("$label ($count)"), listAdapter))
-    }
-
-    private fun addGroupRow(result: Pair<Int, List<GroupItem>>) {
-        val (count, items) = result
-        if (items.isEmpty()) return
-        val listAdapter = ArrayObjectAdapter(CardPresenter(app.api))
-        items.forEach { listAdapter.add(it) }
-        rowsAdapter.add(ListRow(HeaderItem("Groups ($count)"), listAdapter))
     }
 
     private data class SearchResults(

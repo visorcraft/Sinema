@@ -217,17 +217,14 @@ class SetupActivity : FragmentActivity() {
                     lifecycleScope.launch {
                         try {
                             val sessionCookie = performStashLogin(serverUrl, username, password, true)
-
-                            withContext(Dispatchers.Main) {
-                                showAuthModeChoice(serverUrl, username, password, sessionCookie, true)
-                            }
+                            showAuthModeChoice(serverUrl, username, password, sessionCookie, true)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                errorText.text = "Login failed: ${e.message}"
-                                errorText.visibility = android.view.View.VISIBLE
-                                signInBtn.isEnabled = true
-                                signInBtn.text = "Sign In"
-                            }
+                            errorText.text = "Login failed: ${e.message}"
+                            errorText.visibility = android.view.View.VISIBLE
+                            signInBtn.isEnabled = true
+                            signInBtn.text = "Sign In"
                         }
                     }
                 }
@@ -241,17 +238,14 @@ class SetupActivity : FragmentActivity() {
             lifecycleScope.launch {
                 try {
                     val sessionCookie = performStashLogin(serverUrl, username, password, false)
-
-                    withContext(Dispatchers.Main) {
-                        showAuthModeChoice(serverUrl, username, password, sessionCookie, false)
-                    }
+                    showAuthModeChoice(serverUrl, username, password, sessionCookie, false)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        errorText.text = "Login failed: ${e.message}"
-                        errorText.visibility = android.view.View.VISIBLE
-                        signInBtn.isEnabled = true
-                        signInBtn.text = "Sign In"
-                    }
+                    errorText.text = "Login failed: ${e.message}"
+                    errorText.visibility = android.view.View.VISIBLE
+                    signInBtn.isEnabled = true
+                    signInBtn.text = "Sign In"
                 }
             }
         }
@@ -305,26 +299,23 @@ class SetupActivity : FragmentActivity() {
                 .post(loginBody)
                 .build()
             
-            val loginResponse = client.newCall(loginRequest).execute()
-            
-            // Stash returns 302 on success, 401 on failure
-            if (loginResponse.code == 401) {
-                throw Exception("Invalid username or password")
+            client.newCall(loginRequest).execute().use { loginResponse ->
+                // Stash returns 302 on success, 401 on failure
+                if (loginResponse.code == 401) {
+                    throw Exception("Invalid username or password")
+                }
+                if (loginResponse.code !in listOf(302, 303, 307, 308, 200)) {
+                    throw Exception("Unexpected login response: ${loginResponse.code}")
+                }
+
+                // Extract session cookie
+                val cookies = loginResponse.headers("Set-Cookie")
+                val sessionCookie = cookies.firstOrNull { it.contains("session") }
+                    ?: throw Exception("No session cookie received")
+
+                // Just need the cookie name=value part, not the attributes
+                sessionCookie.split(";").first()
             }
-            if (loginResponse.code !in listOf(302, 303, 307, 308, 200)) {
-                throw Exception("Unexpected login response: ${loginResponse.code}")
-            }
-            
-            // Extract session cookie
-            val cookies = loginResponse.headers("Set-Cookie")
-            val sessionCookie = cookies.firstOrNull { it.contains("session") }
-                ?: throw Exception("No session cookie received")
-            
-            // Just need the cookie name=value part, not the attributes
-            val cookieValue = sessionCookie.split(";").first()
-            
-            loginResponse.close()
-            cookieValue
         }
     }
     
@@ -351,17 +342,14 @@ class SetupActivity : FragmentActivity() {
                 .addHeader("Cookie", sessionCookie)
                 .build()
             
-            val graphqlResponse = client.newCall(graphqlRequest).execute()
-            
-            if (!graphqlResponse.isSuccessful) {
-                throw Exception("Failed to generate API key: ${graphqlResponse.code}")
+            val responseBody = client.newCall(graphqlRequest).execute().use { graphqlResponse ->
+                if (!graphqlResponse.isSuccessful) {
+                    throw Exception("Failed to generate API key: ${graphqlResponse.code}")
+                }
+                graphqlResponse.body?.string()
+                    ?: throw Exception("Empty response from server")
             }
-            
-            val responseBody = graphqlResponse.body?.string()
-                ?: throw Exception("Empty response from server")
-            
-            graphqlResponse.close()
-            
+
             // Extract API key from: {"data":{"generateAPIKey":"eyJhbGc..."}}
             val keyStart = responseBody.indexOf("\"generateAPIKey\":\"")
             if (keyStart == -1) throw Exception("Failed to extract API key")
@@ -428,27 +416,25 @@ class SetupActivity : FragmentActivity() {
             lifecycleScope.launch {
                 try {
                     val apiKey = generateApiKey(serverUrl, sessionCookie, trustSelfSigned)
-                    
-                    withContext(Dispatchers.Main) {
-                        app.prefs.serverUrl = serverUrl
-                        app.prefs.apiKey = apiKey
-                        app.prefs.authMode = "apikey"
-                        app.prefs.sessionCookie = ""
-                        app.prefs.stashUsername = ""
-                        app.prefs.stashPassword = ""
-                        app.prefs.setupAllowSelfSigned = trustSelfSigned
-                        app.prefs.migrateToProfilesIfNeeded()
-                        app.refreshApi()
 
-                        Toast.makeText(this@SetupActivity, "API key generated! You're all set.", Toast.LENGTH_SHORT).show()
-                        finishWithSuccess()
-                    }
+                    app.prefs.serverUrl = serverUrl
+                    app.prefs.apiKey = apiKey
+                    app.prefs.authMode = "apikey"
+                    app.prefs.sessionCookie = ""
+                    app.prefs.stashUsername = ""
+                    app.prefs.stashPassword = ""
+                    app.prefs.setupAllowSelfSigned = trustSelfSigned
+                    app.prefs.migrateToProfilesIfNeeded()
+                    app.refreshApi()
+
+                    Toast.makeText(this@SetupActivity, "API key generated! You're all set.", Toast.LENGTH_SHORT).show()
+                    finishWithSuccess()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@SetupActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                        apiKeyBtn.isEnabled = true
-                        apiKeyBtn.text = "Generate New API Key"
-                    }
+                    Toast.makeText(this@SetupActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    apiKeyBtn.isEnabled = true
+                    apiKeyBtn.text = "Generate New API Key"
                 }
             }
         }

@@ -35,8 +35,6 @@ class UntaggedScenesFragment : SceneGridFragment() {
     override val sortScreenKey get() = "untagged"
     override val canAssignTags = true
 
-    override suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
-
     override suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> =
         app.api.findUntaggedScenes(
             page = page,

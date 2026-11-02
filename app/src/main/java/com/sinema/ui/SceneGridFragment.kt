@@ -36,7 +36,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     protected open val pageSize = 100
     protected abstract val gridTitle: String
     protected abstract val emptyMessage: String
-    protected abstract suspend fun loadItems(): List<Any>
+    /** Defaults to the first page; override only for special accumulation. */
+    protected open suspend fun loadItems(): List<Any> = loadPage(1, pageSize).second
 
     protected open suspend fun loadPage(page: Int, perPage: Int): Pair<Int, List<Any>> {
         if (page > 1) return Pair(0, emptyList())

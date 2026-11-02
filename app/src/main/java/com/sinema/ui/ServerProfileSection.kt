@@ -33,16 +33,8 @@ object ServerProfileSection {
             prevMainBtn = mainBtn
         }
 
-        val addServerBtn = Button(ctx).apply {
+        val addServerBtn = ctx.tvButton("+ Add Server") { onAddServer() }.apply {
             id = View.generateViewId()
-            text = "+ Add Server"
-            isFocusable = true
-            setBackgroundColor(0xFF333333.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener { onAddServer() }
         }
         prevMainBtn?.let { it.nextFocusDownId = addServerBtn.id }
         layout.addView(addServerBtn, LinearLayout.LayoutParams(
@@ -94,19 +86,8 @@ object ServerProfileSection {
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
         ))
 
-        val optionsBtn = Button(ctx).apply {
-            text = "..."
-            textSize = 14f
-            isFocusable = true
+        val optionsBtn = ctx.tvButton("...") { showProfileOptions(ctx, profile, isLast) }.apply {
             nextFocusLeftId = btn.id
-            setBackgroundColor(0xFF333333.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
-            setOnClickListener {
-                showProfileOptions(ctx, profile, isLast)
-            }
         }
         rowLayout.addView(optionsBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
