@@ -20,7 +20,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="centerCrop"
-            android:background="#333333" />
+            android:background="#333333"
+            android:importantForAccessibility="no" />
 
         <ImageView
             android:id="@+id/card_heart"
@@ -28,6 +29,7 @@
             android:layout_height="24dp"
             android:layout_gravity="top|end"
             android:layout_margin="4dp"
+            android:contentDescription="@string/accessibility_favorite"
             android:src="@drawable/ic_heart"
             android:visibility="gone" />
     </FrameLayout>

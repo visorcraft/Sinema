@@ -24,7 +24,7 @@ enum class GallerySortOption(val label: String, val field: String, val direction
     }
 }
 
-class GalleryGridActivity : FragmentActivity() {
+class GalleryGridActivity : SinemaActivity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, GalleryGridActivity::class.java)
     }

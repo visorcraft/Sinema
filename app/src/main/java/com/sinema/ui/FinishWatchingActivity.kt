@@ -11,7 +11,7 @@ import com.sinema.model.Scene
  * Play All work like any scene grid. Near-end scenes are hidden (they count
  * as finished server-side once playback clears the resume point).
  */
-class FinishWatchingActivity : FragmentActivity() {
+class FinishWatchingActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)

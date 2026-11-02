@@ -19,7 +19,7 @@ import com.sinema.model.SortOption
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-class SavedFiltersActivity : FragmentActivity() {
+class SavedFiltersActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)
@@ -165,7 +165,7 @@ class SavedFilterCardPresenter(
     }
 }
 
-class SavedFilterScenesActivity : FragmentActivity() {
+class SavedFilterScenesActivity : SinemaActivity() {
     companion object {
         const val EXTRA_ID = "saved_filter_id"
         const val EXTRA_NAME = "saved_filter_name"

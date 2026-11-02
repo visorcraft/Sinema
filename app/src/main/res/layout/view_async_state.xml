@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/grid_state_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF1B1B1B"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="48dp"
+    android:visibility="gone">
+
+    <ProgressBar
+        android:id="@+id/grid_state_progress"
+        android:layout_width="48dp"
+        android:layout_height="48dp" />
+
+    <TextView
+        android:id="@+id/grid_state_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:maxWidth="640dp"
+        android:textColor="@android:color/white"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/grid_state_retry"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/action_button_background"
+        android:focusable="true"
+        android:minWidth="160dp"
+        android:text="@string/grid_retry"
+        android:textColor="@android:color/white" />
+</LinearLayout>

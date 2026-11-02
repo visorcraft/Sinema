@@ -16,7 +16,7 @@ import com.sinema.model.GalleryItem
 import com.sinema.model.ImageItem
 import com.sinema.util.GlideAuth
 
-class GalleryImagesActivity : FragmentActivity() {
+class GalleryImagesActivity : SinemaActivity() {
     companion object {
         private const val EXTRA_ID = "gallery_id"
         private const val EXTRA_NAME = "gallery_name"

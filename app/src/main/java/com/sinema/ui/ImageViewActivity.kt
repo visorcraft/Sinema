@@ -23,7 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-class ImageViewActivity : FragmentActivity() {
+class ImageViewActivity : SinemaActivity() {
     private var images: List<ImageItem> = emptyList()
     private var order: List<Int> = emptyList()
     private var state = ImageViewerState()

@@ -95,7 +95,9 @@ In View All grids, press Menu → `🔤 Jump to letter…` and pick a letter (or
 
 Page Up and Page Down scroll one visible screen at a time. Menu → `↑ Back to top` returns to the first card. While scrolling, a temporary indicator shows the visible result range and server total.
 
-Grids show inline loading and empty-state messages. A failed first load offers a D-pad-accessible `Retry`; failed refreshes or page loads keep the scenes already on screen.
+Grids show inline loading and empty-state messages. A failed first load offers a D-pad-accessible `Retry`; failed refreshes or page loads keep the scenes already on screen. Search, Folder Browser, scene details, and Server Dashboard use the same recovery pattern. Errors explain likely network, authentication, certificate, or server-address problems.
+
+`Settings` → `Accessibility` offers larger interface text, a high-visibility focus outline, reduced motion, and the built-in Remote Control Guide. TalkBack labels cover focused controls, ratings, queue actions, favorite/watched state, and progress. The guide documents D-pad, Menu, long-press, paging, playback, queues, images, and accessibility controls.
 
 ### Favorite entities
 

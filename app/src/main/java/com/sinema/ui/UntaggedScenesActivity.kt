@@ -8,7 +8,7 @@ import com.sinema.R
  * Curation backlog: scenes with no tags and no performers. Long-press a card
  * to assign tags; the scene leaves the grid once it is no longer an orphan.
  */
-class UntaggedScenesActivity : FragmentActivity() {
+class UntaggedScenesActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)

@@ -10,7 +10,7 @@ import com.sinema.R
 import com.sinema.model.Scene
 import java.io.IOException
 
-class RelatedScenesActivity : FragmentActivity() {
+class RelatedScenesActivity : SinemaActivity() {
     companion object {
         private const val EXTRA_ID = "related_scene_id"
         private const val EXTRA_TITLE = "related_scene_title"

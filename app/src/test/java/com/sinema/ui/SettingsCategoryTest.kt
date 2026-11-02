@@ -7,7 +7,7 @@ class SettingsCategoryTest {
     @Test
     fun `categories have a predictable remote friendly order`() {
         assertEquals(
-            listOf("Server", "Home", "Playback", "Privacy", "System"),
+            listOf("Server", "Home", "Playback", "Privacy", "Accessibility", "System"),
             SettingsCategory.entries.map { it.title }
         )
     }

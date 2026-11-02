@@ -34,7 +34,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * Library stats: server totals plus most-watched scenes, performers, tags,
  * and studios aggregated from the top-played scenes.
  */
-class StatsActivity : FragmentActivity() {
+class StatsActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -66,7 +66,7 @@ class StatsFragment : RowsSupportFragment() {
         view.setPadding(hPad, topPad, hPad, topPad)
         (view as? ViewGroup)?.clipToPadding = false
 
-        val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
+        val lrp = ListRowPresenter(TvMotion.focusZoom(), false)
         lrp.shadowEnabled = false
         adapter = ArrayObjectAdapter(lrp)
         loadStats()

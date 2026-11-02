@@ -25,7 +25,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
-class FolderBrowseActivity : FragmentActivity() {
+class FolderBrowseActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)
@@ -174,6 +174,7 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
 
     private fun loadFolder() {
         loadJob?.cancel()
+        activity?.renderGridLoadState(GridLoadState.loading(gridAdapter.size() > 0)) { loadFolder() }
         loadJob = lifecycleScope.launch {
             try {
                 val scenesJob = async {
@@ -195,9 +196,10 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
                 val items = FolderHelper.buildFolderContents(scenes, images, currentPath)
                 gridAdapter.clear()
                 items.forEach { gridAdapter.add(it) }
-                if (items.isEmpty()) {
-                    Toast.makeText(requireContext(), "Empty folder", Toast.LENGTH_SHORT).show()
-                } else if (scenesTruncated || imagesTruncated) {
+                activity?.renderGridLoadState(
+                    GridLoadState.loaded(items.size, "This folder is empty")
+                ) { loadFolder() }
+                if (scenesTruncated || imagesTruncated) {
                     Toast.makeText(requireContext(),
                         "Large folder: showing the first $MAX_ITEMS videos/pictures",
                         Toast.LENGTH_LONG).show()
@@ -205,7 +207,12 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
             } catch (e: CancellationException) {
                 throw e // back-press cancels the scope; not a real error
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                val message = UiErrorMessage.forException(e)
+                if (gridAdapter.size() > 0) {
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                } else {
+                    activity?.renderGridLoadState(GridLoadState.failed(false, message)) { loadFolder() }
+                }
             }
         }
     }

@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 private const val VIDEO_OUTPUT_TIMEOUT_MS = 5_000L
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-class PlaybackActivity : FragmentActivity() {
+class PlaybackActivity : SinemaActivity() {
     private var player: ExoPlayer? = null
     private lateinit var playerView: AspectRatioPlayerView
     private var sceneId: String = ""

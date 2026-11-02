@@ -28,7 +28,7 @@ import java.util.Locale
  * top-rated scenes with a clock. Any key or touch exits. Respects the
  * screenshot block (FLAG_SECURE is applied app-wide by SinemaApp).
  */
-class AmbientActivity : FragmentActivity() {
+class AmbientActivity : SinemaActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val slideMs = 12_000L
     private val clockFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -137,7 +137,7 @@ class AmbientActivity : FragmentActivity() {
         handler.postDelayed(clockRunnable, 30_000L)
     }
 
-    /** Crossfade to the next scene and Ken Burns the incoming image. */
+    /** Crossfade and Ken Burns unless reduced motion is enabled. */
     private fun showNext() {
         if (scenes.isEmpty()) return
         val scene = scenes[index % scenes.size]
@@ -147,11 +147,22 @@ class AmbientActivity : FragmentActivity() {
         val oldBack = back
         front = oldBack
         back = oldFront
+        front.animate().cancel()
+        back.animate().cancel()
         front.alpha = 0f
         Glide.with(this)
             .load(GlideAuth.url(SinemaApp.instance.api, SinemaApp.instance.api.getScreenshotUrl(scene.id)))
             .centerInside()
             .into(front)
+        if (SinemaApp.instance.prefs.reduceMotion) {
+            front.alpha = 1f
+            back.alpha = 0f
+            front.scaleX = 1f
+            front.scaleY = 1f
+            front.translationX = 0f
+            front.translationY = 0f
+            return
+        }
         front.animate().alpha(1f).setDuration(2_000L).setInterpolator(LinearInterpolator()).start()
         back.animate().alpha(0f).setDuration(2_000L).setInterpolator(LinearInterpolator())
             .setListener(object : AnimatorListenerAdapter() {

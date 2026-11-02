@@ -121,6 +121,12 @@ Full details include:
 
 `activity_grid.xml` adds visible D-pad controls through `SortableScreen`. Entity grids additionally expose name search and entity-specific sorting.
 
+### Screen states and accessibility
+
+`GridLoadState` and `GridStateViews` provide shared loading, empty, error, and Retry rendering for scene grids, Search, Folder Browser, and scene details. `UiErrorMessage` maps transport, authentication, TLS, missing-endpoint, and generic failures to actionable copy. Home retains its independent row-level states and persistent empty-dashboard retry. Server Dashboard preserves loaded data during refresh failures and appends a retry action.
+
+`SinemaActivity` applies the persisted `InterfaceTextScale` through configuration contexts and installs an optional high-visibility foreground ring through a global focus listener, without replacing screen-specific focus handlers. `TvMotion` centralizes Leanback zoom choices; reduced motion also disables Ambient Gallery pan, zoom, and crossfades. `RemoteGuideActivity` provides D-pad-scrollable remote help. Accessibility Settings lives beside Privacy and System.
+
 ### Sorting and filtering
 
 Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sort fields. Entity sort options live in `EntityGridActivity.kt`.
@@ -141,7 +147,7 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 ### Insights, entities, backup, server, alpha jump
 
-`TasteInsights` (util, pure) summarizes your 14-day plays and ranks the tags/performers/studios those recently played scenes carry (per-scene counting — Stash has no per-play history, so lifetime play counts are never attributed to the window); it reads `last_played_at` from the most-played snapshot (`findTopPlayedScenes`). Date-part string comparisons keep it timezone-safe. Entity favorites ride `EntityItem.rating100` (list queries select it; `entitySetRating` dispatches to `performerUpdate`/`tagUpdate`/`studioUpdate` with serializeNulls). `Prefs.exportSnapshot`/`importSnapshot` round-trip a versioned JSON backup (regular prefs + encrypted server-profile store — credentials included) through SAF dialogs in Settings → System. `ServerDashboardActivity` reads `getServerVersion`, `getStats`, and `getJobQueue` (null → unsupported), plus `SinemaApp.noteError`'s 20-entry ring buffer. Alpha jump adds an anchored `path MATCHES_REGEX` criterion via `pathPrefixRegex` threaded through the home-row paged queries (`HomeRowScenesFragment` opts in through `supportsAlphaJump`).
+`TasteInsights` (util, pure) summarizes your 14-day plays and ranks the tags/performers/studios those recently played scenes carry (per-scene counting — Stash has no per-play history, so lifetime play counts are never attributed to the window); it reads `last_played_at` from the most-played snapshot (`findTopPlayedScenes`). Date-part string comparisons keep it timezone-safe. Entity favorites ride `EntityItem.rating100` (list queries select it; `entitySetRating` dispatches to `performerUpdate`/`tagUpdate`/`studioUpdate` with serializeNulls). `Prefs.exportSnapshot`/`importSnapshot` round-trip a versioned JSON backup (regular prefs + encrypted server-profile store — credentials included) through SAF dialogs in Settings → System. `ServerDashboardActivity` reads `getServerVersion`, `getStats`, and `getJobQueue` (null → unsupported), plus `SinemaApp.noteError`'s 20-entry ring buffer. Alpha jump adds an anchored `MATCHES_REGEX` criterion via `pathPrefixRegex` and `alphaField`, using `title` for title sorts and `path` otherwise, threaded through the home-row paged queries (`HomeRowScenesFragment` opts in through `supportsAlphaJump`).
 
 ### Playback queue
 

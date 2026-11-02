@@ -21,7 +21,7 @@ import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 
-class SetupActivity : FragmentActivity() {
+class SetupActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private var httpServer: ServerSocket? = null
     private var serverThread: Thread? = null

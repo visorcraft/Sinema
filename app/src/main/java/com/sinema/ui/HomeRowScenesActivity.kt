@@ -9,7 +9,7 @@ import com.sinema.R
 import com.sinema.model.HomeContentRow
 import com.sinema.model.SortOption
 
-class HomeRowScenesActivity : FragmentActivity() {
+class HomeRowScenesActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)

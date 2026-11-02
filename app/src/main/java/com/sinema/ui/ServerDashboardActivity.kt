@@ -2,6 +2,7 @@ package com.sinema.ui
 
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -19,9 +20,11 @@ import kotlinx.coroutines.launch
  * Power-user server dashboard: Stash version, library totals, running jobs,
  * and the most recent errors recorded by the app.
  */
-class ServerDashboardActivity : FragmentActivity() {
+class ServerDashboardActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private lateinit var content: LinearLayout
+    private var hasLoadedData = false
+    private val failureViews = mutableListOf<View>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,8 +49,12 @@ class ServerDashboardActivity : FragmentActivity() {
     }
 
     private fun load() {
-        content.removeAllViews()
-        addRow(getString(com.sinema.R.string.server_loading), "")
+        failureViews.forEach(content::removeView)
+        failureViews.clear()
+        if (!hasLoadedData) {
+            content.removeAllViews()
+            addRow(getString(com.sinema.R.string.server_loading), "")
+        }
         lifecycleScope.launch {
             try {
                 val (version, stats, jobs) = coroutineScope {
@@ -58,6 +65,7 @@ class ServerDashboardActivity : FragmentActivity() {
                 }
                 if (isFinishing || isDestroyed) return@launch
                 content.removeAllViews()
+                hasLoadedData = true
                 addRow(getString(com.sinema.R.string.server_stash_version), version)
                 addRow(getString(com.sinema.R.string.server_scenes), "${stats.sceneCount}  (${TimeFormat.formatSeconds(stats.scenesDurationSeconds)} total)")
                 addRow(getString(com.sinema.R.string.server_entities),
@@ -80,10 +88,24 @@ class ServerDashboardActivity : FragmentActivity() {
                 throw e
             } catch (e: Exception) {
                 if (isFinishing || isDestroyed) return@launch
-                content.removeAllViews()
-                addRow("Error", e.message ?: "unknown")
+                val firstFailureView = content.childCount
+                if (hasLoadedData) addHeader("Refresh failed") else content.removeAllViews()
+                addRow("Error", UiErrorMessage.forException(e))
+                addRetry()
+                for (index in firstFailureView until content.childCount) {
+                    failureViews.add(content.getChildAt(index))
+                }
             }
         }
+    }
+
+    private fun addRetry() {
+        content.addView(Button(this).apply {
+            text = getString(com.sinema.R.string.grid_retry)
+            isFocusable = true
+            setOnClickListener { load() }
+            bindFocusBackground()
+        })
     }
 
     private fun addHeader(label: String) {

@@ -16,7 +16,7 @@ import com.sinema.model.HomeContentRow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-class HomeSettingsActivity : FragmentActivity() {
+class HomeSettingsActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private lateinit var artworkButton: Button
     private lateinit var heroButton: Button

@@ -21,7 +21,7 @@ import com.sinema.util.loadAuth
 import com.sinema.util.SceneIntents
 import java.io.IOException
 
-class GroupScenesActivity : FragmentActivity() {
+class GroupScenesActivity : SinemaActivity() {
     companion object {
         private const val EXTRA_ID = "group_id"
         private const val EXTRA_NAME = "group_name"

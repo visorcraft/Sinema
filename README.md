@@ -160,6 +160,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **🔎 Global Search** — Optional Android TV system-search suggestions for scenes, with signature-level provider protection and PIN-aware deep links; off by default.
 - **🔗 Deep Links** — Open scene details or resume playback through Sinema scene/play links and launcher integrations.
 - **⬆️ In-App Updates** — Automatic once-per-session checks plus manual update checks and APK installation from GitHub releases.
+- **♿ Accessibility & Remote Guide** — Larger interface text, a high-visibility focus outline, reduced motion, TalkBack labels for controls and progress, and a built-in D-pad remote-control guide.
 - **🎮 D-pad Native & Dark Theme** — A couch-friendly, overscan-aware interface designed for TV remotes, with no touchscreen required.
 
 ---

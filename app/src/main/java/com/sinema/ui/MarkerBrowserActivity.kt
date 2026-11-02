@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
  * Library-wide scene markers ("chapters") with tag filtering. Selecting a
  * marker jumps straight into playback at its timestamp.
  */
-class MarkerBrowserActivity : FragmentActivity() {
+class MarkerBrowserActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)

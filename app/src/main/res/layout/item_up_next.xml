@@ -28,6 +28,7 @@
         android:layout_height="44dp"
         android:layout_marginStart="8dp"
         android:focusable="true"
+        android:contentDescription="@string/accessibility_move_earlier"
         android:text="▲"
         android:textSize="14sp" />
 
@@ -37,6 +38,7 @@
         android:layout_height="44dp"
         android:layout_marginStart="6dp"
         android:focusable="true"
+        android:contentDescription="@string/accessibility_move_later"
         android:text="▼"
         android:textSize="14sp" />
 
@@ -46,6 +48,7 @@
         android:layout_height="44dp"
         android:layout_marginStart="6dp"
         android:focusable="true"
+        android:contentDescription="@string/accessibility_remove_queue"
         android:text="✕"
         android:textSize="14sp" />
 </LinearLayout>

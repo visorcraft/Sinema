@@ -38,7 +38,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class SearchActivity : FragmentActivity() {
+class SearchActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)
@@ -151,6 +151,24 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
         activity?.refreshGridControls()
+        val overlay = activity?.findViewById<View>(R.id.grid_state_overlay)
+        val searchBar = view.findViewById<androidx.leanback.widget.SearchBar>(
+            androidx.leanback.R.id.lb_search_bar
+        )
+        view.viewTreeObserver.addOnGlobalLayoutListener {
+            val params = overlay?.layoutParams as? android.widget.FrameLayout.LayoutParams
+            if (params != null) {
+                val barLocation = IntArray(2)
+                val parentLocation = IntArray(2)
+                searchBar.getLocationInWindow(barLocation)
+                (overlay.parent as View).getLocationInWindow(parentLocation)
+                val topMargin = (barLocation[1] + searchBar.height - parentLocation[1]).coerceAtLeast(0)
+                if (params.topMargin != topMargin) {
+                    params.topMargin = topMargin
+                    overlay.layoutParams = params
+                }
+            }
+        }
     }
 
     private val discreetRebind = DiscreetRebind()
@@ -163,7 +181,7 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sort = SortOption.fromName(app.prefs.sortFor("search"))
-        val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
+        val lrp = ListRowPresenter(TvMotion.focusZoom(), false)
         rowsAdapter = ArrayObjectAdapter(lrp)
         setSearchResultProvider(this)
         setSpeechRecognitionCallback {
@@ -236,6 +254,9 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
             renderRecentSearches()
             return
         }
+        activity?.renderGridLoadState(GridLoadState.loading(rowsAdapter.size() > 0)) {
+            search(currentQuery)
+        }
         searchJob = lifecycleScope.launch {
             delay(300)
             try {
@@ -266,11 +287,21 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
                 // and never while incognito.
                 if (!app.prefs.incognitoMode) app.prefs.recordRecentSearch(query)
                 renderResults(results)
+                activity?.renderGridLoadState(
+                    GridLoadState.loaded(rowsAdapter.size(), "No results for “$query”")
+                ) { search(currentQuery) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e("Sinema", "Search failed for query $query", e)
-                Toast.makeText(requireContext(), "Search failed: ${e.message}", Toast.LENGTH_LONG).show()
+                val message = UiErrorMessage.forException(e)
+                if (rowsAdapter.size() > 0) {
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                } else {
+                    activity?.renderGridLoadState(GridLoadState.failed(false, message)) {
+                        search(currentQuery)
+                    }
+                }
             }
         }
     }
@@ -294,11 +325,15 @@ class SinemaSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private fun renderRecentSearches() {
         rowsAdapter.clear()
         val recents = app.prefs.recentSearches
-        if (recents.isEmpty()) return
-        val listAdapter = ArrayObjectAdapter(RecentSearchPresenter())
-        recents.forEach { listAdapter.add(it) }
-        listAdapter.add(RecentSearches.CLEAR_ACTION)
-        rowsAdapter.add(ListRow(HeaderItem("Recent searches"), listAdapter))
+        if (recents.isNotEmpty()) {
+            val listAdapter = ArrayObjectAdapter(RecentSearchPresenter())
+            recents.forEach { listAdapter.add(it) }
+            listAdapter.add(RecentSearches.CLEAR_ACTION)
+            rowsAdapter.add(ListRow(HeaderItem("Recent searches"), listAdapter))
+        }
+        activity?.renderGridLoadState(
+            GridLoadState.loaded(rowsAdapter.size(), "Search scenes, tags, performers, studios, and Groups")
+        ) { search(currentQuery) }
     }
 
     private fun addCardRow(label: String, result: Pair<Int, List<Any>>) {

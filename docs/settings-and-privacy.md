@@ -6,6 +6,7 @@ Open `Settings` from the bottom row of the main screen, then choose a category:
 - **Home**: Home Settings and Ambient Gallery.
 - **Playback**: stream quality, aspect ratio, seek buttons, subtitle appearance and language, and looping defaults.
 - **Privacy**: PIN lock, Discreet Mode, Incognito, and screenshot blocking.
+- **Accessibility**: interface text size, high-visibility focus, reduced motion, and the remote-control guide.
 - **System**: Android TV Channels and Global Search.
 
 Back returns from a category to the category list. URL and API-key edits remain available while moving between categories. If you press Back at the category list with unsaved server edits, Sinema offers **Save**, **Discard**, or **Keep editing**. API-key drafts are retained in memory during activity recreation and are not written into Android instance-state storage.
@@ -86,6 +87,17 @@ Open `Settings` → `Playback` to choose:
 - **Loop current scene**: repeat one scene instead of advancing through a queue.
 
 These settings use the same saved choices as the player controls. Choosing a recovery stream after a playback failure is temporary and does not change these defaults.
+
+## Accessibility and remote guidance
+
+Open `Settings` → `Accessibility` to choose:
+
+- **Interface text**: Default, Large (1.2×), or Extra Large (1.4×). The setting applies throughout Sinema and is saved on this device.
+- **High-visibility focus**: draws a bright yellow outline around the currently focused control without changing other focus behavior.
+- **Reduce motion**: disables card zoom and Ambient Gallery pan, zoom, and crossfade animations.
+- **Remote Control Guide**: D-pad-scrollable help for navigation, grids, playback, queues, images, and accessibility controls.
+
+TalkBack labels describe focused controls, ratings, queue actions, favorite/watched state, and watch progress. Decorative artwork is excluded from the accessibility tree.
 
 ## Privacy controls
 

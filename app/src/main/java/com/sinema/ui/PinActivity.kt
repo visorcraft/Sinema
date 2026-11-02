@@ -12,7 +12,7 @@ import androidx.fragment.app.FragmentActivity
 import com.sinema.R
 import com.sinema.SinemaApp
 
-class PinActivity : FragmentActivity() {
+class PinActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private lateinit var titleText: TextView
     private lateinit var errorText: TextView

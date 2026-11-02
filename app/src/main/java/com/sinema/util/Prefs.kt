@@ -121,6 +121,13 @@ class Prefs(context: Context) {
     /** Endless Mix: auto-extend an exhausted queue with fresh candidates. */
     var endlessMix: Boolean by bool("endless_mix", false)
 
+    var interfaceTextScale: String
+        get() = prefs.getString("interface_text_scale", "") ?: ""
+        set(value) = prefs.edit().putString("interface_text_scale", value).apply()
+
+    var highContrastFocus: Boolean by bool("high_contrast_focus", false)
+    var reduceMotion: Boolean by bool("reduce_motion", false)
+
     var playbackSessionJson: String
         get() = getSecureString("playback_session")
         set(value) = putSecureString("playback_session", value)

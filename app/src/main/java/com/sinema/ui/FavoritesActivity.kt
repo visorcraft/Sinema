@@ -6,7 +6,7 @@ import androidx.fragment.app.FragmentActivity
 import com.sinema.R
 import com.sinema.model.SortOption
 
-class FavoritesActivity : FragmentActivity() {
+class FavoritesActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_grid)

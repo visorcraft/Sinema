@@ -32,6 +32,7 @@ internal enum class SettingsCategory(val title: String) {
     HOME("Home"),
     PLAYBACK("Playback"),
     PRIVACY("Privacy"),
+    ACCESSIBILITY("Accessibility"),
     SYSTEM("System")
 }
 
@@ -59,7 +60,7 @@ internal class SettingsDraftViewModel : ViewModel() {
     var apiKeyVisible = false
 }
 
-class SettingsActivity : FragmentActivity() {
+class SettingsActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -261,6 +262,10 @@ class SettingsFragment : Fragment() {
             )
             if (enabled.isEmpty()) "PIN and local privacy controls" else enabled.joinToString(" · ")
         }
+        SettingsCategory.ACCESSIBILITY -> {
+            val text = com.sinema.model.InterfaceTextScale.fromName(app.prefs.interfaceTextScale).label
+            "$text · High-visibility focus ${onOff(app.prefs.highContrastFocus)} · Reduce motion ${onOff(app.prefs.reduceMotion)}"
+        }
         SettingsCategory.SYSTEM ->
             "Channels ${onOff(app.prefs.channelsEnabled)} · Global Search ${onOff(app.prefs.globalSearchEnabled)}"
     }
@@ -270,6 +275,7 @@ class SettingsFragment : Fragment() {
         SettingsCategory.HOME -> showHomeSettings()
         SettingsCategory.PLAYBACK -> showPlaybackSettings()
         SettingsCategory.PRIVACY -> showPrivacySettings()
+        SettingsCategory.ACCESSIBILITY -> showAccessibilitySettings()
         SettingsCategory.SYSTEM -> showSystemSettings()
     }
 
@@ -468,6 +474,44 @@ class SettingsFragment : Fragment() {
 
     private fun subtitleLanguageLabel(): String =
         "Preferred subtitles: ${com.sinema.model.SubtitleLanguage.fromCode(app.prefs.subtitleLanguage).label}"
+
+    private fun showAccessibilitySettings() {
+        showContent("Accessibility", "Text, focus, motion, and remote-control help.") { layout ->
+            lateinit var textScaleButton: Button
+            textScaleButton = addButton(layout, interfaceTextScaleLabel()) {
+                val next = com.sinema.model.InterfaceTextScale.fromName(app.prefs.interfaceTextScale).next()
+                app.prefs.interfaceTextScale = next.name
+                textScaleButton.text = interfaceTextScaleLabel()
+                requireActivity().recreate()
+            }
+            addDescription(layout, "Large and Extra Large increase interface text while keeping your Android TV layout.")
+
+            addToggle(
+                layout,
+                "High-visibility focus",
+                "Draw a bright yellow outline around the currently focused control.",
+                { app.prefs.highContrastFocus },
+                {
+                    app.prefs.highContrastFocus = it
+                    (requireActivity() as? SinemaActivity)?.refreshAccessibilityFocus()
+                }
+            )
+            addToggle(
+                layout,
+                "Reduce motion",
+                "Disable card zoom and Ambient Gallery pan, zoom, and crossfade animations.",
+                { app.prefs.reduceMotion },
+                { app.prefs.reduceMotion = it }
+            )
+            addButton(layout, "Remote Control Guide") {
+                startActivity(Intent(requireContext(), RemoteGuideActivity::class.java))
+            }
+            textScaleButton
+        }
+    }
+
+    private fun interfaceTextScaleLabel(): String =
+        "Interface text: ${com.sinema.model.InterfaceTextScale.fromName(app.prefs.interfaceTextScale).label}"
 
     private fun autoLockLabel(): String = when (app.prefs.autoLockMinutes) {
         0 -> "Auto-Lock: never"

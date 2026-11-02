@@ -208,6 +208,7 @@ class CardPresenter(
         progress?.let { bar ->
             if (percent > 0) {
                 bar.progress = percent
+                bar.contentDescription = view.context.getString(R.string.accessibility_watch_progress, percent)
                 bar.visibility = View.VISIBLE
             } else {
                 bar.visibility = View.GONE

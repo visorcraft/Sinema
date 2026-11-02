@@ -22,7 +22,7 @@ enum class EntitySortOption(val label: String, val field: String, val direction:
     }
 }
 
-class EntityGridActivity : FragmentActivity() {
+class EntityGridActivity : SinemaActivity() {
     companion object {
         fun intent(context: Context, kind: EntityItem.Kind): Intent =
             Intent(context, EntityGridActivity::class.java).putExtra("kind", kind.name)

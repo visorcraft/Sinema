@@ -27,9 +27,10 @@ import com.sinema.util.SceneIntents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-class SceneDetailActivity : FragmentActivity() {
+class SceneDetailActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private lateinit var detailState: SceneDetailState
+    private var detailsLoaded = false
     private val scene: Scene get() = detailState.scene
 
     private lateinit var btnResume: Button
@@ -115,6 +116,7 @@ class SceneDetailActivity : FragmentActivity() {
         // Star rating: tapping star N sets rating100 = N*20; Clear removes
         // the rating (and with it favorite status, which is rating > 0).
         starButtons.forEachIndexed { index, button ->
+            button.contentDescription = getString(R.string.accessibility_rate_stars, index + 1)
             button.setOnClickListener { setRating(index + 1) }
         }
         findViewById<Button>(R.id.btn_rating_clear).setOnClickListener { setRating(0) }
@@ -239,11 +241,14 @@ class SceneDetailActivity : FragmentActivity() {
     }
 
     private fun loadDetails() {
+        renderGridLoadState(GridLoadState.loading(detailsLoaded)) { loadDetails() }
         val generation = detailState.startRefresh()
         lifecycleScope.launch {
             try {
-                val details = app.api.findSceneFull(scene.id) ?: return@launch
+                val details = app.api.findSceneFull(scene.id)
+                    ?: throw java.io.IOException("Scene not found")
                 if (!detailState.applyRefresh(generation, details.scene)) return@launch
+                detailsLoaded = true
                 captions = details.scene.captions
                 markers = details.markers
                 bindSceneText(scene)
@@ -255,6 +260,7 @@ class SceneDetailActivity : FragmentActivity() {
                 bindChips(details.scene)
                 bindChapterStrip()
                 bindGalleryStrip(details.scene.galleries)
+                renderGridLoadState(GridLoadState.loaded(1, "")) { loadDetails() }
                 if (relatedSceneId != details.scene.id) {
                     relatedSceneId = details.scene.id
                     loadRelatedScenes(details.scene)
@@ -263,6 +269,14 @@ class SceneDetailActivity : FragmentActivity() {
                 throw e
             } catch (e: Exception) {
                 Log.e("Sinema", "Failed to load scene details for ${scene.id}", e)
+                val message = UiErrorMessage.forException(e)
+                if (detailsLoaded) {
+                    if (!isFinishing && !isDestroyed) {
+                        android.widget.Toast.makeText(this@SceneDetailActivity, message, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    renderGridLoadState(GridLoadState.failed(false, message)) { loadDetails() }
+                }
             }
         }
     }

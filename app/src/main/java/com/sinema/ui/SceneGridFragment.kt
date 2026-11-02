@@ -489,7 +489,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         // No badgeDrawable here: it overlays the first grid row on screens
         // with their own headers (entity scenes, folders). The title text
         // alone identifies the screen.
-        val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
+        val gridPresenter = VerticalGridPresenter(TvMotion.focusZoom(), false)
         gridPresenter.numberOfColumns = columns
         setGridPresenter(gridPresenter)
         gridAdapter = ArrayObjectAdapter(createCardPresenter())
@@ -589,15 +589,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     }
 
     private fun renderLoadState(state: GridLoadState) {
-        val overlay = activity?.findViewById<View>(R.id.grid_state_overlay) ?: return
-        overlay.visibility = if (state.visible) View.VISIBLE else View.GONE
-        activity?.findViewById<View>(R.id.grid_state_progress)?.visibility =
-            if (state.showProgress) View.VISIBLE else View.GONE
-        activity?.findViewById<android.widget.TextView>(R.id.grid_state_message)?.text = state.message
-        val retry = activity?.findViewById<android.widget.Button>(R.id.grid_state_retry)
-        retry?.visibility = if (state.showRetry) View.VISIBLE else View.GONE
-        retry?.setOnClickListener { reload() }
-        if (state.showRetry) retry?.post { retry.requestFocus() }
+        activity?.renderGridLoadState(state) { reload() }
     }
 
     protected fun reload(): Job? {
@@ -638,9 +630,9 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 throw e
             } catch (e: Exception) {
                 Log.e("Sinema", "Failed to load first page for $gridTitle", e)
-                val message = e.message ?: getString(R.string.grid_unknown_error)
+                val message = UiErrorMessage.forException(e)
                 if (gridAdapter.size() > 0) {
-                    Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
                 } else {
                     renderLoadState(GridLoadState.failed(
                         hasContent = false,

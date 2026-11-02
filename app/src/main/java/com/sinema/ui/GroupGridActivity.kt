@@ -23,7 +23,7 @@ enum class GroupSortOption(val label: String, val field: String, val direction: 
     }
 }
 
-class GroupGridActivity : FragmentActivity() {
+class GroupGridActivity : SinemaActivity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, GroupGridActivity::class.java)
     }

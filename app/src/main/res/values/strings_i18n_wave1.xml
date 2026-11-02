@@ -63,6 +63,26 @@
     <string name="playback_skip_marker">Skip %1$s</string>
     <string name="playback_marker_generic">chapter</string>
     <string name="grid_position_range">%1$s–%2$s of %3$s</string>
+    <string name="remote_guide_title">Remote Control Guide</string>
+    <string name="remote_guide_navigation_title">Navigation</string>
+    <string name="remote_guide_navigation_body">D-pad: move focus.\nOK / Select: open the focused item or show player controls.\nBack: return to the previous screen.\nMenu: open actions for the current grid or player.</string>
+    <string name="remote_guide_grids_title">Grids and libraries</string>
+    <string name="remote_guide_grids_body">Sort and Filter are available on the control bar and in the grid Menu.\nLong-press OK for scene, entity, or saved-filter actions.\nPage Up / Page Down: move one visible screen.\nMenu → Back to top returns to the first card.\nJump to letter filters by title for title sorts and by path otherwise.</string>
+    <string name="remote_guide_playback_title">Playback</string>
+    <string name="remote_guide_playback_body">Play/Pause toggles playback. Rewind and Forward use your seek preset.\nFocus the timeline and use Left / Right to scrub with frame previews.\nPrevious / Next jumps between markers. Entering a marker can offer Skip.\nCC changes captions. Settings selects audio and speed. Menu opens chapters, quality, aspect ratio, and more.</string>
+    <string name="remote_guide_queues_title">Queues and session restore</string>
+    <string name="remote_guide_queues_body">Play All, Shuffle Play, or Play from here starts a queue.\nOpen Up Next to jump, reorder, remove, shuffle, or keep only unwatched scenes.\nEndless Mix refills an exhausted queue.\nAfter an app restart, Home can explicitly restore your scene, position, and queue.</string>
+    <string name="remote_guide_images_title">Images and galleries</string>
+    <string name="remote_guide_images_body">D-pad arrows move between images; when zoomed, they pan.\nOK shows or hides captions.\nMenu controls slideshow, delay, shuffle, fit/fill, and zoom.\nMedia Next / Previous navigates; Play / Pause toggles the slideshow.</string>
+    <string name="remote_guide_accessibility_title">Accessibility</string>
+    <string name="remote_guide_accessibility_body">Settings → Accessibility offers larger interface text, a high-visibility focus outline, and reduced motion.\nSettings → Playback offers subtitle size, background, position, and preferred language.\nTalkBack reads focused controls, queue actions, ratings, watch state, and progress.</string>
+    <string name="accessibility_favorite">Favorite</string>
+    <string name="accessibility_watched">Watched</string>
+    <string name="accessibility_watch_progress">Watched %1$d percent</string>
+    <string name="accessibility_move_earlier">Move earlier in queue</string>
+    <string name="accessibility_move_later">Move later in queue</string>
+    <string name="accessibility_remove_queue">Remove from queue</string>
+    <string name="accessibility_rate_stars">Rate %1$d stars</string>
 
     <!-- Scene grid / card actions -->
     <string name="card_play">▶ Play</string>

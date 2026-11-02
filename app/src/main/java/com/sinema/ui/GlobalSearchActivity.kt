@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.SearchManager
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import com.sinema.SinemaApp
 
@@ -15,7 +14,7 @@ import com.sinema.SinemaApp
  * library UI. Ships disabled in the manifest; enabled together with
  * GlobalSearchProvider from Settings → Global Search.
  */
-class GlobalSearchActivity : ComponentActivity() {
+class GlobalSearchActivity : SinemaActivity() {
     private var pendingQuery: String? = null
 
     private val pinLauncher = registerForActivityResult(

@@ -13,7 +13,7 @@ import com.sinema.SinemaApp
  * backgrounds the app (finishing would fall through to the real library).
  * MENU offers a discreet path back to the real PIN prompt.
  */
-class DecoyActivity : FragmentActivity() {
+class DecoyActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(TextView(this).apply {

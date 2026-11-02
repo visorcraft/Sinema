@@ -27,7 +27,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
-class MainActivity : FragmentActivity() {
+class MainActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private var waitingForPin = false
     private var lastInteractionMs = 0L
@@ -254,7 +254,7 @@ class MainFragment : RowsSupportFragment() {
             }
         })
 
-        val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
+        val lrp = ListRowPresenter(TvMotion.focusZoom(), false)
         lrp.shadowEnabled = false
         rowsAdapter = ArrayObjectAdapter(lrp)
         adapter = rowsAdapter
@@ -653,7 +653,7 @@ class MainFragment : RowsSupportFragment() {
             requireActivity().finish()
             true
         } else {
-            Toast.makeText(requireContext(), "Error: $message", Toast.LENGTH_LONG).show()
+            Toast.makeText(requireContext(), UiErrorMessage.forException(e), Toast.LENGTH_LONG).show()
             false
         }
     }

@@ -21,7 +21,7 @@ import com.sinema.util.GlideAuth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-class EntityScenesActivity : FragmentActivity() {
+class EntityScenesActivity : SinemaActivity() {
     companion object {
         fun intent(context: Context, item: EntityItem): Intent =
             Intent(context, EntityScenesActivity::class.java)

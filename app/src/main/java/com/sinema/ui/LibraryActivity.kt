@@ -12,7 +12,7 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.EntityItem
 
-class LibraryActivity : FragmentActivity() {
+class LibraryActivity : SinemaActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -29,7 +29,7 @@ class LibraryFragment : VerticalGridSupportFragment() {
         super.onCreate(savedInstanceState)
         title = getString(com.sinema.R.string.library_title)
         badgeDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.sinema_logo)
-        val presenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_SMALL, false)
+        val presenter = VerticalGridPresenter(TvMotion.focusZoom(), false)
         presenter.numberOfColumns = 3
         setGridPresenter(presenter)
         val shortcuts = SinemaApp.instance.prefs.homeLayout.visibleLibraryShortcuts().map { it.label }

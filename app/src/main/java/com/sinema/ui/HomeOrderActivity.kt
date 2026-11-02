@@ -17,7 +17,7 @@ import com.sinema.model.HomeShortcut
  * order, so D-pad focus survives Move Up/Down and Hide/Show; focus is also
  * restored by view tag after reordering.
  */
-class HomeOrderActivity : FragmentActivity() {
+class HomeOrderActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private val shortcutsMode get() = intent.getStringExtra(EXTRA_MODE) == MODE_SHORTCUTS
 
