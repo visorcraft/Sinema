@@ -119,13 +119,10 @@ class GroupScenesFragment : SceneGridFragment() {
             ?: throw IOException("Group no longer exists")
 
     override fun showGridMenu() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(gridTitle)
-            .setItems(arrayOf("Play All", "Shuffle Play")) { dialog, which ->
-                dialog.dismiss()
-                playAll(shuffle = which == 1)
-            }
-            .show()
+        Dialogs.showActions(requireContext(), gridTitle, listOf(
+            "Play All" to { playAll(shuffle = false) },
+            "Shuffle Play" to { playAll(shuffle = true) }
+        ))
     }
 
     fun playResume() {

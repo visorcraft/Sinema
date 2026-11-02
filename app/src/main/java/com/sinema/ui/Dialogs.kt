@@ -26,6 +26,20 @@ object Dialogs {
             .show()
     }
 
+    /** Label→action list menu: rows become data instead of when(which) indices. */
+    fun showActions(context: Context, title: String, actions: List<Pair<String, () -> Unit>>) {
+        AlertDialog.Builder(context)
+            .setTitle(title)
+            .setItems(actions.map { it.first }.toTypedArray()) { dialog, which ->
+                dialog.dismiss()
+                actions[which].second()
+            }
+            .show()
+    }
+
+    /** Label→action pairs builder for [showActions]. */
+    fun <T> action(label: String, run: () -> Unit): Pair<String, () -> Unit> = label to run
+
     fun showTextSearchDialog(
         context: Context,
         title: String,

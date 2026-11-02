@@ -199,6 +199,35 @@ class SinemaApi(
     // match nothing. Anchored MATCHES_REGEX matches the path literally.
     private fun pathPrefixRegex(path: String): String = "^${Regex.escape(path.trimEnd('/'))}/"
 
+    /** Shared FindFilterType map builder. */
+    private fun findFilter(
+        page: Int? = null,
+        perPage: Int? = null,
+        sort: String? = null,
+        direction: String? = null,
+        query: String? = null
+    ): Map<String, Any?> = buildMap {
+        page?.let { put("page", it) }
+        perPage?.let { put("per_page", it) }
+        sort?.let { put("sort", it) }
+        direction?.let { put("direction", it) }
+        query?.takeIf { !it.isNullOrBlank() }?.let { put("q", it) }
+    }
+
+    /** Shared paged-result extraction: count + parsed list under one key. */
+    private fun <T> parsePaged(
+        result: JsonObject,
+        queryName: String,
+        listKey: String,
+        parse: (JsonObject) -> T
+    ): Pair<Int, List<T>> {
+        val data = result.getAsJsonObject("data")?.optObject(queryName)
+            ?: return Pair(0, emptyList())
+        val count = data.optInt("count")
+        val items = data.optArray(listKey)?.map { parse(it.asJsonObject) } ?: emptyList()
+        return Pair(count, items)
+    }
+
     private suspend fun findScenesInternal(
         page: Int = 1,
         perPage: Int = 100,
@@ -437,7 +466,7 @@ class SinemaApi(
         val file = if (files != null && files.size() > 0) files[0].asJsonObject else null
         return ImageItem(
             id = obj.get("id").asString,
-            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            title = obj.optString("title", ""),
             path = file?.get("path")?.asString ?: "",
             size = file?.get("size")?.asLong ?: 0L,
             width = file?.get("width")?.asInt ?: 0,
@@ -890,24 +919,24 @@ class SinemaApi(
     private fun parseTagRefs(arr: JsonArray): List<TagRef> = arr.map { el ->
         val t = el.asJsonObject
         TagRef(
-            id = t.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-            name = t.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+            id = t.optString("id", ""),
+            name = t.optString("name", "")
         )
     }
 
     private fun parsePerformerRefs(arr: JsonArray): List<PerformerRef> = arr.map { el ->
         val p = el.asJsonObject
         PerformerRef(
-            id = p.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-            name = p.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+            id = p.optString("id", ""),
+            name = p.optString("name", "")
         )
     }
 
     private fun parseCaptionRefs(arr: JsonArray): List<CaptionRef> = arr.map { el ->
         val c = el.asJsonObject
         CaptionRef(
-            languageCode = c.get("language_code")?.takeIf { !it.isJsonNull }?.asString ?: "",
-            captionType = c.get("caption_type")?.takeIf { !it.isJsonNull }?.asString ?: ""
+            languageCode = c.optString("language_code", ""),
+            captionType = c.optString("caption_type", "")
         )
     }
 
@@ -916,35 +945,35 @@ class SinemaApi(
         val files = obj.getAsJsonArray("files")
         val file = if (files != null && files.size() > 0) files[0].asJsonObject else null
         // Optional metadata — only present in SCENE_FIELDS_FULL queries; guarded to keep lean list queries working.
-        val studioObj = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
+        val studioObj = obj.optObject("studio")
         return Scene(
             id = obj.get("id").asString,
-            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            title = obj.optString("title", ""),
             path = file?.get("path")?.asString ?: "",
             size = file?.get("size")?.asLong ?: 0L,
             duration = file?.get("duration")?.asDouble ?: 0.0,
             width = file?.get("width")?.asInt ?: 0,
             height = file?.get("height")?.asInt ?: 0,
-            playCount = obj.get("play_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt,
-            resumeTime = obj.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
-            date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
-            details = obj.get("details")?.takeIf { !it.isJsonNull }?.asString?.trim(),
-            oCounter = obj.get("o_counter")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+            playCount = obj.optInt("play_count", 0),
+            rating100 = obj.optNullableInt("rating100"),
+            resumeTime = obj.optDouble("resume_time", 0.0),
+            date = obj.optNullableString("date"),
+            details = obj.optNullableString("details")?.trim(),
+            oCounter = obj.optInt("o_counter", 0),
             studio = studioObj?.let { s ->
                 StudioRef(
-                    id = s.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-                    name = s.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                    id = s.optString("id", ""),
+                    name = s.optString("name", "")
                 )
             },
             tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
             performers = (obj.get("performers") as? JsonArray)?.let(::parsePerformerRefs) ?: emptyList(),
             captions = (obj.get("captions") as? JsonArray)?.let(::parseCaptionRefs) ?: emptyList(),
-            lastPlayedAt = obj.get("last_played_at")?.takeIf { !it.isJsonNull }?.asString,
+            lastPlayedAt = obj.optNullableString("last_played_at"),
             galleries = (obj.get("galleries") as? JsonArray)?.mapNotNull { g ->
                 val go = g.asJsonObject
-                val gid = go.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
-                com.sinema.model.GalleryRef(gid, go.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "")
+                val gid = go.optString("id", return@mapNotNull null)
+                com.sinema.model.GalleryRef(gid, go.optString("title", ""))
             } ?: emptyList()
         )
     }
@@ -994,31 +1023,21 @@ class SinemaApi(
                 }
             }
         """.trimIndent()
-        val filter = mutableMapOf<String, Any?>(
-            "page" to page,
-            "per_page" to perPage,
-            "sort" to sort,
-            "direction" to direction
+        val result = graphql(
+            query,
+            mapOf("filter" to findFilter(page, perPage, sort, direction, searchTerm))
         )
-        if (!searchTerm.isNullOrBlank()) filter["q"] = searchTerm
-        val variables = mapOf("filter" to filter)
-        val result = graphql(query, variables)
-        val data = result.getAsJsonObject("data")?.getAsJsonObject(queryName) ?: return Pair(0, emptyList())
-        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
-        val items = (data.get(listKey) as? JsonArray)?.map { el ->
-            parseEntity(el.asJsonObject, kind)
-        } ?: emptyList()
-        return Pair(count, items)
+        return parsePaged(result, queryName, listKey) { parseEntity(it, kind) }
     }
 
     @VisibleForTesting
     internal fun parseEntity(obj: JsonObject, kind: EntityItem.Kind): EntityItem = EntityItem(
-        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-        imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
+        id = obj.optString("id", ""),
+        name = obj.optString("name", ""),
+        sceneCount = obj.optInt("scene_count", 0),
+        imagePath = obj.optNullableString("image_path"),
         kind = kind,
-        rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt
+        rating100 = obj.optNullableInt("rating100")
     )
 
     /**
@@ -1089,13 +1108,13 @@ class SinemaApi(
 
     @VisibleForTesting
     internal fun parseEntityHeader(obj: JsonObject, kind: EntityItem.Kind): EntityHeader = EntityHeader(
-        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+        id = obj.optString("id", ""),
+        name = obj.optString("name", ""),
         kind = kind,
-        sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-        imagePath = obj.get("image_path")?.takeIf { !it.isJsonNull }?.asString,
+        sceneCount = obj.optInt("scene_count", 0),
+        imagePath = obj.optNullableString("image_path"),
         tags = (obj.get("tags") as? JsonArray)?.let(::parseTagRefs) ?: emptyList(),
-        rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt
+        rating100 = obj.optNullableInt("rating100")
     )
 
     suspend fun findGroups(
@@ -1136,7 +1155,7 @@ class SinemaApi(
         val result = graphql(query, mapOf("filter" to filter))
         val data = result.getAsJsonObject("data")?.get(queryName)
             ?.takeIf { !it.isJsonNull }?.asJsonObject ?: return Pair(0, emptyList())
-        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val count = data.optInt("count", 0)
         val groups = (data.get(listKey) as? JsonArray)?.map { parseGroup(it.asJsonObject) } ?: emptyList()
         return Pair(count, groups)
     }
@@ -1172,15 +1191,15 @@ class SinemaApi(
 
     @VisibleForTesting
     internal fun parseGroup(obj: JsonObject): GroupItem = GroupItem(
-        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-        frontImagePath = obj.get("front_image_path")?.takeIf { !it.isJsonNull }?.asString,
-        backImagePath = obj.get("back_image_path")?.takeIf { !it.isJsonNull }?.asString,
-        date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
-        director = obj.get("director")?.takeIf { !it.isJsonNull }?.asString,
-        synopsis = obj.get("synopsis")?.takeIf { !it.isJsonNull }?.asString?.trim(),
-        studioName = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
+        id = obj.optString("id", ""),
+        name = obj.optString("name", ""),
+        sceneCount = obj.optInt("scene_count", 0),
+        frontImagePath = obj.optNullableString("front_image_path"),
+        backImagePath = obj.optNullableString("back_image_path"),
+        date = obj.optNullableString("date"),
+        director = obj.optNullableString("director"),
+        synopsis = obj.optNullableString("synopsis")?.trim(),
+        studioName = obj.optObject("studio")
             ?.get("name")?.takeIf { !it.isJsonNull }?.asString
     )
 
@@ -1199,17 +1218,8 @@ class SinemaApi(
                 }
             }
         """.trimIndent()
-        val filter = mutableMapOf<String, Any?>(
-            "page" to page, "per_page" to perPage, "sort" to sort, "direction" to direction
-        )
-        if (!searchTerm.isNullOrBlank()) filter["q"] = searchTerm
-        val result = graphql(query, mapOf("filter" to filter))
-        val data = result.getAsJsonObject("data")?.getAsJsonObject("findGalleries")
-            ?: return Pair(0, emptyList())
-        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
-        val galleries = (data.get("galleries") as? JsonArray)
-            ?.map { parseGallery(it.asJsonObject) } ?: emptyList()
-        return Pair(count, galleries)
+        val result = graphql(query, mapOf("filter" to findFilter(page, perPage, sort, direction, searchTerm)))
+        return parsePaged(result, "findGalleries", "galleries") { parseGallery(it) }
     }
 
     suspend fun findGallery(galleryId: String): GalleryItem? {
@@ -1254,24 +1264,24 @@ class SinemaApi(
         val result = graphql(query, variables)
         val data = result.getAsJsonObject("data")?.getAsJsonObject("findImages")
             ?: return Pair(0, emptyList())
-        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val count = data.optInt("count", 0)
         val images = (data.get("images") as? JsonArray)?.map { parseImage(it.asJsonObject) } ?: emptyList()
         return Pair(count, images)
     }
 
     @VisibleForTesting
     internal fun parseGallery(obj: JsonObject): GalleryItem = GalleryItem(
-        id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        imageCount = obj.get("image_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-        coverImageId = obj.get("cover")?.takeIf { !it.isJsonNull }?.asJsonObject
+        id = obj.optString("id", ""),
+        title = obj.optString("title", ""),
+        imageCount = obj.optInt("image_count", 0),
+        coverImageId = obj.optObject("cover")
             ?.get("id")?.takeIf { !it.isJsonNull }?.asString,
-        date = obj.get("date")?.takeIf { !it.isJsonNull }?.asString,
-        details = obj.get("details")?.takeIf { !it.isJsonNull }?.asString?.trim(),
-        photographer = obj.get("photographer")?.takeIf { !it.isJsonNull }?.asString,
-        studioName = obj.get("studio")?.takeIf { !it.isJsonNull }?.asJsonObject
+        date = obj.optNullableString("date"),
+        details = obj.optNullableString("details")?.trim(),
+        photographer = obj.optNullableString("photographer"),
+        studioName = obj.optObject("studio")
             ?.get("name")?.takeIf { !it.isJsonNull }?.asString,
-        rating100 = obj.get("rating100")?.takeIf { !it.isJsonNull }?.asInt
+        rating100 = obj.optNullableInt("rating100")
     )
 
     /**
@@ -1435,7 +1445,7 @@ class SinemaApi(
         val result = graphql(query, variables)
         val data = result.getAsJsonObject("data")?.getAsJsonObject("findSceneMarkers")
             ?: return Pair(0, emptyList())
-        val count = data.get("count")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val count = data.optInt("count", 0)
         val markers = (data.get("scene_markers") as? JsonArray)
             ?.map { parseSceneMarker(it.asJsonObject) } ?: emptyList()
         return Pair(count, markers)
@@ -1443,14 +1453,14 @@ class SinemaApi(
 
     @VisibleForTesting
     internal fun parseSceneMarker(obj: JsonObject): SceneMarkerItem {
-        val scene = obj.get("scene")?.takeIf { !it.isJsonNull }?.asJsonObject
+        val scene = obj.optObject("scene")
         val files = scene?.get("files") as? JsonArray
         val file = files?.firstOrNull()?.asJsonObject
-        val tag = obj.get("primary_tag")?.takeIf { !it.isJsonNull }?.asJsonObject
+        val tag = obj.optObject("primary_tag")
         return SceneMarkerItem(
-            id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-            title = obj.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
-            seconds = obj.get("seconds")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            id = obj.optString("id", ""),
+            title = obj.optString("title", ""),
+            seconds = obj.optDouble("seconds", 0.0),
             sceneId = scene?.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
             sceneTitle = scene?.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
             sceneWidth = file?.get("width")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
@@ -1475,17 +1485,17 @@ class SinemaApi(
         val obj = result.getAsJsonObject("data")?.get("stats")?.takeIf { !it.isJsonNull }?.asJsonObject
             ?: return StatsSummary()
         return StatsSummary(
-            sceneCount = obj.get("scene_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            scenesSizeBytes = obj.get("scenes_size")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
-            scenesDurationSeconds = obj.get("scenes_duration")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
-            imageCount = obj.get("image_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            performerCount = obj.get("performer_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            studioCount = obj.get("studio_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            tagCount = obj.get("tag_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            totalOCount = obj.get("total_o_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            totalPlayDurationSeconds = obj.get("total_play_duration")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
-            totalPlayCount = obj.get("total_play_count")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
-            scenesPlayed = obj.get("scenes_played")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+            sceneCount = obj.optInt("scene_count", 0),
+            scenesSizeBytes = obj.optDouble("scenes_size", 0.0),
+            scenesDurationSeconds = obj.optDouble("scenes_duration", 0.0),
+            imageCount = obj.optInt("image_count", 0),
+            performerCount = obj.optInt("performer_count", 0),
+            studioCount = obj.optInt("studio_count", 0),
+            tagCount = obj.optInt("tag_count", 0),
+            totalOCount = obj.optInt("total_o_count", 0),
+            totalPlayDurationSeconds = obj.optDouble("total_play_duration", 0.0),
+            totalPlayCount = obj.optInt("total_play_count", 0),
+            scenesPlayed = obj.optInt("scenes_played", 0)
         )
     }
 
@@ -1547,8 +1557,8 @@ class SinemaApi(
                 ?.takeIf { !it.isJsonNull }?.asJsonArray ?: return emptyList()
             arr.mapNotNull { el ->
                 val obj = el.asJsonObject
-                val status = obj.get("status")?.takeIf { !it.isJsonNull }?.asString ?: ""
-                val description = obj.get("description")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                val status = obj.optString("status", "")
+                val description = obj.optString("description", "")
                 if (description.isBlank()) null else "$status — $description"
             }
         } catch (_: Exception) {
@@ -1558,12 +1568,12 @@ class SinemaApi(
 
     @VisibleForTesting
     internal fun parseSavedSceneFilter(obj: JsonObject): SavedSceneFilter {
-        val findFilter = obj.get("find_filter")?.takeIf { !it.isJsonNull }?.asJsonObject
-        val rawObjectFilter = obj.get("object_filter")?.takeIf { !it.isJsonNull }?.asJsonObject
-        val rawUiOptions = obj.get("ui_options")?.takeIf { !it.isJsonNull }?.asJsonObject
+        val findFilter = obj.optObject("find_filter")
+        val rawObjectFilter = obj.optObject("object_filter")
+        val rawUiOptions = obj.optObject("ui_options")
         return SavedSceneFilter(
-            id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-            name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: "",
+            id = obj.optString("id", ""),
+            name = obj.optString("name", ""),
             sceneFilter = rawObjectFilter?.let { gson.fromJson(it, MapType.savingFilterMap) },
             sort = findFilter?.get("sort")?.takeIf { !it.isJsonNull }?.asString,
             direction = findFilter?.get("direction")?.takeIf { !it.isJsonNull }?.asString,
@@ -1701,16 +1711,16 @@ class SinemaApi(
         } ?: emptyList()
         return SceneDetails(
             scene = parseScene(obj),
-            resumeTime = obj.get("resume_time")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+            resumeTime = obj.optDouble("resume_time", 0.0),
             markers = markers
         )
     }
 
     @VisibleForTesting
     internal fun parseMarker(mo: JsonObject): MarkerRef = MarkerRef(
-        id = mo.get("id")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        title = mo.get("title")?.takeIf { !it.isJsonNull }?.asString ?: "",
-        seconds = mo.get("seconds")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0,
+        id = mo.optString("id", ""),
+        title = mo.optString("title", ""),
+        seconds = mo.optDouble("seconds", 0.0),
         primaryTag = (mo.get("primary_tag") as? JsonObject)?.get("name")?.takeIf { !it.isJsonNull }?.asString ?: ""
     )
 

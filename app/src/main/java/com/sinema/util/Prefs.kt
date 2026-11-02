@@ -12,6 +12,26 @@ import java.security.SecureRandom
 
 class Prefs(context: Context) {
 
+    /** Standard string pref as a property delegate. */
+    private fun string(key: String, default: String) =
+        object : kotlin.properties.ReadWriteProperty<Any?, String> {
+            override fun getValue(thisRef: Any?, property: kotlin.reflect.KProperty<*>) =
+                prefs.getString(key, default) ?: default
+            override fun setValue(thisRef: Any?, property: kotlin.reflect.KProperty<*>, value: String) {
+                prefs.edit().putString(key, value).apply()
+            }
+        }
+
+    /** Standard int pref as a property delegate. */
+    private fun int(key: String, default: Int) =
+        object : kotlin.properties.ReadWriteProperty<Any?, Int> {
+            override fun getValue(thisRef: Any?, property: kotlin.reflect.KProperty<*>) =
+                prefs.getInt(key, default)
+            override fun setValue(thisRef: Any?, property: kotlin.reflect.KProperty<*>, value: Int) {
+                prefs.edit().putInt(key, value).apply()
+            }
+        }
+
     /** Standard boolean pref as a property delegate. */
     private fun bool(key: String, default: Boolean) =
         object : kotlin.properties.ReadWriteProperty<Any?, Boolean> {
@@ -26,9 +46,7 @@ class Prefs(context: Context) {
     private val securePrefs: SharedPreferences? = createSecurePrefs(appContext)
     private val gson = Gson()
 
-    var serverUrl: String
-        get() = prefs.getString("server_url", "http://localhost:6969") ?: "http://localhost:6969"
-        set(value) = prefs.edit().putString("server_url", value).apply()
+    var serverUrl: String by string("server_url", "http://localhost:6969")
 
     var apiKey: String
         get() = getSecureString("api_key")
@@ -48,15 +66,11 @@ class Prefs(context: Context) {
         set(value) = putSecureString("stash_password", value)
 
     // "apikey" or "session"
-    var authMode: String
-        get() = prefs.getString("auth_mode", "apikey") ?: "apikey"
-        set(value) = prefs.edit().putString("auth_mode", value).apply()
+    var authMode: String by string("auth_mode", "apikey")
 
     var channelsEnabled: Boolean by bool("channels_enabled", false)
 
-    var setupAllowSelfSigned: Boolean
-        get() = prefs.getBoolean("setup_allow_self_signed", false)
-        set(value) = prefs.edit().putBoolean("setup_allow_self_signed", value).apply()
+    var setupAllowSelfSigned: Boolean by bool("setup_allow_self_signed", false)
 
     /**
      * Opt-in participation in Android TV system search. The manifest ships
@@ -67,17 +81,11 @@ class Prefs(context: Context) {
 
     var loopEnabled: Boolean by bool("loop_enabled", false)
 
-    var playbackAspectRatio: String
-        get() = prefs.getString("playback_aspect_ratio", "") ?: ""
-        set(value) = prefs.edit().putString("playback_aspect_ratio", value).apply()
+    var playbackAspectRatio: String by string("playback_aspect_ratio", "")
 
-    var playbackStreamQuality: String
-        get() = prefs.getString("playback_stream_quality", "") ?: ""
-        set(value) = prefs.edit().putString("playback_stream_quality", value).apply()
+    var playbackStreamQuality: String by string("playback_stream_quality", "")
 
-    var playbackSeekPreset: String
-        get() = prefs.getString("playback_seek_preset", "") ?: ""
-        set(value) = prefs.edit().putString("playback_seek_preset", value).apply()
+    var playbackSeekPreset: String by string("playback_seek_preset", "")
 
     var subtitleSize: String
         get() = prefs.getString("subtitle_size", "") ?: ""

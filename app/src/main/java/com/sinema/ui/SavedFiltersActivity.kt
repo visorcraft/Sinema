@@ -65,13 +65,10 @@ class SavedFiltersFragment : SceneGridFragment() {
     }
 
     private fun showFilterActions(filter: SavedSceneFilter) {
-        AlertDialog.Builder(requireContext())
-            .setTitle(filter.name)
-            .setItems(arrayOf("Rename", "Delete")) { dialog, which ->
-                dialog.dismiss()
-                if (which == 0) promptRename(filter) else confirmDelete(filter)
-            }
-            .show()
+        Dialogs.showActions(requireContext(), filter.name, listOf(
+            "Rename" to { promptRename(filter) },
+            "Delete" to { confirmDelete(filter) }
+        ))
     }
 
     private fun promptRename(filter: SavedSceneFilter) {

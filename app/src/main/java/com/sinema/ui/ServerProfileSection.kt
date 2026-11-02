@@ -103,17 +103,11 @@ object ServerProfileSection {
     private fun showProfileOptions(ctx: Context, profile: ServerProfile, isLast: Boolean) {
         val selfSignedLabel = if (profile.allowSelfSigned)
             "Trust self-signed certificates: ON" else "Trust self-signed certificates: OFF"
-        val items = arrayOf("Rename", selfSignedLabel, "Remove")
-        AlertDialog.Builder(ctx)
-            .setTitle(profile.name)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> renameProfile(ctx, profile)
-                    1 -> confirmSelfSignedToggle(ctx, profile)
-                    2 -> removeProfile(ctx, profile, isLast)
-                }
-            }
-            .show()
+        Dialogs.showActions(ctx, profile.name, listOf(
+            "Rename" to { renameProfile(ctx, profile) },
+            selfSignedLabel to { confirmSelfSignedToggle(ctx, profile) },
+            "Remove" to { removeProfile(ctx, profile, isLast) }
+        ))
     }
 
     private fun confirmSelfSignedToggle(ctx: Context, profile: ServerProfile) {
