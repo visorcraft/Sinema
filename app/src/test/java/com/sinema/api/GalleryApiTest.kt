@@ -37,58 +37,42 @@ class GalleryApiTest {
 
     @Test
     fun `findGalleries sends paging search and sort`() {
-        val body = AtomicReference("")
-        val server = TestServers.graphql(
+        withGraphqlServer(
             """{"data":{"findGalleries":{"count":1,"galleries":[
                 {"id":"7","title":"Holiday","image_count":42,"cover":{"id":"91"}}
             ]}}}""",
-            body
-        )
-        try {
-            val api = SinemaApi(server, "k")
+        ) { api, body ->
             val result = kotlinx.coroutines.runBlocking {
                 api.findGalleries(page = 2, perPage = 50, searchTerm = "holiday", sort = "title", direction = "ASC")
             }
             assertEquals(1, result.first)
             assertEquals("Holiday", result.second.single().displayTitle)
-            assertTrue(body.get().contains("\"page\":2"))
-            assertTrue(body.get().contains("\"per_page\":50"))
-            assertTrue(body.get().contains("\"q\":\"holiday\""))
-            assertTrue(body.get().contains("\"sort\":\"title\""))
-        } finally {
-            TestServers.stop()
+            assertTrue(body().contains("\"page\":2"))
+            assertTrue(body().contains("\"per_page\":50"))
+            assertTrue(body().contains("\"q\":\"holiday\""))
+            assertTrue(body().contains("\"sort\":\"title\""))
         }
     }
 
     @Test
     fun `findGallery requests and parses one gallery`() {
-        val body = AtomicReference("")
-        val server = TestServers.graphql(
+        withGraphqlServer(
             """{"data":{"findGallery":{"id":"7","title":"Holiday","image_count":42,"cover":{"id":"91"}}}}""",
-            body
-        )
-        try {
-            val api = SinemaApi(server, "k")
+        ) { api, body ->
             val gallery = kotlinx.coroutines.runBlocking { api.findGallery("7") }
             assertEquals("Holiday", gallery?.displayTitle)
-            assertTrue(body.get().contains("findGallery(id:"))
-            assertTrue(body.get().contains("\"id\":\"7\""))
-        } finally {
-            TestServers.stop()
+            assertTrue(body().contains("findGallery(id:"))
+            assertTrue(body().contains("\"id\":\"7\""))
         }
     }
 
     @Test
     fun `findImagesForGallery sends gallery criterion`() {
-        val body = AtomicReference("")
-        val server = TestServers.graphql(
+        withGraphqlServer(
             """{"data":{"findImages":{"count":1,"images":[
                 {"id":"11","title":"One","visual_files":[{"path":"/data/one.jpg","size":12,"width":100,"height":200}]}
             ]}}}""",
-            body
-        )
-        try {
-            val api = SinemaApi(server, "k")
+        ) { api, body ->
             val result = kotlinx.coroutines.runBlocking {
                 api.findImagesForGallery("7", page = 3, perPage = 200)
             }
@@ -96,37 +80,13 @@ class GalleryApiTest {
             assertEquals("/data/one.jpg", result.second.single().path)
             assertEquals(100, result.second.single().width)
             assertEquals(200, result.second.single().height)
-            assertTrue(body.get().contains("\"galleries\""))
-            assertTrue(body.get().contains("\"value\":[\"7\"]"))
-            assertTrue(body.get().contains("\"modifier\":\"INCLUDES\""))
-            assertTrue(body.get().contains("\"page\":3"))
-            assertTrue(body.get().contains("... on VideoFile"))
-        } finally {
-            TestServers.stop()
+            assertTrue(body().contains("\"galleries\""))
+            assertTrue(body().contains("\"value\":[\"7\"]"))
+            assertTrue(body().contains("\"modifier\":\"INCLUDES\""))
+            assertTrue(body().contains("\"page\":3"))
+            assertTrue(body().contains("... on VideoFile"))
         }
     }
 }
 
-private object TestServers {
-    private var server: com.sun.net.httpserver.HttpServer? = null
 
-    fun graphql(response: String, body: AtomicReference<String>): String {
-        val created = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
-        created.createContext("/graphql") { exchange ->
-            body.set(exchange.requestBody.bufferedReader().readText())
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        created.start()
-        server = created
-        return "http://127.0.0.1:${created.address.port}"
-    }
-
-    fun stop() {
-        server?.stop(0)
-        server = null
-    }
-}

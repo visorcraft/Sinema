@@ -1,10 +1,7 @@
 package com.sinema.util
 
+import com.sinema.api.testScene
 import com.sinema.model.EntityItem
-import com.sinema.model.PerformerRef
-import com.sinema.model.Scene
-import com.sinema.model.StudioRef
-import com.sinema.model.TagRef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -19,12 +16,12 @@ class TasteInsightsTest {
         performers: List<String> = emptyList(),
         studio: String? = null,
         durationSec: Double = 60.0
-    ) = Scene(
-        id = id, title = id, path = "/$id.mp4", size = 1L, duration = durationSec,
-        width = 1, height = 1, playCount = playCount, lastPlayedAt = playedAt,
-        tags = tags.map { TagRef("t-$it", it) },
-        performers = performers.map { PerformerRef("p-$it", it) },
-        studio = studio?.let { StudioRef("s-$it", it) }
+    ) = testScene(
+        id = id, playCount = playCount, lastPlayedAt = playedAt,
+        tags = tags.map { "t-$it" to it },
+        performers = performers.map { "p-$it" to it },
+        studio = studio,
+        durationSec = durationSec
     )
 
     @Test
@@ -55,7 +52,7 @@ class TasteInsightsTest {
     fun `no recent plays yields no trends`() {
         val scenes = listOf(scene("old", 3, "2026-01-01T00:00:00Z"))
         assertTrue(TasteInsights.trends(scenes, "2026-10-18").isEmpty())
-        assertEquals(emptyList<Scene>(), TasteInsights.recentScenes(scenes, "2026-10-18"))
+        assertTrue(TasteInsights.recentScenes(scenes, "2026-10-18").isEmpty())
         assertNull(TasteInsights.summary(emptyList()))
     }
 

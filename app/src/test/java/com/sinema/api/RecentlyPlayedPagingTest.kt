@@ -1,20 +1,18 @@
 package com.sinema.api
 
+import com.sinema.api.testScene
+
 import com.sinema.model.Scene
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RecentlyPlayedPagingTest {
-    private fun scene(id: String, playedAt: String?) = Scene(
+
+    private fun scene(id: String, playedAt: String?) = testScene(
         id = id,
-        title = id,
-        path = "/$id.mp4",
-        size = 1L,
-        duration = 1.0,
-        width = 1,
-        height = 1,
         lastPlayedAt = playedAt
     )
+
 
     @Test
     fun `null timestamps sort after all dated scenes across page boundaries`() {

@@ -1,5 +1,7 @@
 package com.sinema.util
 
+import com.sinema.api.testScene
+
 import com.sinema.model.Scene
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,15 +10,11 @@ import org.junit.Test
 import kotlin.random.Random
 
 class QueuePlanningTest {
-    private fun scene(id: String) = Scene(
-        id = id,
-        title = "Scene $id",
-        path = "/$id.mp4",
-        size = 1L,
-        duration = 60.0,
-        width = 1,
-        height = 1
+
+    private fun scene(id: String) = testScene(
+        id = id
     )
+
 
     @Test
     fun `plain plan keeps order and honors startAt`() {

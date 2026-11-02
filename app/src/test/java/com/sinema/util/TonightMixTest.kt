@@ -1,5 +1,7 @@
 package com.sinema.util
 
+import com.sinema.api.testScene
+
 import com.sinema.model.Scene
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -7,10 +9,12 @@ import org.junit.Test
 import kotlin.random.Random
 
 class TonightMixTest {
-    private fun scene(id: String, durationSec: Double) = Scene(
-        id = id, title = id, path = "/$id.mp4", size = 1L,
-        duration = durationSec, width = 1, height = 1
+
+    private fun scene(id: String, durationSec: Double) = testScene(
+        id = id,
+        durationSec = durationSec
     )
+
 
     @Test
     fun `mix fills the time budget and keeps the scene that crosses it`() {
