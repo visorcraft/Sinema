@@ -104,6 +104,7 @@
     <string name="tags_load_failed">Could not load tags: %1$s</string>
 
     <!-- Home -->
+    <string name="accessibility_log_out">Log Out, lock app and exit</string>
     <string name="shortcut_tonight_mix">Tonight\'s Mix</string>
     <string name="tonight_mix_card_title">🌙 Tonight\'s Mix</string>
     <string name="tonight_mix_card_sub">~30 min personalized queue</string>
