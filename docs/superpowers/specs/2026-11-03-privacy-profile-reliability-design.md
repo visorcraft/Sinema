@@ -64,14 +64,16 @@ Do not expand this phase into details screens, playback, launcher artwork, or ot
 
 ### Active-server transitions
 
-Every operation that changes the active server identity or endpoint must clear stale Sinema launcher content before new content can publish:
+Every operation that changes the active server identity or endpoint must clear stale Sinema launcher content before new content can publish. The required call-site inventory is:
 
-- Switching profiles.
-- Removing the active profile.
-- Editing the active profile's server URL.
-- Importing a backup that changes the active profile or endpoint.
+- `ServerProfileSection`: profile switch and active-profile removal.
+- `SettingsActivity.saveServerSettings`: active-server URL editing.
+- `SettingsActivity.setupLauncher`: adding a server through Setup when the new profile becomes active.
+- `SetupActivity.performManualSave`: manual setup/re-setup.
+- `SetupActivity` Web Setup completion.
+- `SettingsActivity.backupImportLauncher`: backup import that changes the active profile or endpoint.
 
-Rename-only and TLS-only changes do not require a server-identity transition, although their existing API refresh behavior remains intact.
+Initial setup also clears legacy launcher content defensively. Rename-only changes do not refresh the API or require a server-identity transition. TLS-only changes retain their existing API refresh but do not require a launcher clear because the endpoint is unchanged.
 
 ### Provider identity and synchronization
 
@@ -79,18 +81,22 @@ Rename-only and TLS-only changes do not require a server-identity transition, al
 - Cleanup continues to recognize legacy `sinema:<sceneId>` entries and all Sinema-prefixed entries.
 - `TvChannels.clearAll` remains the single cleanup path for Watch Next and the Sinema Recently Added channel.
 - Channel clear and sync operations are serialized on one private lock.
-- Each sync captures the active profile ID before doing work and checks it again after acquiring the lock. A stale sync returns without deleting or inserting content for the newer profile.
-- If an old sync completes while a profile transition waits, the subsequent clear removes its entries before the transition finishes.
+- The profile ID is captured at the data-fetch site, before awaiting the rows or enqueueing playback persistence, and passed to `TvChannels.sync*` as `expectedProfileId`. Capturing only inside `TvChannels` is forbidden because already-fetched profile-A data could otherwise publish under profile B.
+- After acquiring the lock, `TvChannels` compares `expectedProfileId` with the current active profile ID. A mismatch returns without deleting or inserting content. The ID also namespaces new provider entries.
+- The three production sync call sites are `MainActivity` Home row completion, `PlaybackActivity` playback-save completion, and `TvChannelInitReceiver`; each passes the identity captured before its associated data work.
+- If an old sync completes while a profile transition waits, the subsequent serialized clear removes its entries before the transition finishes.
 
-Extract pure helpers for provider IDs and stale-profile checks and unit-test them. Add Robolectric coverage for active-profile transitions and coordinator behavior, including legacy cleanup and stale-sync suppression; do not require a physical TV.
+Extract pure helpers for provider IDs and stale-profile checks and unit-test them. Add Robolectric coverage for every transition call-site family, fetch-time identity capture, legacy cleanup, and stale-sync suppression; do not require a physical TV.
 
 ## 3. Playback, recency, and lifecycle fixes
 
 ### Recently Played
 
-Make `findRecentlyPlayed(perPage)` use the same complete-filtered-result, nulls-last ordering and slicing as `findRecentlyPlayedPaged(page = 1, perPage = perPage)`. Remove the duplicate limited-fetch implementation rather than adding a third recency path.
+Make `findRecentlyPlayed(perPage)` use the same complete-filtered-result, nulls-last ordering and slicing as `findRecentlyPlayedPaged(page = 1, perPage = perPage)`. Remove the duplicate limited-fetch implementation rather than adding a third recency path. Preserve the existing API signature.
 
-Preserve the existing API signature and Home call sites. Add a wire-level regression with more than 25 matching scenes and null timestamps proving that a newer scene outside the first server page appears in Home's result. Document the complete-result fetch tradeoff already used by paged recency sorting.
+The second Home consumer, `MainActivity`'s Because You Watched discovery source currently calling `findRecentlyPlayed(1)`, must not trigger a second complete-library fetch. Within one Home load, fetch `findRecentlyPlayed(25)` once and share that result between the Recently Played row and the discovery source's first item, even when the row itself is hidden. Preserve independent row error presentation and all discovery fallback behavior. This makes the complete-result cost explicit while allowing at most one such request per Home load.
+
+Add a wire-level regression with more than 25 matching scenes and null timestamps proving that a newer scene outside the first server page appears in Home's result. Add a Home test proving the row and discovery source share one request and use the same correctly ordered result. Document the complete-result fetch tradeoff already used by paged recency sorting.
 
 ### Queue metadata
 
@@ -103,32 +109,27 @@ Tests cover null, thrown failure, and successful queue transitions.
 - Capture `val api = app.api` before launching the app-scope O-counter mutation so the scene ID and API client originate from the same profile.
 - Remove the owned Home logo and its scroll listener in `onDestroyView`; clear `logoView` so repeated PIN fragment replacement cannot accumulate views.
 - Snapshot `recentErrors` inside `synchronized(recentErrorsBuffer)`.
-- Reject setting or changing a decoy PIN to the same value as the primary PIN, with a focusable error and no credential changes. Existing stored PINs remain usable; this is not a migration.
+- Reject setting or changing a decoy PIN to the same value as the primary PIN, and reject setting or changing the primary PIN to the same value as an existing decoy PIN. Show a focusable error and make no credential changes in either direction. Existing stored PINs remain usable; this is not a migration.
 
-Each item gets a focused regression test where the existing Android/test infrastructure permits.
+Add focused regression tests for API/profile capture, logo teardown, concurrent error-buffer access, and both PIN-equality directions.
 
 ## 4. Integration-state coordination
 
 Create one small utility, `SystemIntegrations`, with narrowly scoped operations:
 
-- `applyGlobalSearchState(context)`: enable or disable `GlobalSearchProvider` and `GlobalSearchActivity` together from `Prefs.globalSearchEnabled` using `DONT_KILL_APP`.
+- `applyGlobalSearchState(context)`: reconcile `GlobalSearchProvider` and `GlobalSearchActivity` from `Prefs.globalSearchEnabled`. For each component, read `getComponentEnabledSetting` first, treating `COMPONENT_ENABLED_STATE_DEFAULT` as the manifest's disabled state. Call `setComponentEnabledSetting(..., DONT_KILL_APP)` only when the desired state differs, so startup reconciliation performs no redundant persistent binder writes.
 - `reconcileAfterImport(context, previousProfileId, previousServerUrl)`: apply Global Search state, clear launcher entries when channels are disabled, and call `onActiveServerChanged` when the imported active profile ID or trimmed server URL differs from the captured pre-import values.
 - `onActiveServerChanged(context)`: clear launcher content through the serialized `TvChannels` path.
 
-Use the coordinator from:
-
-- The Global Search Settings toggle.
-- Backup import.
-- `SinemaApp.onCreate` for component/preference reconciliation.
-- Active-profile switch, active-profile removal, and active-server URL editing.
+Use `applyGlobalSearchState` from the Global Search Settings toggle, backup import, and `SinemaApp.onCreate`. Use `onActiveServerChanged` from every call site enumerated in §2: profile switch/removal, server URL save, Setup-launched profile addition, manual setup, Web Setup completion, and qualifying backup import.
 
 Do not make this a general settings event bus. Preserve the backup message's restart guidance only for settings that genuinely still require restart.
 
-Tests prove imported true/false Global Search values produce matching component states after import and after a fresh application start, and imported server changes cannot leave old launcher entries.
+Tests prove imported true/false Global Search values produce matching component states after import and after a fresh application start, unchanged startup state performs no component writes, and every server-transition call-site family clears old launcher entries.
 
 ## 5. Single-flight session renewal
 
-Add a private coroutine `Mutex` to each `SinemaApi` instance.
+Add a private coroutine `Mutex` to each `SinemaApi` instance and make the mutable `sessionCookie` field `@Volatile` so send-time captures, renewal writes, and post-mutex reads have cross-thread visibility.
 
 When a session-mode GraphQL request receives 401:
 
@@ -140,7 +141,7 @@ When a session-mode GraphQL request receives 401:
 
 If no refreshed cookie is available, preserve the original 401 handling. Do not loop retries or change API-key behavior. Concurrent requests sharing one `SinemaApi` instance must produce one login; separate profile API instances remain isolated.
 
-Extend the shared test server fixture as needed to coordinate concurrent 401s and `/login` responses. Tests prove one login for concurrent failures, one callback per actual renewal, successful retries, no renewal without stored credentials, and no API-key renewal.
+Extend the shared test server fixture with a bounded thread-pool executor and a `/login` context so concurrent requests are genuinely in flight together; single-threaded serving would make the test vacuous. Shut down the executor and server deterministically. Tests prove one login for concurrent failures, one callback per actual renewal, successful retries, no renewal without stored credentials, and no API-key renewal.
 
 ## 6. API de-duplication
 
@@ -149,11 +150,11 @@ Extend the shared test server fixture as needed to coordinate concurrent 401s an
 Add an API-layer `StashAuth` helper used by setup and `SinemaApi` renewal:
 
 - Session login through the existing OkHttp/TLS configuration.
+- A structured `LoginResult` with `Success(cookie)`, `InvalidCredentials`, `MissingCookie`, `HttpFailure(code)`, and `TransportFailure(cause)` outcomes. Setup maps these to actionable existing messages; `SinemaApi.reLogin` maps every non-success outcome to null.
 - API-key generation through Stash GraphQL with the session cookie.
-- Structured Gson parsing for `generateAPIKey`; no string-offset JSON extraction.
-- Existing setup error messages for invalid credentials, missing cookies, transport failures, and malformed responses remain actionable.
+- Structured Gson parsing for `generateAPIKey`; malformed JSON, GraphQL errors, and missing/blank keys fail explicitly rather than through string-offset extraction.
 
-`SetupActivity` delegates network authentication to this helper. `SinemaApi.reLogin` delegates its login request to the same path while retaining its current null-on-failure contract. Tests cover login redirects/statuses, self-signed client reuse, cookie extraction, API-key parsing, and malformed responses.
+`SetupActivity` delegates network authentication to this helper while preserving its user-facing error distinctions. `SinemaApi.reLogin` delegates its login request to the same path while retaining its current null-on-failure contract. Tests cover every `LoginResult` variant, accepted redirect/status responses, self-signed client reuse, cookie extraction, API-key parsing, GraphQL errors, and malformed responses.
 
 ### Watched-state mutation
 
@@ -178,7 +179,7 @@ Correct documentation for:
 
 - Watch Next deep-linking directly to playback.
 - Actual launcher artwork behavior.
-- Encrypted interrupted-session persistence.
+- Interrupted-session persistence and its conditional encrypted-storage fallback behavior.
 - Release logging/minification claims.
 - Recently Played complete-result recency behavior, Global Search lock behavior, expanded Discreet Mode cards, and integration reconciliation.
 
