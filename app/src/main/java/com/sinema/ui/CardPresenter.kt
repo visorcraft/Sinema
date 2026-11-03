@@ -313,10 +313,22 @@ class FolderCardPresenter : Presenter() {
     }
 }
 
-class SettingsPresenter : Presenter() {
+class SettingsPresenter(private val onUp: (() -> Unit)? = null) : Presenter() {
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_folder_card, parent, false)
+        if (onUp != null) {
+            view.setOnKeyListener { _, keyCode, event ->
+                if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                    keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP
+                ) {
+                    onUp.invoke()
+                    true
+                } else {
+                    false
+                }
+            }
+        }
         return ViewHolder(view)
     }
 
@@ -486,5 +498,7 @@ class SettingsPresenter : Presenter() {
         }
     }
 
-    override fun onUnbindViewHolder(viewHolder: ViewHolder) {}
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) {
+        viewHolder.view.setOnKeyListener(null)
+    }
 }

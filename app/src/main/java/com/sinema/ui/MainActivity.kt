@@ -207,6 +207,7 @@ class MainFragment : RowsSupportFragment() {
     private var serverErrorActive = false
     private lateinit var shortcutsRow: ListRow
     private lateinit var settingsRow: ListRow
+    private var initialFocusApplied = false
 
     private var logoView: android.widget.ImageView? = null
 
@@ -323,23 +324,21 @@ class MainFragment : RowsSupportFragment() {
         }
     }
 
-    /** Shortcut row contents: personalization order + fixed session cards. */
     private fun addShortcutItems(shortcutsAdapter: ArrayObjectAdapter) {
         layoutSnapshot.visibleShortcuts().map { it.label }.forEach(shortcutsAdapter::add)
         shortcutsAdapter.add(getString(com.sinema.R.string.shortcut_tonight_mix))
-        if (app.prefs.hasPinSet()) shortcutsAdapter.add("Log Out")
     }
 
     private fun createStaticRows() {
-        val shortcutsAdapter = ArrayObjectAdapter(SettingsPresenter())
+        val shortcutsAdapter = ArrayObjectAdapter(SettingsPresenter(onUp = ::focusQuickActions))
         addShortcutItems(shortcutsAdapter)
-        shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, ""), shortcutsAdapter)
+        shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, "Browse"), shortcutsAdapter)
 
-        val settingsAdapter = ArrayObjectAdapter(SettingsPresenter())
-        settingsAdapter.add("Refresh")
-        settingsAdapter.add("Settings")
-        settingsAdapter.add("About")
-        settingsRow = ListRow(HeaderItem(SETTINGS_ROW_ID, ""), settingsAdapter)
+        val settingsAdapter = ArrayObjectAdapter(
+            CommandPresenter(hasPin = app.prefs.hasPinSet(), onDown = ::focusBrowse)
+        )
+        HomeCommandRow.items(app.prefs.hasPinSet()).forEach(settingsAdapter::add)
+        settingsRow = ListRow(HeaderItem(SETTINGS_ROW_ID, "Quick actions"), settingsAdapter)
 
         rowsAdapter.add(shortcutsRow)
         rowsAdapter.add(settingsRow)
@@ -477,6 +476,46 @@ class MainFragment : RowsSupportFragment() {
     private fun indexOfRow(row: ListRow): Int =
         (0 until rowsAdapter.size()).indexOfFirst { rowsAdapter.get(it) === row }
 
+    private fun focusRow(row: ListRow?, itemKey: String? = null) {
+        row ?: return
+        val rowIndex = indexOfRow(row)
+        if (rowIndex < 0) return
+        setSelectedPosition(rowIndex)
+        verticalGridView?.post {
+            val grid = verticalGridView ?: return@post
+            val rowGrid = (grid.findViewHolderForAdapterPosition(rowIndex) as? ListRowPresenter.ViewHolder)?.gridView
+                ?: return@post
+            val rowAdapter = row.adapter as ArrayObjectAdapter
+            val keys = (0 until rowAdapter.size()).map { FocusRestore.keyOf(rowAdapter.get(it)!!) }
+            val itemIndex = if (itemKey == null) 0 else keys.indexOf(itemKey)
+            if (itemIndex < 0) return@post
+            rowGrid.setSelectedPosition(itemIndex)
+            rowGrid.post {
+                val target = rowGrid.findViewHolderForAdapterPosition(itemIndex)?.itemView
+                if (target != null && target.isShown && target.isEnabled && target.isFocusable) {
+                    target.requestFocus()
+                }
+            }
+        }
+    }
+
+    private fun focusQuickActions() = focusRow(settingsRow, HomeCommandRow.REFRESH_KEY)
+
+    private fun focusBrowse() {
+        val adapter = shortcutsRow.adapter as ArrayObjectAdapter
+        if (adapter.size() > 0) focusRow(shortcutsRow) else focusQuickActions()
+    }
+
+    private fun applyInitialFocus() {
+        val browseCount = (shortcutsRow.adapter as ArrayObjectAdapter).size()
+        when (HomeFocusPolicy.initialTarget(serverErrorRow != null, heroRow != null, browseCount)) {
+            HomeInitialTarget.RETRY -> focusRow(serverErrorRow)
+            HomeInitialTarget.HERO -> focusRow(heroRow)
+            HomeInitialTarget.BROWSE -> focusBrowse()
+            HomeInitialTarget.REFRESH -> focusQuickActions()
+        }
+    }
+
     private fun rowId(row: HomeContentRow): Long = when (row) {
         HomeContentRow.CONTINUE_PLAYING -> CONTINUE_ROW_ID
         HomeContentRow.RECENTLY_PLAYED -> PLAYED_ROW_ID
@@ -586,7 +625,7 @@ class MainFragment : RowsSupportFragment() {
         } else {
             val row = heroRow ?: ListRow(
                 HeaderItem(HERO_ROW_ID, ""),
-                ArrayObjectAdapter(HeroPresenter(app.api))
+                ArrayObjectAdapter(HeroPresenter(app.api, onDown = ::focusQuickActions))
             ).also { heroRow = it }
             updateItems(row, listOf(heroItem))
         }
@@ -605,11 +644,11 @@ class MainFragment : RowsSupportFragment() {
         val orderedRows = buildList {
             serverErrorRow?.let(::add)
             heroRow?.let(::add)
+            add(settingsRow)
             add(shortcutsRow)
             layoutSnapshot.orderedRows().forEach { rowType ->
                 contentRows[rowId(rowType)]?.let(::add)
             }
-            add(settingsRow)
         }
         orderedRows.forEachIndexed { index, row ->
             val currentIndex = indexOfRow(row)
@@ -619,6 +658,10 @@ class MainFragment : RowsSupportFragment() {
                 rowsAdapter.remove(row)
                 rowsAdapter.add(index, row)
             }
+        }
+        if (!initialFocusApplied) {
+            initialFocusApplied = true
+            verticalGridView?.post { applyInitialFocus() }
         }
     }
 
@@ -858,8 +901,7 @@ class MainFragment : RowsSupportFragment() {
                             ?.adapter as? ArrayObjectAdapter
                         val itemKeys = (0 until (rowAdapter?.size() ?: 0))
                             .map { FocusRestore.keyOf(rowAdapter!!.get(it)!!) }
-                        val newItemIndex = FocusRestore.positionAfterReload(
-                            focus.itemKey, focus.itemIndex, itemKeys)
+                        val newItemIndex = HomeFocusPolicy.restoredItemIndex(focus.itemKey, focus.itemIndex, itemKeys)
                         if (newItemIndex >= 0) {
                             (verticalGridView?.findViewHolderForAdapterPosition(newRowIndex)
                                 as? ListRowPresenter.ViewHolder)?.gridView

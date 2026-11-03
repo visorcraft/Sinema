@@ -25,10 +25,23 @@ object HeroCard {
 }
 
 /** Wide single-focus card: screenshot backdrop + title/meta/action strip. */
-class HeroPresenter(private val api: SinemaApi) : Presenter() {
+class HeroPresenter(
+    private val api: SinemaApi,
+    private val onDown: () -> Unit = {}
+) : Presenter() {
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_hero_card, parent, false)
+        view.setOnKeyListener { _, keyCode, event ->
+            if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN
+            ) {
+                onDown()
+                true
+            } else {
+                false
+            }
+        }
         return ViewHolder(view)
     }
 
@@ -48,5 +61,6 @@ class HeroPresenter(private val api: SinemaApi) : Presenter() {
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
         viewHolder.view.findViewById<ImageView>(R.id.hero_image).setImageDrawable(null)
+        viewHolder.view.setOnKeyListener(null)
     }
 }
