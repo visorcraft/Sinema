@@ -209,11 +209,22 @@ class MainFragment : RowsSupportFragment() {
     private lateinit var settingsRow: ListRow
     private var initialFocusApplied = false
     private var focusAttempt: Runnable? = null
+    private var focusAttemptTarget: View? = null
+    private var applyingFocusAttempt = false
+    private val focusOwnershipListener = android.view.ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
+        if (newFocus != null && focusAttempt != null && focusAttemptTarget != null &&
+            !applyingFocusAttempt && newFocus !== focusAttemptTarget
+        ) {
+            initialFocusApplied = true
+            cancelFocusAttempt()
+        }
+    }
 
     private var logoView: android.widget.ImageView? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        view.viewTreeObserver.addOnGlobalFocusChangeListener(focusOwnershipListener)
         layoutSnapshot = app.prefs.homeLayout
         view.setBackgroundColor(0xFF1B1B1B.toInt())
         // Overscan-safe padding so content isn't clipped at screen edges
@@ -227,6 +238,20 @@ class MainFragment : RowsSupportFragment() {
         verticalGridView?.let { grid ->
             grid.setPadding(hPad, topPad, hPad, vPad)
             grid.clipToPadding = false
+            grid.setOnKeyListener { _, keyCode, event ->
+                if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                    keyCode in intArrayOf(
+                        android.view.KeyEvent.KEYCODE_DPAD_UP,
+                        android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+                        android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                        android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+                    )
+                ) {
+                    initialFocusApplied = true
+                    cancelFocusAttempt()
+                }
+                false
+            }
         }
 
         // Add Sinema logo to activity's FrameLayout (not the fragment's RecyclerView!)
@@ -480,6 +505,8 @@ class MainFragment : RowsSupportFragment() {
     private fun cancelFocusAttempt() {
         focusAttempt?.let { verticalGridView?.removeCallbacks(it) }
         focusAttempt = null
+        focusAttemptTarget = null
+        applyingFocusAttempt = false
     }
 
     private fun focusRow(
@@ -500,35 +527,41 @@ class MainFragment : RowsSupportFragment() {
             if (focusAttempt !== attempt) return@Runnable
             val currentGrid = verticalGridView
             if (currentGrid == null) {
-                focusAttempt = null
+                cancelFocusAttempt()
                 return@Runnable
             }
             attempts++
-            val rowIndex = indexOfRow(row)
-            if (rowIndex >= 0) setSelectedPosition(rowIndex, false)
-            val rowAdapter = row.adapter as ArrayObjectAdapter
-            val keys = (0 until rowAdapter.size()).map { FocusRestore.keyOf(rowAdapter.get(it)!!) }
-            val itemIndex = if (itemKey == null) 0 else keys.indexOf(itemKey)
-            val rowHolder = if (rowIndex >= 0) {
-                getRowViewHolder(rowIndex) as? ListRowPresenter.ViewHolder
-            } else {
-                null
-            }
-            if (rowHolder != null && itemIndex >= 0) {
-                rowHolder.gridView.setSelectedPosition(itemIndex)
-                val target = rowHolder.getItemViewHolder(itemIndex)?.view
-                if (target != null && target.isShown && target.isEnabled && target.isFocusable &&
-                    target.requestFocus() && target.hasFocus()
-                ) {
-                    focusAttempt = null
-                    onFocused?.invoke()
-                    return@Runnable
+            applyingFocusAttempt = true
+            try {
+                val rowIndex = indexOfRow(row)
+                if (rowIndex >= 0) setSelectedPosition(rowIndex, false)
+                val rowAdapter = row.adapter as ArrayObjectAdapter
+                val keys = (0 until rowAdapter.size()).map { FocusRestore.keyOf(rowAdapter.get(it)!!) }
+                val itemIndex = if (itemKey == null) 0 else keys.indexOf(itemKey)
+                val rowHolder = if (rowIndex >= 0) {
+                    getRowViewHolder(rowIndex) as? ListRowPresenter.ViewHolder
+                } else {
+                    null
                 }
+                if (rowHolder != null && itemIndex >= 0) {
+                    rowHolder.gridView.setSelectedPosition(itemIndex)
+                    val target = rowHolder.getItemViewHolder(itemIndex)?.view
+                    focusAttemptTarget = target
+                    if (target != null && target.isShown && target.isEnabled && target.isFocusable &&
+                        target.requestFocus() && target.hasFocus()
+                    ) {
+                        cancelFocusAttempt()
+                        onFocused?.invoke()
+                        return@Runnable
+                    }
+                }
+            } finally {
+                applyingFocusAttempt = false
             }
             if (attempts < FOCUS_MAX_ATTEMPTS) {
                 currentGrid.postOnAnimation(attempt)
             } else {
-                focusAttempt = null
+                cancelFocusAttempt()
                 onFailure?.invoke()
             }
         }
@@ -537,6 +570,8 @@ class MainFragment : RowsSupportFragment() {
     }
 
     override fun onDestroyView() {
+        view?.viewTreeObserver?.removeOnGlobalFocusChangeListener(focusOwnershipListener)
+        verticalGridView?.setOnKeyListener(null)
         cancelFocusAttempt()
         super.onDestroyView()
     }

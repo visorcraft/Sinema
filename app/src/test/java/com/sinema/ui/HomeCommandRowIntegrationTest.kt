@@ -99,6 +99,33 @@ class HomeCommandRowIntegrationTest {
     }
 
     @Test
+    fun `user focus move cancels pending automated focus retry`() {
+        withHomeServer(EMPTY_RESPONSE) {
+            val activity = launch(pin = true)
+            awaitFocused(activity, "Search")
+            val automatedTarget = itemView(activity, QUICK_ROW_ID, HomeCommandRow.REFRESH)
+            automatedTarget.isFocusable = false
+            dispatchUp(activity)
+            val pendingField = MainFragment::class.java.getDeclaredField("focusAttempt").apply {
+                isAccessible = true
+            }
+            assertNotNull(
+                "Expected a pending automated focus attempt",
+                pendingField.get(mainFragment(activity))
+            )
+            layoutHome(activity)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(16))
+            focusItem(activity, QUICK_ROW_ID, HomeCommandRow.SETTINGS)
+            automatedTarget.isFocusable = true
+            repeat(65) {
+                layoutHome(activity)
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(16))
+            }
+            assertEquals(HomeCommandRow.SETTINGS, focusedItem(activity))
+        }
+    }
+
+    @Test
     fun `retry receives initial focus after full dashboard failure`() {
         val activity = launch(pin = true)
         awaitRow(activity, RETRY_ROW_ID)
