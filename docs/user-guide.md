@@ -20,7 +20,6 @@ By default, the top shortcut row contains:
 - Markers
 - Stats
 - Saved Filters
-- Log Out, only when a PIN is set
 
 The content rows are loaded from Stash:
 
@@ -35,11 +34,9 @@ Scene cards show at a glance:
 - A checkmark when the scene has been played.
 - A thin progress bar along the bottom edge when a scene is partially watched.
 
-The bottom row contains:
+The Quick actions row sits above Browse and contains Log Out (only when a PIN is set), Refresh, Settings, and About. Log Out is always the left-most command and exits immediately without changing the configured PIN. Refresh reloads the home rows, Settings opens preferences, and About shows version and update information.
 
-- Refresh: reloads the home screen rows.
-- Settings: opens server, profile, PIN, channel, and update settings.
-- About: shows the installed Sinema version and can manually check for updates.
+When no hero or retry action is shown, Home starts focus on the first visible Browse item. Down from the hero or Up from Browse enters Quick actions at Refresh, leaving Log Out one intentional Left press away.
 
 Sinema refreshes the home screen when you return to it, so changes made in playback or scene detail screens are reflected quickly. Existing cards stay visible while rows refresh, and row headers show loading or refresh status. If a refresh fails, Sinema keeps the last loaded cards and marks that row as `Refresh failed`; if the first load fails, the row is marked `Unavailable`.
 

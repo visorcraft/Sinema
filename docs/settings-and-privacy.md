@@ -1,6 +1,6 @@
 # Settings and Privacy
 
-Open `Settings` from the bottom row of the main screen, then choose a category:
+Open `Settings` from the Quick actions row of the main screen, then choose a category:
 
 - **Server**: connection details and server profiles.
 - **Home**: Home Settings and Ambient Gallery.
@@ -121,8 +121,8 @@ The PIN lock is a local four-digit lock for Sinema.
 After a PIN is set:
 
 - Sinema asks for the PIN on launch until it has been verified for the current app session.
-- The main screen shows `Log Out`.
-- Selecting `Log Out` clears the current PIN verification and exits the app.
+- The main screen shows `Log Out` as the left-most Quick actions command.
+- Selecting `Log Out` clears only current-session verification and exits the app; it does not change the configured PIN.
 
 ### Remove a PIN
 
@@ -203,7 +203,7 @@ Sinema checks GitHub releases once per app session from the main screen.
 
 You can also check manually:
 
-1. Select `About` from the main screen bottom row.
+1. Select `About` from the main screen Quick actions row.
 2. Select `Check for Updates`.
 
 If a newer GitHub release has an APK asset, Sinema can download it and open Android's installer.

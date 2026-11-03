@@ -63,7 +63,7 @@ Session mode can automatically re-login when Stash GraphQL returns 401, if the p
 - Recently Played via `findRecentlyPlayed`.
 - Recently Added via `findRecentScenes`.
 - Favorites via `findFavoriteScenes`.
-- Bottom settings row.
+- Quick actions row above Browse, using stable command keys and explicit safe-focus routing.
 
 Each Stash-backed row has a `HomeRowState` that retains its last successful items through loading and failures. `MainFragment` keeps persistent `ListRow` instances and reconciles only changed adapters, headers, and row positions instead of clearing the dashboard. Stable header IDs preserve focus across refresh-status changes and row insertion or removal. Empty successful results hide their rows; failures retain content or show an unavailable header when no content has loaded.
 
