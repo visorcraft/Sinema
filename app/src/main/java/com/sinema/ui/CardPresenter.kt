@@ -35,10 +35,8 @@ class CardPresenter(
         @Volatile var discreetGeneration: Int = 0
     }
 
-    /** Holds the last-bound scene so discreet mode can re-render on focus. */
-    private class SceneHolder(view: View) : ViewHolder(view) {
-        var scene: Scene? = null
-        var focused: Boolean = false
+    private class ContentHolder(view: View) : ViewHolder(view) {
+        var item: Any? = null
     }
 
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
@@ -49,58 +47,83 @@ class CardPresenter(
         view.layoutParams.height = (cardSize.heightDp * density).toInt()
         (view.findViewById<ImageView>(R.id.card_image).parent as View).layoutParams.height =
             (cardSize.imageHeightDp * density).toInt()
-        return SceneHolder(view).also { holder ->
+        return ContentHolder(view).also { holder ->
             view.tag = holder
-            view.setOnFocusChangeListener { _, hasFocus ->
-                holder.focused = hasFocus
-                // No-op for holders currently bound to non-scene items.
-                if (holder.scene != null) applySceneDisplay(holder)
+            view.setOnFocusChangeListener { _, _ ->
+                holder.item?.let { onBindViewHolder(holder, it) }
             }
         }
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
-        val view = viewHolder.view
+        val holder = viewHolder as ContentHolder
+        holder.item = item
+        val view = holder.view
         val image = view.findViewById<ImageView>(R.id.card_image)
-        // Reset holder state every bind: recycled views must not leak the
-        // previous scene or its focus state into the new item.
-        (viewHolder as? SceneHolder)?.let { holder ->
-            holder.scene = item as? Scene
-            holder.focused = view.hasFocus()
-        }
-        // Restored per bind; the scene branch may hide it again for discreet.
-        image.visibility = View.VISIBLE
         val title = view.findViewById<TextView>(R.id.card_title)
         val content = view.findViewById<TextView>(R.id.card_content)
         val heart = view.findViewById<TextView>(R.id.card_heart)
         val checkmark = view.findViewById<TextView>(R.id.card_checkmark)
         val progress = view.findViewById<android.widget.ProgressBar>(R.id.card_progress)
-        // Long-press OK on a focused card opens per-card actions (grids only).
-        // Lambda parameter must not be named — it would shadow the bound item.
         view.setOnLongClickListener(
             onItemLongClick?.let { hook ->
                 android.view.View.OnLongClickListener { _ -> item?.let(hook); true }
             }
         )
+
+        val identity = item?.let(::discreetIdentity)
+        if (SinemaApp.instance.prefs.discreetMode && !view.hasFocus() && identity != null) {
+            Glide.with(view.context).clear(image)
+            image.setImageDrawable(null)
+            image.visibility = View.INVISIBLE
+            title.text = DiscreetMode.neutralTitle(identity.first, identity.second)
+            content.text = "•••"
+            heart.visibility = View.GONE
+            checkmark.visibility = View.GONE
+            progress.visibility = View.GONE
+            progress.contentDescription = null
+            return
+        }
+
+        image.visibility = View.VISIBLE
+        heart.visibility = View.GONE
+        checkmark.visibility = View.GONE
+        progress.visibility = View.GONE
+        progress.contentDescription = null
         when (item) {
             is Scene -> {
-                val url = api.getScreenshotUrl(item.id)
+                title.text = item.displayTitle
+                content.text = buildString {
+                    if (item.starCount > 0) {
+                        append(StarRating.glyphs(item.starCount))
+                        append("  ")
+                    }
+                    append(item.formatDuration())
+                    if (item.oCounter > 0) {
+                        append("  O×")
+                        append(item.oCounter)
+                    }
+                }
+                heart.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
+                checkmark.visibility = if (item.isWatched) View.VISIBLE else View.GONE
+                val percent = item.watchProgressPercent
+                if (percent > 0) {
+                    progress.progress = percent
+                    progress.contentDescription = view.context.getString(
+                        R.string.accessibility_watch_progress, percent
+                    )
+                    progress.visibility = View.VISIBLE
+                }
                 image.scaleType = ImageView.ScaleType.CENTER_CROP
                 image.setBackgroundColor(0xFF333333.toInt())
                 Glide.with(view.context)
-                    .load(GlideAuth.url(api, url))
+                    .load(GlideAuth.url(api, api.getScreenshotUrl(item.id)))
                     .centerCrop()
                     .into(image)
-                val holder = viewHolder as? SceneHolder ?: return
-                holder.scene = item
-                applySceneDisplay(holder)
             }
             is HomeViewAll -> {
                 title.text = item.actionLabel
                 content.text = item.title
-                heart?.visibility = View.GONE
-                checkmark?.visibility = View.GONE
-                progress?.visibility = View.GONE
                 Glide.with(view.context).clear(image)
                 image.setImageResource(android.R.drawable.ic_menu_more)
                 image.scaleType = ImageView.ScaleType.CENTER
@@ -109,9 +132,6 @@ class CardPresenter(
             is GroupItem -> {
                 title.text = item.name
                 content.text = "${item.sceneCount} " + if (item.sceneCount == 1) "scene" else "scenes"
-                heart?.visibility = View.GONE
-                checkmark?.visibility = View.GONE
-                progress?.visibility = View.GONE
                 if (item.frontImagePath != null) {
                     image.scaleType = ImageView.ScaleType.CENTER_CROP
                     image.setBackgroundColor(0xFF333333.toInt())
@@ -129,9 +149,7 @@ class CardPresenter(
             is GalleryItem -> {
                 title.text = item.displayTitle
                 content.text = "${item.imageCount} " + if (item.imageCount == 1) "image" else "images"
-                heart?.visibility = if ((item.rating100 ?: 0) > 0) View.VISIBLE else View.GONE
-                checkmark?.visibility = View.GONE
-                progress?.visibility = View.GONE
+                heart.visibility = if ((item.rating100 ?: 0) > 0) View.VISIBLE else View.GONE
                 if (item.coverImageId != null) {
                     image.scaleType = ImageView.ScaleType.CENTER_CROP
                     image.setBackgroundColor(0xFF333333.toInt())
@@ -149,13 +167,9 @@ class CardPresenter(
             is EntityItem -> {
                 title.text = item.name
                 content.text = "${item.sceneCount} " + if (item.sceneCount == 1) "scene" else "scenes"
-                heart?.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
-                checkmark?.visibility = View.GONE
-                progress?.visibility = View.GONE
+                heart.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
                 image.scaleType = ImageView.ScaleType.CENTER_CROP
                 image.setBackgroundColor(0xFF333333.toInt())
-                // Prefer the list payload's image_path; newer Stash schemas
-                // can omit it, so fall back to the direct image endpoint.
                 val imageUrl = item.imagePath ?: api.entityImageUrl(item.kind, item.id)
                 Glide.with(view.context)
                     .load(GlideAuth.url(api, imageUrl))
@@ -166,82 +180,80 @@ class CardPresenter(
         }
     }
 
-    /**
-     * Scene text/overlays/artwork in one place so discreet mode can re-render
-     * on focus change: unfocused cards show a neutral label, no overlays, and
-     * hidden artwork; focused cards reveal everything.
-     */
-    private fun applySceneDisplay(holder: SceneHolder) {
-        val scene = holder.scene ?: return
-        val view = holder.view
-        val image = view.findViewById<ImageView>(R.id.card_image)
-        val title = view.findViewById<TextView>(R.id.card_title)
-        val content = view.findViewById<TextView>(R.id.card_content)
-        val heart = view.findViewById<TextView>(R.id.card_heart)
-        val checkmark = view.findViewById<TextView>(R.id.card_checkmark)
-        val progress = view.findViewById<android.widget.ProgressBar>(R.id.card_progress)
-        val hide = com.sinema.SinemaApp.instance.prefs.discreetMode && !holder.focused
-        if (hide) {
-            title.text = DiscreetMode.neutralTitle(scene.id)
-            content.text = "•••"
-            heart?.visibility = View.GONE
-            checkmark?.visibility = View.GONE
-            progress?.visibility = View.GONE
-            image.visibility = View.INVISIBLE
-            return
-        }
-        title.text = scene.displayTitle
-        content.text = buildString {
-            if (scene.starCount > 0) {
-                append(StarRating.glyphs(scene.starCount))
-                append("  ")
-            }
-            append(scene.formatDuration())
-            if (scene.oCounter > 0) {
-                append("  O×")
-                append(scene.oCounter)
-            }
-        }
-        heart?.visibility = if (scene.isFavorite) View.VISIBLE else View.GONE
-        checkmark?.visibility = if (scene.isWatched) View.VISIBLE else View.GONE
-        val percent = scene.watchProgressPercent
-        progress?.let { bar ->
-            if (percent > 0) {
-                bar.progress = percent
-                bar.contentDescription = view.context.getString(R.string.accessibility_watch_progress, percent)
-                bar.visibility = View.VISIBLE
-            } else {
-                bar.visibility = View.GONE
-            }
-        }
-        image.visibility = View.VISIBLE
+    private fun discreetIdentity(item: Any): Pair<String, String>? = when (item) {
+        is Scene -> "Scene" to item.id
+        is GroupItem -> "Group" to item.id
+        is GalleryItem -> "Gallery" to item.id
+        is EntityItem -> "Entity" to item.id
+        else -> null
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
-        (viewHolder as? SceneHolder)?.scene = null
-        val image = viewHolder.view.findViewById<ImageView>(R.id.card_image)
+        val holder = viewHolder as ContentHolder
+        holder.item = null
+        val view = holder.view
+        val image = view.findViewById<ImageView>(R.id.card_image)
+        Glide.with(view.context).clear(image)
         image.setImageDrawable(null)
+        image.visibility = View.VISIBLE
+        view.findViewById<TextView>(R.id.card_title).text = ""
+        view.findViewById<TextView>(R.id.card_content).text = ""
+        view.findViewById<View>(R.id.card_heart).visibility = View.GONE
+        view.findViewById<View>(R.id.card_checkmark).visibility = View.GONE
+        view.findViewById<android.widget.ProgressBar>(R.id.card_progress).apply {
+            visibility = View.GONE
+            contentDescription = null
+        }
     }
 }
 
 class FolderCardPresenter : Presenter() {
+    private class FolderHolder(view: View) : ViewHolder(view) {
+        var item: Any? = null
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_folder_card, parent, false)
-        return ViewHolder(view)
+        return FolderHolder(view).also { holder ->
+            view.setOnFocusChangeListener { _, _ ->
+                holder.item?.let { onBindViewHolder(holder, it) }
+            }
+        }
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
-        val view = viewHolder.view
+        val holder = viewHolder as FolderHolder
+        holder.item = item
+        val view = holder.view
         val image = view.findViewById<ImageView>(R.id.card_image)
         val title = view.findViewById<TextView>(R.id.card_title)
         val content = view.findViewById<TextView>(R.id.card_content)
         val heart = view.findViewById<ImageView>(R.id.card_heart)
+        val identity = when (item) {
+            is FolderItem -> (if (item.isFolder) "Folder" else if (item.scene != null) "Scene" else "Image") to
+                item.fullPath.ifBlank { item.name }
+            is ImageItem -> "Image" to item.id
+            else -> null
+        }
+        if (SinemaApp.instance.prefs.discreetMode && !view.hasFocus() && identity != null) {
+            Glide.with(view.context).clear(image)
+            image.setImageDrawable(null)
+            image.visibility = View.INVISIBLE
+            title.text = DiscreetMode.neutralTitle(identity.first, identity.second)
+            content.text = "•••"
+            heart.visibility = View.GONE
+            return
+        }
+
+        image.visibility = View.VISIBLE
+        heart.visibility = View.GONE
+        content.text = ""
+        Glide.with(view.context).clear(image)
+        image.setImageDrawable(null)
         when (item) {
             is FolderItem -> {
-                // Show/hide heart
-                heart?.visibility = if (item.hasFavorites) View.VISIBLE else View.GONE
-
+                heart.visibility = if (item.hasFavorites) View.VISIBLE else View.GONE
                 if (item.isFolder) {
                     title.text = "\uD83D\uDCC1 ${item.name}"
                     val itemWord = if (item.childCount == 1) "item" else "items"
@@ -252,14 +264,8 @@ class FolderCardPresenter : Presenter() {
                         else -> null
                     }
                     if (thumbUrl != null) {
-                        image.scaleType = ImageView.ScaleType.CENTER_CROP
-                        image.setBackgroundColor(0xFF333333.toInt())
-                        Glide.with(view.context)
-                            .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
-                            .centerCrop()
-                            .into(image)
+                        loadArtwork(image, thumbUrl)
                     } else {
-                        Glide.with(view.context).clear(image)
                         image.setImageResource(android.R.drawable.ic_menu_agenda)
                         image.scaleType = ImageView.ScaleType.CENTER
                         image.setBackgroundColor(0xFF444444.toInt())
@@ -276,40 +282,42 @@ class FolderCardPresenter : Presenter() {
                             content.text = item.scene.formatDuration()
                             SinemaApp.instance.api.getScreenshotUrl(item.scene.id)
                         }
-                        else -> {
-                            content.text = ""
-                            null
-                        }
+                        else -> null
                     }
-                    if (thumbUrl != null) {
-                        image.scaleType = ImageView.ScaleType.CENTER_CROP
-                        image.setBackgroundColor(0xFF333333.toInt())
-                        Glide.with(view.context)
-                            .load(GlideAuth.url(SinemaApp.instance.api, thumbUrl))
-                            .centerCrop()
-                            .into(image)
-                    }
+                    thumbUrl?.let { loadArtwork(image, it) }
                 }
             }
             is ImageItem -> {
                 title.text = item.title.ifBlank { item.filename }
                 content.text = if (item.width > 0 && item.height > 0)
                     "${item.width} × ${item.height}" else "Picture"
-                heart?.visibility = if ((item.rating100 ?: 0) > 0) View.VISIBLE else View.GONE
-                image.scaleType = ImageView.ScaleType.CENTER_CROP
-                image.setBackgroundColor(0xFF333333.toInt())
+                heart.visibility = if ((item.rating100 ?: 0) > 0) View.VISIBLE else View.GONE
                 val api = SinemaApp.instance.api
-                Glide.with(view.context)
-                    .load(GlideAuth.url(api, api.getImageThumbnailUrl(item.id)))
-                    .centerCrop()
-                    .into(image)
+                loadArtwork(image, api.getImageThumbnailUrl(item.id))
             }
         }
     }
 
+    private fun loadArtwork(image: ImageView, url: String) {
+        image.scaleType = ImageView.ScaleType.CENTER_CROP
+        image.setBackgroundColor(0xFF333333.toInt())
+        Glide.with(image.context)
+            .load(GlideAuth.url(SinemaApp.instance.api, url))
+            .centerCrop()
+            .into(image)
+    }
+
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
-        val image = viewHolder.view.findViewById<ImageView>(R.id.card_image)
+        val holder = viewHolder as FolderHolder
+        holder.item = null
+        val view = holder.view
+        val image = view.findViewById<ImageView>(R.id.card_image)
+        Glide.with(view.context).clear(image)
         image.setImageDrawable(null)
+        image.visibility = View.VISIBLE
+        view.findViewById<TextView>(R.id.card_title).text = ""
+        view.findViewById<TextView>(R.id.card_content).text = ""
+        view.findViewById<View>(R.id.card_heart).visibility = View.GONE
     }
 }
 

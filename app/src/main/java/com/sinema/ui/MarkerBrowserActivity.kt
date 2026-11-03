@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.leanback.widget.Presenter
 import androidx.lifecycle.lifecycleScope
 import com.sinema.R
+import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
 import com.sinema.model.EntityItem
 import com.sinema.model.MarkerSortOption
@@ -179,24 +180,44 @@ class MarkerBrowserFragment : SceneGridFragment() {
 
 /** Marker card: the scene screenshot at the marker's timestamp. */
 class MarkerCardPresenter(private val api: SinemaApi) : Presenter() {
+    private class MarkerHolder(view: View) : ViewHolder(view) {
+        var item: SceneMarkerItem? = null
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_card, parent, false)
-        return ViewHolder(view)
+        return MarkerHolder(view).also { holder ->
+            view.setOnFocusChangeListener { _, _ ->
+                holder.item?.let { onBindViewHolder(holder, it) }
+            }
+        }
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         if (item !is SceneMarkerItem) return
-        val view = viewHolder.view
-        view.findViewById<TextView>(R.id.card_title).text = item.displayTitle
-        view.findViewById<TextView>(R.id.card_content).text =
-            "${item.sceneTitle.ifBlank { "Scene" }}  •  ${com.sinema.util.TimeFormat.formatSeconds(item.seconds)}"
+        val holder = viewHolder as MarkerHolder
+        holder.item = item
+        val view = holder.view
+        val title = view.findViewById<TextView>(R.id.card_title)
+        val content = view.findViewById<TextView>(R.id.card_content)
+        val image = view.findViewById<ImageView>(R.id.card_image)
         view.findViewById<View>(R.id.card_heart).visibility = View.GONE
         view.findViewById<View>(R.id.card_checkmark).visibility = View.GONE
         view.findViewById<View>(R.id.card_progress).visibility = View.GONE
-        val image = view.findViewById<ImageView>(R.id.card_image)
-        // Stash serves the scene screenshot at any timestamp — exactly the
-        // marker's frame.
+        if (SinemaApp.instance.prefs.discreetMode && !view.hasFocus()) {
+            com.bumptech.glide.Glide.with(view.context).clear(image)
+            image.setImageDrawable(null)
+            image.visibility = View.INVISIBLE
+            title.text = com.sinema.util.DiscreetMode.neutralTitle("Marker", item.id)
+            content.text = "•••"
+            return
+        }
+
+        image.visibility = View.VISIBLE
+        title.text = item.displayTitle
+        content.text =
+            "${item.sceneTitle.ifBlank { "Scene" }}  •  ${com.sinema.util.TimeFormat.formatSeconds(item.seconds)}"
         val url = api.getMarkerScreenshotUrl(item.sceneId, item.seconds)
         image.scaleType = ImageView.ScaleType.CENTER_CROP
         image.setBackgroundColor(0xFF333333.toInt())
@@ -207,6 +228,17 @@ class MarkerCardPresenter(private val api: SinemaApi) : Presenter() {
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
-        viewHolder.view.findViewById<ImageView>(R.id.card_image).setImageDrawable(null)
+        val holder = viewHolder as MarkerHolder
+        holder.item = null
+        val view = holder.view
+        val image = view.findViewById<ImageView>(R.id.card_image)
+        com.bumptech.glide.Glide.with(view.context).clear(image)
+        image.setImageDrawable(null)
+        image.visibility = View.VISIBLE
+        view.findViewById<TextView>(R.id.card_title).text = ""
+        view.findViewById<TextView>(R.id.card_content).text = ""
+        view.findViewById<View>(R.id.card_heart).visibility = View.GONE
+        view.findViewById<View>(R.id.card_checkmark).visibility = View.GONE
+        view.findViewById<View>(R.id.card_progress).visibility = View.GONE
     }
 }

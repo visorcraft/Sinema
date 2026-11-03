@@ -62,7 +62,7 @@ The `🌙 Tonight's Mix` card on the shortcut row builds a ~30-minute queue from
 
 - **PIN Lock** with **Auto-Lock** (never / 5 / 15 / 30 minutes idle) — Sinema re-asks for the PIN after the selected idle time.
 - **Decoy PIN** — entering it unlocks a blank "No content" shell instead of your library; Back from the shell backgrounds the app. Set a different PIN than your real one.
-- **Discreet Mode** — scene cards show a neutral label (for example `Scene 4271`), no overlays, and no artwork until the card is focused, and the home hero banner is hidden. A passing glance reveals nothing.
+- **Discreet Mode** — Scene, Group, Gallery, Entity, Folder, Image, and Marker cards show neutral labels (for example `Scene 4271`), no overlays, and no artwork until focused. Focus reveals the normal card; navigation cards such as View All keep their labels, and the home hero banner is hidden. A passing glance reveals no content metadata.
 - **Incognito (pause watch history)** — stops writing resume positions, play counts, and play durations to Stash and skips Watch Next syncing and search-history recording. Server data stays untouched from this device.
 - **Block Screenshots** — sets `FLAG_SECURE` on every screen, blocking screenshots and recents thumbnails.
 

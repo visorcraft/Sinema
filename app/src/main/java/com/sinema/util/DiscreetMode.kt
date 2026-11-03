@@ -7,9 +7,12 @@ import kotlin.math.abs
  * card is focused, so a passing glance at the TV reveals nothing.
  */
 object DiscreetMode {
-    /** Stable per-scene neutral label ("Scene 4271") independent of title. */
-    fun neutralTitle(sceneId: String): String {
-        if (sceneId.isBlank()) return "Scene 0"
-        return "Scene ${abs(sceneId.hashCode().toLong() % 10_000L)}"
+    /** Stable neutral label independent of the item's title. */
+    fun neutralTitle(kind: String, id: String): String {
+        val safeKind = kind.ifBlank { "Item" }
+        if (id.isBlank()) return "$safeKind 0"
+        return "$safeKind ${abs(id.hashCode().toLong() % 10_000L)}"
     }
+
+    fun neutralTitle(sceneId: String): String = neutralTitle("Scene", sceneId)
 }

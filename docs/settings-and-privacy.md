@@ -103,7 +103,7 @@ TalkBack labels describe focused controls, ratings, queue actions, favorite/watc
 
 Open `Settings` → `Privacy` for local privacy controls:
 
-- **Discreet Mode** uses neutral labels and hides artwork until cards are focused. It does not change Stash metadata.
+- **Discreet Mode** uses neutral labels and hides metadata, overlays, and artwork on Scene, Group, Gallery, Entity, Folder, Image, and Marker cards until focused. Navigation cards remain normal, and focusing a content card reveals it. Sinema does not change Stash metadata.
 - **Incognito** pauses resume, play-count, Watch Next, and search-history writes from this device. Enabling it also clears the restorable playback-session snapshot and prevents new snapshots until it is disabled.
 - **Block Screenshots** blocks screenshots and recents thumbnails throughout Sinema on this device.
 
