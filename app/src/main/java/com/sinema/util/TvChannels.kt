@@ -20,8 +20,24 @@ object TvChannels {
     private const val PROGRAM_TITLE_COLUMN = "title"
     private const val MAX_WATCH_NEXT = 10
     private const val MAX_RECENT = 20
+    private val syncLock = Any()
 
-    fun syncWatchNext(context: Context, continuePairs: List<Pair<Scene, Double>>) {
+    fun syncWatchNext(
+        context: Context,
+        continuePairs: List<Pair<Scene, Double>>,
+        expectedProfileId: String
+    ) = synchronized(syncLock) {
+        if (!isActiveProfile(expectedProfileId, SinemaApp.instance.prefs.activeProfileId)) {
+            return@synchronized
+        }
+        syncWatchNextLocked(context, continuePairs, expectedProfileId)
+    }
+
+    private fun syncWatchNextLocked(
+        context: Context,
+        continuePairs: List<Pair<Scene, Double>>,
+        expectedProfileId: String
+    ) {
         val app = SinemaApp.instance
         if (!app.prefs.channelsEnabled) return
         try {
@@ -33,7 +49,7 @@ object TvChannels {
                 while (c.moveToNext()) {
                     val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
                     val internalId = c.getString(c.getColumnIndexOrThrow(internalIdCol))
-                    if (internalId?.startsWith("sinema:") == true) {
+                    if (isSinemaProviderId(internalId)) {
                         resolver.delete(ContentUris.withAppendedId(uri, id), null, null)
                     }
                 }
@@ -52,7 +68,7 @@ object TvChannels {
                     put(TvContractCompat.PreviewProgramColumns.COLUMN_DURATION_MILLIS, (scene.duration * 1000).toInt())
                     put(TvContractCompat.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS, (resumeSec * 1000).toInt())
                     put(TvContractCompat.PreviewProgramColumns.COLUMN_INTENT_URI, intentUri.toString())
-                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID, "sinema:${scene.id}")
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID, providerId(expectedProfileId, scene.id))
                 }
                 resolver.insert(uri, values)
             }
@@ -61,7 +77,22 @@ object TvChannels {
         }
     }
 
-    fun syncRecentlyAdded(context: Context, scenes: List<Scene>) {
+    fun syncRecentlyAdded(
+        context: Context,
+        scenes: List<Scene>,
+        expectedProfileId: String
+    ) = synchronized(syncLock) {
+        if (!isActiveProfile(expectedProfileId, SinemaApp.instance.prefs.activeProfileId)) {
+            return@synchronized
+        }
+        syncRecentlyAddedLocked(context, scenes, expectedProfileId)
+    }
+
+    private fun syncRecentlyAddedLocked(
+        context: Context,
+        scenes: List<Scene>,
+        expectedProfileId: String
+    ) {
         val app = SinemaApp.instance
         if (!app.prefs.channelsEnabled) return
         try {
@@ -91,7 +122,7 @@ object TvChannels {
                     put(PROGRAM_TITLE_COLUMN, scene.title)
                     put(TvContractCompat.PreviewProgramColumns.COLUMN_DURATION_MILLIS, (scene.duration * 1000).toInt())
                     put(TvContractCompat.PreviewProgramColumns.COLUMN_INTENT_URI, intentUri.toString())
-                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID, "sinema:${scene.id}")
+                    put(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID, providerId(expectedProfileId, scene.id))
                 }
                 resolver.insert(programsUri, values)
             }
@@ -100,7 +131,11 @@ object TvChannels {
         }
     }
 
-    fun clearAll(context: Context) {
+    fun clearAll(context: Context) = synchronized(syncLock) {
+        clearAllLocked(context)
+    }
+
+    private fun clearAllLocked(context: Context) {
         try {
             val resolver = context.contentResolver
             val watchUri = TvContractCompat.WatchNextPrograms.CONTENT_URI
@@ -109,7 +144,7 @@ object TvChannels {
                 while (c.moveToNext()) {
                     val id = c.getLong(c.getColumnIndexOrThrow(BaseColumns._ID))
                     val internalId = c.getString(c.getColumnIndexOrThrow(internalIdCol))
-                    if (internalId?.startsWith("sinema:") == true) {
+                    if (isSinemaProviderId(internalId)) {
                         resolver.delete(ContentUris.withAppendedId(watchUri, id), null, null)
                     }
                 }

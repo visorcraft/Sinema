@@ -337,7 +337,7 @@ class PlaybackActivity : SinemaActivity() {
                 // Refresh Watch Next only if the originating server is still active.
                 if (resumeTimeSec > 0 && app.prefs.activeProfileId == profileId) {
                     val continuePairs = api.findContinuePlaying()
-                    com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs)
+                    com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs, profileId)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

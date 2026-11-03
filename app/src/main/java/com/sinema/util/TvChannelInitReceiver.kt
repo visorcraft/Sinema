@@ -27,10 +27,11 @@ class TvChannelInitReceiver : BroadcastReceiver() {
         val pending = goAsync()
         scope.launch {
             try {
+                val profileId = app.prefs.activeProfileId
                 val continuePairs = app.api.findContinuePlaying()
-                TvChannels.syncWatchNext(context, continuePairs)
+                TvChannels.syncWatchNext(context, continuePairs, profileId)
                 val recentScenes = app.api.findRecentScenes(20)
-                TvChannels.syncRecentlyAdded(context, recentScenes)
+                TvChannels.syncRecentlyAdded(context, recentScenes, profileId)
             } catch (e: Exception) {
                 android.util.Log.e("Sinema", "TV channel init sync failed", e)
             } finally {
