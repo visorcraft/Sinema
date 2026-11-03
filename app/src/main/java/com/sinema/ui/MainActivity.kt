@@ -356,12 +356,12 @@ class MainFragment : RowsSupportFragment() {
     }
 
     private fun createStaticRows() {
-        val shortcutsAdapter = ArrayObjectAdapter(SettingsPresenter(onUp = ::focusQuickActions))
+        val shortcutsAdapter = ArrayObjectAdapter(SettingsPresenter(onUp = ::focusQuickActionsFromUser))
         addShortcutItems(shortcutsAdapter)
         shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, "Browse"), shortcutsAdapter)
 
         val settingsAdapter = ArrayObjectAdapter(
-            CommandPresenter(hasPin = app.prefs.hasPinSet(), onDown = ::focusBrowse)
+            CommandPresenter(hasPin = app.prefs.hasPinSet(), onDown = ::focusBrowseFromUser)
         )
         HomeCommandRow.items(app.prefs.hasPinSet()).forEach(settingsAdapter::add)
         settingsRow = ListRow(HeaderItem(SETTINGS_ROW_ID, "Quick actions"), settingsAdapter)
@@ -578,6 +578,11 @@ class MainFragment : RowsSupportFragment() {
 
     private fun focusQuickActions() = focusRow(settingsRow, HomeCommandRow.REFRESH_KEY)
 
+    private fun focusQuickActionsFromUser() {
+        initialFocusApplied = true
+        focusQuickActions()
+    }
+
     private fun focusBrowse() {
         val adapter = shortcutsRow.adapter as ArrayObjectAdapter
         if (adapter.size() > 0) {
@@ -585,6 +590,11 @@ class MainFragment : RowsSupportFragment() {
         } else {
             focusQuickActions()
         }
+    }
+
+    private fun focusBrowseFromUser() {
+        initialFocusApplied = true
+        focusBrowse()
     }
 
     private fun focusSafeTarget(onFocused: (() -> Unit)? = null) {
@@ -730,7 +740,7 @@ class MainFragment : RowsSupportFragment() {
         } else {
             val row = heroRow ?: ListRow(
                 HeaderItem(HERO_ROW_ID, ""),
-                ArrayObjectAdapter(HeroPresenter(app.api, onDown = ::focusQuickActions))
+                ArrayObjectAdapter(HeroPresenter(app.api, onDown = ::focusQuickActionsFromUser))
             ).also { heroRow = it }
             updateItems(row, listOf(heroItem))
         }

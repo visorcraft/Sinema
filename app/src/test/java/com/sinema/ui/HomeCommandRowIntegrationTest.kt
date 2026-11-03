@@ -126,6 +126,45 @@ class HomeCommandRowIntegrationTest {
     }
 
     @Test
+    fun `browse up takes ownership from pending initial focus`() {
+        withHomeServer(EMPTY_RESPONSE) {
+            val activity = launch(pin = true)
+            awaitFocused(activity, "Search")
+            val initialTarget = itemView(activity, BROWSE_ROW_ID, "Search")
+            initialTarget.isFocusable = false
+            setInitialFocusPending(activity)
+            dispatchUp(activity)
+            awaitFocused(activity, HomeCommandRow.REFRESH)
+            initialTarget.isFocusable = true
+            reconcileHome(activity)
+            repeat(65) {
+                layoutHome(activity)
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(16))
+            }
+            assertEquals(HomeCommandRow.REFRESH, focusedItem(activity))
+        }
+    }
+
+    @Test
+    fun `quick action down takes ownership from pending initial focus`() {
+        val activity = launch(pin = true)
+        awaitFocused(activity, "Retry Connection")
+        val initialTarget = itemView(activity, RETRY_ROW_ID, "Retry Connection")
+        initialTarget.isFocusable = false
+        setInitialFocusPending(activity)
+        focusItem(activity, QUICK_ROW_ID, HomeCommandRow.ABOUT)
+        dispatchDown(activity)
+        awaitFocused(activity, "Search")
+        initialTarget.isFocusable = true
+        reconcileHome(activity)
+        repeat(65) {
+            layoutHome(activity)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(16))
+        }
+        assertEquals("Search", focusedItem(activity))
+    }
+
+    @Test
     fun `retry receives initial focus after full dashboard failure`() {
         val activity = launch(pin = true)
         awaitRow(activity, RETRY_ROW_ID)
@@ -374,6 +413,24 @@ class HomeCommandRowIntegrationTest {
         }
         layoutHome(activity)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(16))
+    }
+
+    private fun setInitialFocusPending(activity: MainActivity) {
+        val fragment = mainFragment(activity)
+        MainFragment::class.java.getDeclaredField("initialFocusApplied").apply {
+            isAccessible = true
+        }.setBoolean(fragment, false)
+        reconcileHome(activity)
+        val pending = MainFragment::class.java.getDeclaredField("focusAttempt").apply {
+            isAccessible = true
+        }.get(fragment)
+        assertNotNull("Expected initial focus to be pending", pending)
+    }
+
+    private fun reconcileHome(activity: MainActivity) {
+        MainFragment::class.java.getDeclaredMethod("reconcileHomeRows").apply {
+            isAccessible = true
+        }.invoke(mainFragment(activity))
     }
 
     private fun withHomeServer(response: String, block: () -> Unit) {
