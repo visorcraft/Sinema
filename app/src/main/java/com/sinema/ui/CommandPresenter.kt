@@ -10,9 +10,11 @@ import androidx.leanback.widget.Presenter
 import com.sinema.R
 
 class CommandPresenter(
-    private val hasPin: Boolean,
+    hasPin: Boolean,
     private val onDown: () -> Unit = {}
 ) : Presenter() {
+    var hasPin: Boolean = hasPin
+        internal set
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_command_card, parent, false)

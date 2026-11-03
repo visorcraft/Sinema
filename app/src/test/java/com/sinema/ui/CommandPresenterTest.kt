@@ -31,6 +31,24 @@ class CommandPresenterTest {
     }
 
     @Test
+    fun `left key keeps focus on log out at the left edge`() {
+        val view = bind(CommandPresenter(hasPin = true), HomeCommandRow.LOG_OUT)
+        view.layout(0, 0, 156, 64)
+        assertTrue(view.requestFocus())
+        view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
+        assertTrue(view.hasFocus())
+    }
+
+    @Test
+    fun `right key keeps focus on about at the right edge`() {
+        val view = bind(CommandPresenter(hasPin = true), HomeCommandRow.ABOUT)
+        view.layout(0, 0, 156, 64)
+        assertTrue(view.requestFocus())
+        view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertTrue(view.hasFocus())
+    }
+
+    @Test
     fun `refresh is the left edge without a pin but remains navigable with one`() {
         val withoutPin = bind(CommandPresenter(hasPin = false), HomeCommandRow.REFRESH)
         val withPin = bind(CommandPresenter(hasPin = true), HomeCommandRow.REFRESH)

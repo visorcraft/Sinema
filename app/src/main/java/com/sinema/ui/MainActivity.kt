@@ -207,8 +207,10 @@ class MainFragment : RowsSupportFragment() {
     private var serverErrorActive = false
     private lateinit var shortcutsRow: ListRow
     private lateinit var settingsRow: ListRow
+    private lateinit var commandPresenter: CommandPresenter
     private var initialFocusApplied = false
     private var focusAttempt: Runnable? = null
+    private var provisionalFocusAttempt = false
     private var focusAttemptTarget: View? = null
     private var applyingFocusAttempt = false
     private val focusOwnershipListener = android.view.ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
@@ -360,9 +362,8 @@ class MainFragment : RowsSupportFragment() {
         addShortcutItems(shortcutsAdapter)
         shortcutsRow = ListRow(HeaderItem(SHORTCUTS_ROW_ID, "Browse"), shortcutsAdapter)
 
-        val settingsAdapter = ArrayObjectAdapter(
-            CommandPresenter(hasPin = app.prefs.hasPinSet(), onDown = ::focusBrowseFromUser)
-        )
+        commandPresenter = CommandPresenter(hasPin = app.prefs.hasPinSet(), onDown = ::focusBrowseFromUser)
+        val settingsAdapter = ArrayObjectAdapter(commandPresenter)
         HomeCommandRow.items(app.prefs.hasPinSet()).forEach(settingsAdapter::add)
         settingsRow = ListRow(HeaderItem(SETTINGS_ROW_ID, "Quick actions"), settingsAdapter)
 
@@ -370,8 +371,31 @@ class MainFragment : RowsSupportFragment() {
         rowsAdapter.add(settingsRow)
     }
 
+    private fun syncCommandRow() {
+        val adapter = settingsRow.adapter as ArrayObjectAdapter
+        val hasPin = app.prefs.hasPinSet()
+        val commands = HomeCommandRow.items(hasPin)
+        val currentCommands = (0 until adapter.size()).map { adapter.get(it) as String }
+        val presenterChanged = commandPresenter.hasPin != hasPin
+        if (!presenterChanged && currentCommands == commands) return
+        val focus = captureFocus()
+        val focusedCommand = if (focus.rowKey == rowKey(settingsRow)) focus.itemKey else null
+        commandPresenter.hasPin = hasPin
+        updateItems(settingsRow, commands)
+        if (presenterChanged) adapter.rebindCardsRecursively()
+        if (focusedCommand != null) {
+            val target = if (focusedCommand == HomeCommandRow.LOG_OUT_KEY && !hasPin) {
+                HomeCommandRow.REFRESH_KEY
+            } else {
+                focusedCommand
+            }
+            focusRow(settingsRow, target, onFailure = ::focusQuickActions)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        syncCommandRow()
         // Discreet toggle while away: rebind visible cards without a reload
         // and re-evaluate hero visibility even when the reload TTL would
         // skip loadContent().
@@ -627,8 +651,30 @@ class MainFragment : RowsSupportFragment() {
         focusSafeTarget(onFocused = { initialFocusApplied = true })
     }
 
+    private fun selectProvisionalFocus() {
+        if (initialFocusApplied || focusAttempt != null) return
+        val browseCount = (shortcutsRow.adapter as ArrayObjectAdapter).size()
+        if (browseCount > 0) {
+            val rowIndex = indexOfRow(shortcutsRow)
+            if (rowIndex >= 0) setSelectedPosition(rowIndex, false)
+        } else {
+            provisionalFocusAttempt = true
+            focusRow(
+                settingsRow,
+                HomeCommandRow.REFRESH_KEY,
+                onFocused = { provisionalFocusAttempt = false },
+                onFailure = { provisionalFocusAttempt = false }
+            )
+        }
+    }
+
     private fun scheduleInitialFocus() {
-        if (!initialFocusApplied && focusAttempt == null) applyInitialFocus()
+        if (initialFocusApplied) return
+        if (provisionalFocusAttempt) {
+            provisionalFocusAttempt = false
+            cancelFocusAttempt()
+        }
+        if (focusAttempt == null) applyInitialFocus()
     }
 
     private fun rowId(row: HomeContentRow): Long = when (row) {
@@ -774,7 +820,7 @@ class MainFragment : RowsSupportFragment() {
                 rowsAdapter.add(index, row)
             }
         }
-        if (!isLoading) scheduleInitialFocus()
+        if (isLoading) selectProvisionalFocus() else scheduleInitialFocus()
     }
 
     private fun <T> applyResult(state: HomeRowState<T>, result: RowResult<List<T>>): HomeRowState<T> =

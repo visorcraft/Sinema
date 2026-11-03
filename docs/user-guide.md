@@ -6,7 +6,7 @@ This guide explains the browsing and library features in Sinema.
 
 When a scene is partially watched, a hero banner sits at the very top: a large backdrop for the newest Continue Playing scene with its title, details, and a one-click `RESUME` (or `PLAY`) action.
 
-By default, the top shortcut row contains:
+By default, the Browse row below Quick actions contains:
 
 - Search
 - Surprise Me: plays a random scene from your library right away.

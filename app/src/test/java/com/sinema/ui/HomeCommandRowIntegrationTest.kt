@@ -1,7 +1,6 @@
 package com.sinema.ui
 
 import android.os.Looper
-import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.widget.FrameLayout
@@ -15,6 +14,8 @@ import com.sinema.model.HomeShortcut
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -61,6 +62,72 @@ class HomeCommandRowIntegrationTest {
         val activity = launch(pin = false)
         val quick = homeRows(activity).single { it.headerItem.id == QUICK_ROW_ID }
         assertEquals(listOf("Refresh", "Settings", "About"), items(quick))
+    }
+
+    @Test
+    fun `cold launch uses safe provisional focus before delayed retry response`() {
+        val responseGate = CountDownLatch(1)
+        withHomeServer("""{"errors":[{"message":"delayed"}]}""", responseGate, status = 500) {
+            try {
+                val activity = launch(pin = true)
+                layoutHome(activity)
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(16))
+                assertFalse(focusedItem(activity) == HomeCommandRow.LOG_OUT)
+                assertEquals("Search", focusedItem(activity))
+                responseGate.countDown()
+                awaitRow(activity, RETRY_ROW_ID)
+                awaitFocused(activity, "Retry Connection")
+            } finally {
+                responseGate.countDown()
+            }
+        }
+    }
+
+    @Test
+    fun `setting pin on return adds log out and preserves command focus and edges`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        layoutHome(activity)
+        shadowOf(Looper.getMainLooper()).idle()
+        awaitFocused(activity, "Retry Connection")
+        focusItem(activity, QUICK_ROW_ID, HomeCommandRow.SETTINGS)
+        SinemaApp.instance.prefs.setPinHash("1234")
+        controller.pause().resume()
+        layoutHome(activity)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(
+            listOf("Log Out", "Refresh", "Settings", "About"),
+            items(row(activity, QUICK_ROW_ID))
+        )
+        awaitFocused(activity, HomeCommandRow.SETTINGS)
+        awaitHome(activity, "Log Out holder after PIN change") {
+            runCatching { itemView(activity, QUICK_ROW_ID, HomeCommandRow.LOG_OUT) }.getOrNull() != null
+        }
+        val logOut = itemView(activity, QUICK_ROW_ID, HomeCommandRow.LOG_OUT)
+        assertEquals(logOut.id, logOut.nextFocusLeftId)
+    }
+
+    @Test
+    fun `removing pin on return removes log out and restores safe refresh edge and focus`() {
+        SinemaApp.instance.prefs.setPinHash("1234")
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        layoutHome(activity)
+        shadowOf(Looper.getMainLooper()).idle()
+        awaitFocused(activity, "Retry Connection")
+        focusItem(activity, QUICK_ROW_ID, HomeCommandRow.LOG_OUT)
+        SinemaApp.instance.prefs.removePin()
+        controller.pause().resume()
+        layoutHome(activity)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(
+            listOf("Refresh", "Settings", "About"),
+            items(row(activity, QUICK_ROW_ID))
+        )
+        val refresh = itemView(activity, QUICK_ROW_ID, HomeCommandRow.REFRESH)
+        assertEquals(refresh.id, refresh.nextFocusLeftId)
+        awaitFocused(activity, HomeCommandRow.REFRESH)
+        assertFalse(focusedItem(activity) == HomeCommandRow.LOG_OUT)
     }
 
     @Test
@@ -395,9 +462,9 @@ class HomeCommandRowIntegrationTest {
     }
 
     private fun awaitHome(activity: MainActivity, failure: String, condition: () -> Boolean) {
-        val deadline = SystemClock.elapsedRealtime() + 5_000L
+        val deadline = System.nanoTime() + 5_000_000_000L
         while (!condition()) {
-            if (SystemClock.elapsedRealtime() >= deadline) {
+            if (System.nanoTime() >= deadline) {
                 val grid = mainFragment(activity).verticalGridView
                 val browseView = runCatching { itemView(activity, BROWSE_ROW_ID, "Search") }.getOrNull()
                 throw AssertionError(
@@ -433,12 +500,18 @@ class HomeCommandRowIntegrationTest {
         }.invoke(mainFragment(activity))
     }
 
-    private fun withHomeServer(response: String, block: () -> Unit) {
+    private fun withHomeServer(
+        response: String,
+        responseGate: CountDownLatch? = null,
+        status: Int = 200,
+        block: () -> Unit
+    ) {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/graphql") { exchange ->
+            responseGate?.await(5, TimeUnit.SECONDS)
             val bytes = response.toByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.sendResponseHeaders(status, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
             exchange.close()
         }
