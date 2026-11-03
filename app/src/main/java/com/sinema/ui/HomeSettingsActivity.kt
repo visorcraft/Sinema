@@ -106,42 +106,40 @@ class HomeSettingsActivity : SinemaActivity() {
     }
 
     private fun chooseSavedFilter() {
-        lifecycleScope.launch {
-            try {
-                val filters = app.api.findSavedSceneFilters()
-                if (isFinishing || isDestroyed) return@launch
-                if (filters.isEmpty()) {
-                    Toast.makeText(this@HomeSettingsActivity, "No saved filters on this server", Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-                val labels = listOf("None (hide home row)") + filters.map { it.name }
-                AlertDialog.Builder(this@HomeSettingsActivity)
-                    .setTitle("Saved Filter home row")
-                    .setItems(labels.toTypedArray()) { _, which ->
-                        val settings = app.prefs.homeLayout
-                        app.prefs.homeLayout = if (which == 0) {
-                            settings.copy(
-                                savedFilterId = "",
-                                savedFilterName = "",
-                                hiddenRows = settings.hiddenRows.orEmpty() + HomeContentRow.SAVED_FILTER
-                            )
-                        } else {
-                            val filter = filters[which - 1]
-                            settings.copy(
-                                savedFilterId = filter.id,
-                                savedFilterName = filter.name,
-                                hiddenRows = settings.hiddenRows.orEmpty() - HomeContentRow.SAVED_FILTER
-                            )
-                        }
-                        update()
-                    }
-                    .show()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.e("Sinema", "Failed to load saved filters", e)
+        launchSafely(
+            "Load saved filters",
+            onError = { e ->
                 Toast.makeText(this@HomeSettingsActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        ) {
+            val filters = app.api.findSavedSceneFilters()
+            if (isFinishing || isDestroyed) return@launchSafely
+            if (filters.isEmpty()) {
+                Toast.makeText(this@HomeSettingsActivity, "No saved filters on this server", Toast.LENGTH_LONG).show()
+                return@launchSafely
+            }
+            val labels = listOf("None (hide home row)") + filters.map { it.name }
+            AlertDialog.Builder(this@HomeSettingsActivity)
+                .setTitle("Saved Filter home row")
+                .setItems(labels.toTypedArray()) { _, which ->
+                    val settings = app.prefs.homeLayout
+                    app.prefs.homeLayout = if (which == 0) {
+                        settings.copy(
+                            savedFilterId = "",
+                            savedFilterName = "",
+                            hiddenRows = settings.hiddenRows.orEmpty() + HomeContentRow.SAVED_FILTER
+                        )
+                    } else {
+                        val filter = filters[which - 1]
+                        settings.copy(
+                            savedFilterId = filter.id,
+                            savedFilterName = filter.name,
+                            hiddenRows = settings.hiddenRows.orEmpty() - HomeContentRow.SAVED_FILTER
+                        )
+                    }
+                    update()
+                }
+                .show()
         }
     }
 }

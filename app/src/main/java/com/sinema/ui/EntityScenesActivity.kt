@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
 import android.widget.ImageView
@@ -20,7 +19,7 @@ import com.sinema.util.GlideAuth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-class EntityScenesActivity : SinemaActivity() {
+class EntityScenesActivity : GridActivity() {
     companion object {
         fun intent(context: Context, item: EntityItem): Intent =
             Intent(context, EntityScenesActivity::class.java)
@@ -29,27 +28,19 @@ class EntityScenesActivity : SinemaActivity() {
                 .putExtra("name", item.name)
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        // Header binds on every create so it survives recreation; only the
-        // fragment creation is skipped when restoring.
-        val kind = EntityItem.parseOrTag(intent.getStringExtra("kind"))
-        bindEntityHeader(kind, intent.getStringExtra("id") ?: "", intent.getStringExtra("name") ?: "")
-        if (savedInstanceState == null) {
-            val fragment = EntityScenesFragment.create(
-                kind,
-                intent.getStringExtra("id") ?: "",
-                intent.getStringExtra("name") ?: ""
-            )
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
+    override fun createGridFragment(): SceneGridFragment = EntityScenesFragment.create(
+        EntityItem.parseOrTag(intent.getStringExtra("kind")),
+        intent.getStringExtra("id") ?: "",
+        intent.getStringExtra("name") ?: ""
+    )
+
+    override fun onGridBound(screen: SceneGridFragment) {
+        // Header binds on every create so it survives recreation.
+        bindEntityHeader(
+            EntityItem.parseOrTag(intent.getStringExtra("kind")),
+            intent.getStringExtra("id") ?: "",
+            intent.getStringExtra("name") ?: ""
+        )
         // Collapse the tall entity header while the grid is scrolled so
         // content rows get the full viewport; it returns at the top. Runs on
         // every create so restored fragments keep the behavior.
@@ -73,28 +64,22 @@ class EntityScenesActivity : SinemaActivity() {
         header.visibility = View.VISIBLE
         findViewById<TextView>(R.id.entity_header_name).text = name
         findViewById<TextView>(R.id.entity_header_count).text = kind.label
-        lifecycleScope.launch {
-            try {
-                val info = SinemaApp.instance.api.findEntityHeader(kind, id) ?: return@launch
-                findViewById<TextView>(R.id.entity_header_name).text = info.name
-                val count = findViewById<TextView>(R.id.entity_header_count)
-                count.text = "${info.sceneCount} " +
-                    if (info.sceneCount == 1) "scene" else "scenes"
-                val image = findViewById<ImageView>(R.id.entity_header_image)
-                val headerImageUrl = info.imagePath
-                    ?: SinemaApp.instance.api.entityImageUrl(kind, id)
-                Glide.with(this@EntityScenesActivity)
-                    .load(GlideAuth.url(SinemaApp.instance.api, headerImageUrl))
-                    .centerCrop()
-                    .error(android.R.drawable.ic_menu_gallery)
-                    .into(image)
-                bindHeaderTagChips(info.tags)
-                bindHeaderActions(kind, info)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w("Sinema", "Entity header load failed for $kind $id", e)
-            }
+        launchSafely("Entity header load", onError = {}) {
+            val info = SinemaApp.instance.api.findEntityHeader(kind, id) ?: return@launchSafely
+            findViewById<TextView>(R.id.entity_header_name).text = info.name
+            val count = findViewById<TextView>(R.id.entity_header_count)
+            count.text = "${info.sceneCount} " +
+                if (info.sceneCount == 1) "scene" else "scenes"
+            val image = findViewById<ImageView>(R.id.entity_header_image)
+            val headerImageUrl = info.imagePath
+                ?: SinemaApp.instance.api.entityImageUrl(kind, id)
+            Glide.with(this@EntityScenesActivity)
+                .load(GlideAuth.url(SinemaApp.instance.api, headerImageUrl))
+                .centerCrop()
+                .error(android.R.drawable.ic_menu_gallery)
+                .into(image)
+            bindHeaderTagChips(info.tags)
+            bindHeaderActions(kind, info)
         }
     }
 
@@ -161,10 +146,6 @@ class EntityScenesActivity : SinemaActivity() {
         }
         scroll.visibility = View.VISIBLE
     }
-
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 }
 
 class EntityScenesFragment : SceneGridFragment() {

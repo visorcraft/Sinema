@@ -35,16 +35,14 @@ object SavedFilterActions {
                     Toast.makeText(activity, "Enter a filter name", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                activity.lifecycleScope.launch {
-                    try {
-                        val saved = SinemaApp.instance.api.saveSceneFilter(name, options, sort, direction)
-                        Toast.makeText(activity, "Saved ‘${saved.name}’", Toast.LENGTH_SHORT).show()
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.e("Sinema", "Failed to save scene filter", e)
+                activity.launchSafely(
+                    "Save scene filter",
+                    onError = { e ->
                         Toast.makeText(activity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
+                ) {
+                    val saved = SinemaApp.instance.api.saveSceneFilter(name, options, sort, direction)
+                    Toast.makeText(activity, "Saved ‘${saved.name}’", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel", null)

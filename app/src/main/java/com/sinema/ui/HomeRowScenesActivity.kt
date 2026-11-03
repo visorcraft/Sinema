@@ -3,30 +3,14 @@ package com.sinema.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.KeyEvent
 import com.sinema.R
 import com.sinema.model.HomeContentRow
 
-class HomeRowScenesActivity : SinemaActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val fragment = HomeRowScenesFragment.create(
-                intent.getStringExtra(EXTRA_ROW) ?: HomeContentRow.RECENTLY_ADDED.name
-            )
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+class HomeRowScenesActivity : GridActivity() {
+    override fun createGridFragment(): SceneGridFragment =
+        HomeRowScenesFragment.create(
+intent.getStringExtra(EXTRA_ROW) ?: HomeContentRow.RECENTLY_ADDED.name
+)
 
     companion object {
         const val EXTRA_ROW = "home_row"

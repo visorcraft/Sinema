@@ -1534,6 +1534,8 @@ class SinemaApi(
         return try {
             graphql(query).getAsJsonObject("data")?.getAsJsonObject("version")
                 ?.get("version")?.takeIf { !it.isJsonNull }?.asString ?: "unknown"
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (_: Exception) {
             "unknown"
         }
@@ -1555,6 +1557,8 @@ class SinemaApi(
                 val description = obj.optString("description", "")
                 if (description.isBlank()) null else "$status — $description"
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }

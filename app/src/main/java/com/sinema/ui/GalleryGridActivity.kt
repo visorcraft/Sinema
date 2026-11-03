@@ -3,7 +3,6 @@ package com.sinema.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.KeyEvent
 import com.sinema.R
 import com.sinema.model.GalleryItem
 
@@ -20,23 +19,12 @@ enum class GallerySortOption(val label: String, val field: String, val direction
     }
 }
 
-class GalleryGridActivity : SinemaActivity() {
+class GalleryGridActivity : GridActivity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, GalleryGridActivity::class.java)
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        val fragment = supportFragmentManager.findFragmentById(R.id.main_frame) as? GalleryGridFragment
-            ?: GalleryGridFragment().also {
-                supportFragmentManager.beginTransaction().replace(R.id.main_frame, it).commit()
-            }
-        bindGridControls(fragment)
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+    override fun createGridFragment(): SceneGridFragment = GalleryGridFragment()
 }
 
 class GalleryGridFragment : SceneGridFragment() {

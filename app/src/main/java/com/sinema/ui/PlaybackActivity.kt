@@ -426,6 +426,9 @@ class PlaybackActivity : SinemaActivity() {
 
     private fun loadInitialMetadata() {
         val requestedScene = sceneId
+        // Raw launch on purpose: a metadata failure must still fall through
+        // to clear autoResumePending and begin the playback session —
+        // launchSafely's catch would skip that tail and stall startup.
         lifecycleScope.launch {
             try {
                 val details = SinemaApp.instance.api.findSceneFull(requestedScene)

@@ -3,7 +3,6 @@ package com.sinema.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
 import android.widget.ImageView
@@ -15,7 +14,7 @@ import com.sinema.model.GalleryItem
 import com.sinema.model.ImageItem
 import com.sinema.util.GlideAuth
 
-class GalleryImagesActivity : SinemaActivity() {
+class GalleryImagesActivity : GridActivity() {
     companion object {
         private const val EXTRA_ID = "gallery_id"
         private const val EXTRA_NAME = "gallery_name"
@@ -38,16 +37,14 @@ class GalleryImagesActivity : SinemaActivity() {
                 .putExtra(EXTRA_STUDIO, gallery.studioName)
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        bindHeader()
+    override fun createGridFragment(): SceneGridFragment = GalleryImagesFragment.create(
+        intent.getStringExtra(EXTRA_ID).orEmpty(),
+        intent.getStringExtra(EXTRA_NAME).orEmpty()
+    )
+
+    override fun onGridBound(screen: SceneGridFragment) {
         val galleryId = intent.getStringExtra(EXTRA_ID).orEmpty()
-        val fragment = supportFragmentManager.findFragmentById(R.id.main_frame) as? GalleryImagesFragment
-            ?: GalleryImagesFragment.create(galleryId, intent.getStringExtra(EXTRA_NAME).orEmpty()).also {
-                supportFragmentManager.beginTransaction().replace(R.id.main_frame, it).commit()
-            }
-        bindGridControls(fragment)
+        bindHeader()
         findViewById<Button>(R.id.btn_grid_sort).visibility = View.GONE
         findViewById<Button>(R.id.btn_group_resume).apply {
             visibility = View.VISIBLE
@@ -66,9 +63,6 @@ class GalleryImagesActivity : SinemaActivity() {
             }
         }
     }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
 
     private fun bindHeader() {
         findViewById<View>(R.id.entity_header).visibility = View.VISIBLE

@@ -1,7 +1,6 @@
 package com.sinema.ui
 
 import android.os.Bundle
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,24 +21,9 @@ import kotlinx.coroutines.launch
  * Library-wide scene markers ("chapters") with tag filtering. Selecting a
  * marker jumps straight into playback at its timestamp.
  */
-class MarkerBrowserActivity : SinemaActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val fragment = MarkerBrowserFragment()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+class MarkerBrowserActivity : GridActivity() {
+    override fun createGridFragment(): SceneGridFragment =
+        MarkerBrowserFragment()
 }
 
 class MarkerBrowserFragment : SceneGridFragment() {

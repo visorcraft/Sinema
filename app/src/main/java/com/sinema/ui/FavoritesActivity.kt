@@ -1,28 +1,11 @@
 package com.sinema.ui
 
-import android.os.Bundle
-import android.view.KeyEvent
 import com.sinema.R
 import com.sinema.model.SortOption
 
-class FavoritesActivity : SinemaActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val fragment = FavoritesGridFragment()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+class FavoritesActivity : GridActivity() {
+    override fun createGridFragment(): SceneGridFragment =
+        FavoritesGridFragment()
 }
 
 class FavoritesGridFragment : SceneGridFragment() {

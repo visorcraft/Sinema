@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.util.Log
-import android.view.KeyEvent
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
@@ -18,24 +17,9 @@ import com.sinema.model.SortOption
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-class SavedFiltersActivity : SinemaActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val fragment = SavedFiltersFragment()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+class SavedFiltersActivity : GridActivity() {
+    override fun createGridFragment(): SceneGridFragment =
+        SavedFiltersFragment()
 }
 
 internal fun savedFilterDefaultSort(sortField: String?, direction: String?): SortOption =
@@ -87,17 +71,15 @@ class SavedFiltersFragment : SceneGridFragment() {
                     Toast.makeText(requireContext(), "Enter a filter name", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                lifecycleScope.launch {
-                    try {
-                        val renamed = app.api.renameSavedSceneFilter(filter, name)
-                        Toast.makeText(requireContext(), "Renamed to ‘${renamed.name}’", Toast.LENGTH_SHORT).show()
-                        reload()
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.e("Sinema", "Failed to rename saved filter ${filter.id}", e)
+                launchSafely(
+                    "Rename saved filter",
+                    onError = { e ->
                         Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
+                ) {
+                    val renamed = app.api.renameSavedSceneFilter(filter, name)
+                    Toast.makeText(requireContext(), "Renamed to ‘${renamed.name}’", Toast.LENGTH_SHORT).show()
+                    reload()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -109,17 +91,15 @@ class SavedFiltersFragment : SceneGridFragment() {
             .setTitle("Delete saved filter?")
             .setMessage("Delete ‘${filter.name}’ from Stash? Scenes are not affected.")
             .setPositiveButton("Delete") { _, _ ->
-                lifecycleScope.launch {
-                    try {
-                        app.api.destroySavedSceneFilter(filter.id)
-                        Toast.makeText(requireContext(), "Deleted ‘${filter.name}’", Toast.LENGTH_SHORT).show()
-                        reload()
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.e("Sinema", "Failed to delete saved filter ${filter.id}", e)
+                launchSafely(
+                    "Delete saved filter",
+                    onError = { e ->
                         Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
+                ) {
+                    app.api.destroySavedSceneFilter(filter.id)
+                    Toast.makeText(requireContext(), "Deleted ‘${filter.name}’", Toast.LENGTH_SHORT).show()
+                    reload()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -164,7 +144,7 @@ class SavedFilterCardPresenter(
     }
 }
 
-class SavedFilterScenesActivity : SinemaActivity() {
+class SavedFilterScenesActivity : GridActivity() {
     companion object {
         const val EXTRA_ID = "saved_filter_id"
         const val EXTRA_NAME = "saved_filter_name"
@@ -183,29 +163,13 @@ class SavedFilterScenesActivity : SinemaActivity() {
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val fragment = SavedFilterScenesFragment.create(
-                intent.getStringExtra(EXTRA_ID) ?: "",
-                intent.getStringExtra(EXTRA_NAME) ?: "",
-                intent.getStringExtra(EXTRA_SORT),
-                intent.getStringExtra(EXTRA_DIRECTION),
-                intent.getStringExtra(EXTRA_OBJECT_FILTER) ?: ""
-            )
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+    override fun createGridFragment(): SceneGridFragment = SavedFilterScenesFragment.create(
+        intent.getStringExtra(EXTRA_ID) ?: "",
+        intent.getStringExtra(EXTRA_NAME) ?: "",
+        intent.getStringExtra(EXTRA_SORT),
+        intent.getStringExtra(EXTRA_DIRECTION),
+        intent.getStringExtra(EXTRA_OBJECT_FILTER) ?: ""
+    )
 }
 
 class SavedFilterScenesFragment : SceneGridFragment() {

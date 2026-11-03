@@ -444,24 +444,11 @@ class SinemaApiTest {
 
     @Test
     fun `getStats parses the server stats payload`() {
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            val response = """{"data":{"stats":{
+        withGraphqlServer("""{"data":{"stats":{
                 "scene_count":120,"scenes_size":300.5,"scenes_duration":432000.0,
                 "image_count":10,"performer_count":7,"studio_count":3,"tag_count":40,
                 "total_o_count":11,"total_play_duration":5400.0,
-                "total_play_count":77,"scenes_played":55}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+                "total_play_count":77,"scenes_played":55}}}""") { api, _ ->
             val stats = kotlinx.coroutines.runBlocking { api.getStats() }
             assertEquals(120, stats.sceneCount)
             assertEquals(7, stats.performerCount)
@@ -470,8 +457,6 @@ class SinemaApiTest {
             assertEquals(5400.0, stats.totalPlayDurationSeconds, 0.0)
             assertEquals(77, stats.totalPlayCount)
             assertEquals(55, stats.scenesPlayed)
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -508,22 +493,7 @@ class SinemaApiTest {
 
     @Test
     fun `entity search sends query sort direction and page for every kind`() {
-        val requestBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBodies.add(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+        withGraphqlServer(listOf(SequencedResponse("""{"data":{}}"""))) { api, requests ->
             val cases = listOf(
                 Triple(com.sinema.model.EntityItem.Kind.TAG, "findTags", "tags"),
                 Triple(com.sinema.model.EntityItem.Kind.PERFORMER, "findPerformers", "performers"),
@@ -541,9 +511,9 @@ class SinemaApiTest {
                     )
                 }
             }
-            assertEquals(3, requestBodies.size)
+            assertEquals(3, requests().size)
             cases.forEachIndexed { index, (_, queryName, listKey) ->
-                val body = requestBodies[index]
+                val body = requests()[index]
                 org.junit.Assert.assertTrue(body, body.contains(queryName))
                 org.junit.Assert.assertTrue(body, body.contains("$listKey { id name"))
                 org.junit.Assert.assertTrue(body, body.contains("\"page\":3"))
@@ -552,8 +522,6 @@ class SinemaApiTest {
                 org.junit.Assert.assertTrue(body, body.contains("\"sort\":\"name\""))
                 org.junit.Assert.assertTrue(body, body.contains("\"direction\":\"ASC\""))
             }
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -578,22 +546,7 @@ class SinemaApiTest {
 
     @Test
     fun `entity and folder constraints survive user filters`() {
-        val requestBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBodies.add(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+        withGraphqlServer(listOf(SequencedResponse("""{"data":{"findScenes":{"count":0,"scenes":[]}}}"""))) { api, requests ->
             val filters = com.sinema.model.SceneFilterOptions(
                 com.sinema.model.WatchFilter.WATCHED,
                 favoritesOnly = true
@@ -606,39 +559,22 @@ class SinemaApiTest {
                 )
                 api.findScenesByPath("/data/Foo - Bar", filters = filters)
             }
-            assertEquals(2, requestBodies.size)
-            val entityBody = requestBodies[0]
+            assertEquals(2, requests().size)
+            val entityBody = requests()[0]
             org.junit.Assert.assertTrue(entityBody, entityBody.contains("\"tags\""))
             org.junit.Assert.assertTrue(entityBody, entityBody.contains("\"play_count\""))
             org.junit.Assert.assertTrue(entityBody, entityBody.contains("\"rating100\""))
-            val folderBody = requestBodies[1]
+            val folderBody = requests()[1]
             org.junit.Assert.assertTrue(folderBody, folderBody.contains("\"path\""))
             org.junit.Assert.assertTrue(folderBody, folderBody.contains("Foo - Bar"))
             org.junit.Assert.assertTrue(folderBody, folderBody.contains("\"play_count\""))
             org.junit.Assert.assertTrue(folderBody, folderBody.contains("\"rating100\""))
-        } finally {
-            server.stop(0)
         }
     }
 
     @Test
     fun `home view all queries preserve paging and row criteria`() {
-        val requestBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBodies.add(exchange.requestBody.bufferedReader().readText())
-            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+        withGraphqlServer(listOf(SequencedResponse("""{"data":{"findScenes":{"count":0,"scenes":[]}}}"""))) { api, requests ->
             kotlinx.coroutines.runBlocking {
                 api.findFavoriteScenesPaged(
                     page = 2, perPage = 50, sort = "updated_at", direction = "DESC", unwatchedOnly = true
@@ -646,13 +582,13 @@ class SinemaApiTest {
                 api.findContinuePlayingPaged(page = 3, perPage = 75)
                 api.findRecentlyPlayedPaged(page = 2, perPage = 25)
             }
-            assertEquals(3, requestBodies.size)
-            val favorites = requestBodies[0]
+            assertEquals(3, requests().size)
+            val favorites = requests()[0]
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"page\":2"))
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"per_page\":50"))
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"rating100\""))
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"play_count\""))
-            val resume = requestBodies[1]
+            val resume = requests()[1]
             // Continue Playing's default recency sort fetches the complete
             // result and slices client-side (null-timestamp-safe ordering),
             // mirroring Recently Played.
@@ -661,32 +597,15 @@ class SinemaApiTest {
             org.junit.Assert.assertTrue(resume, resume.contains("\"resume_time\""))
             org.junit.Assert.assertTrue(resume, resume.contains("GREATER_THAN"))
             org.junit.Assert.assertTrue(resume, resume.contains("last_played_at"))
-            val recentlyPlayed = requestBodies[2]
+            val recentlyPlayed = requests()[2]
             org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"page\":1"))
             org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"per_page\":-1"))
-        } finally {
-            server.stop(0)
         }
     }
 
     @Test
     fun `alpha jump can filter titles instead of paths`() {
-        var requestBody = ""
-        val server = com.sun.net.httpserver.HttpServer.create(
-            java.net.InetSocketAddress("127.0.0.1", 0), 0
-        )
-        server.createContext("/graphql") { exchange ->
-            requestBody = exchange.requestBody.bufferedReader().readText()
-            val response = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            val api = SinemaApi("http://127.0.0.1:${server.address.port}", "k")
+        withGraphqlServer("""{"data":{"findScenes":{"count":0,"scenes":[]}}}""") { api, requestBody ->
             kotlinx.coroutines.runBlocking {
                 api.findRecentScenesPaged(
                     page = 1,
@@ -698,11 +617,9 @@ class SinemaApiTest {
                 )
             }
             org.junit.Assert.assertTrue(
-                requestBody,
-                requestBody.contains("\"title\":{\"value\":\"^A\",\"modifier\":\"MATCHES_REGEX\"}")
+                requestBody(),
+                requestBody().contains("\"title\":{\"value\":\"^A\",\"modifier\":\"MATCHES_REGEX\"}")
             )
-        } finally {
-            server.stop(0)
         }
     }
 }

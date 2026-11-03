@@ -1,30 +1,14 @@
 package com.sinema.ui
 
-import android.os.Bundle
 import com.sinema.R
 
 /**
  * Curation backlog: scenes with no tags and no performers. Long-press a card
  * to assign tags; the scene leaves the grid once it is no longer an orphan.
  */
-class UntaggedScenesActivity : SinemaActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val fragment = UntaggedScenesFragment()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+class UntaggedScenesActivity : GridActivity() {
+    override fun createGridFragment(): SceneGridFragment =
+        UntaggedScenesFragment()
 }
 
 class UntaggedScenesFragment : SceneGridFragment() {

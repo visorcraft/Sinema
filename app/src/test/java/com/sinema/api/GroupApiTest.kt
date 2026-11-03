@@ -8,8 +8,6 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
-import java.net.InetSocketAddress
-import java.util.concurrent.atomic.AtomicInteger
 
 class GroupApiTest {
 
@@ -148,24 +146,15 @@ class GroupApiTest {
         requests: MutableList<String>,
         statusCodes: List<Int> = List(responses.size) { 200 },
         block: suspend (SinemaApi) -> Unit
-    ) = runBlocking {
-        val index = AtomicInteger(0)
-        val server = com.sun.net.httpserver.HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/graphql") { exchange ->
-            requests += exchange.requestBody.bufferedReader().readText()
-            val responseIndex = index.getAndIncrement().coerceAtMost(responses.lastIndex)
-            val response = responses[responseIndex]
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(statusCodes[responseIndex], bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            block(SinemaApi("http://127.0.0.1:${server.address.port}", "k"))
-        } finally {
-            server.stop(0)
+    ) {
+        withGraphqlServer(
+            responses.mapIndexed { i, body -> SequencedResponse(body, statusCodes[i]) }
+        ) { api, captured ->
+            try {
+                kotlinx.coroutines.runBlocking { block(api) }
+            } finally {
+                requests.addAll(captured())
+            }
         }
     }
 }

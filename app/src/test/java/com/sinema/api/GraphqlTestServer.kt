@@ -44,5 +44,47 @@ fun withGraphqlServer(
     }
 }
 
+/** One canned reply per request, in order; repeats the last one when exhausted. */
+class SequencedResponse(val body: String, val status: Int = 200)
+
+/**
+ * [withGraphqlServer] variant for tests that need different replies per
+ * request (fallback chains, pagination) or request-dependent bodies.
+ * [responder] takes the captured request body and returns the reply; it is
+ * used when present, otherwise the next [SequencedResponse] is sent.
+ */
+fun withGraphqlServer(
+    responses: List<SequencedResponse>,
+    responder: ((requestBody: String) -> SequencedResponse)? = null,
+    configureSinemaApp: Boolean = false,
+    block: (api: SinemaApi, requests: () -> List<String>) -> Unit
+) {
+    val captured = java.util.Collections.synchronizedList(mutableListOf<String>())
+    val index = java.util.concurrent.atomic.AtomicInteger(0)
+    val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+    server.createContext("/graphql") { exchange ->
+        val body = exchange.requestBody.bufferedReader().readText()
+        captured.add(body)
+        val reply = responder?.invoke(body)
+            ?: responses[index.getAndIncrement().coerceAtMost(responses.size - 1)]
+        val bytes = reply.body.toByteArray()
+        exchange.responseHeaders.add("Content-Type", "application/json")
+        exchange.sendResponseHeaders(reply.status, bytes.size.toLong())
+        exchange.responseBody.use { it.write(bytes) }
+        exchange.close()
+    }
+    server.start()
+    try {
+        val serverUrl = "http://127.0.0.1:${server.address.port}"
+        if (configureSinemaApp) {
+            SinemaApp.instance.prefs.serverUrl = serverUrl
+            SinemaApp.instance.refreshApi()
+        }
+        block(SinemaApi(serverUrl, "k")) { java.util.ArrayList(captured) }
+    } finally {
+        server.stop(0)
+    }
+}
+
 fun testGraphqlErrorResponse(message: String): String =
     Gson().toJson(mapOf("errors" to listOf(mapOf("message" to message))))

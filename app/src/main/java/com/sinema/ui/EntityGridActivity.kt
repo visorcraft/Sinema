@@ -3,7 +3,6 @@ package com.sinema.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.KeyEvent
 import com.sinema.R
 import com.sinema.model.EntityItem
 
@@ -18,31 +17,14 @@ enum class EntitySortOption(val label: String, val field: String, val direction:
     }
 }
 
-class EntityGridActivity : SinemaActivity() {
+class EntityGridActivity : GridActivity() {
     companion object {
         fun intent(context: Context, kind: EntityItem.Kind): Intent =
             Intent(context, EntityGridActivity::class.java).putExtra("kind", kind.name)
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val kind = EntityItem.parseOrTag(intent.getStringExtra("kind"))
-            val fragment = EntityGridFragment.create(kind)
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
-
+    override fun createGridFragment(): SceneGridFragment =
+        EntityGridFragment.create(EntityItem.parseOrTag(intent.getStringExtra("kind")))
 }
 
 class EntityGridFragment : SceneGridFragment() {

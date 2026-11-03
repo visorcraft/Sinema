@@ -67,31 +67,29 @@ object EntityFilterDialog {
         query: String,
         onChosen: (EntityFilter) -> Unit
     ) {
-        context.lifecycleScope.launch {
-            try {
-                val results = SinemaApp.instance.api.findEntities(
-                    kind,
-                    page = 1,
-                    perPage = 100,
-                    searchTerm = query.ifBlank { null },
-                    sort = "name",
-                    direction = "ASC"
-                ).second
-                val existing = current.entities.map {
-                    EntityItem(it.id, it.name, sceneCount = 0, imagePath = null, kind = kind)
-                }
-                val entities = (existing + results).distinctBy { it.id }
-                if (entities.isEmpty()) {
-                    Toast.makeText(context, "No ${kind.label.lowercase()} found", Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-                showPicker(context, kind, current, entities, onChosen)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("Sinema", "Failed to load ${kind.label} filter choices", e)
+        context.launchSafely(
+            "Load ${kind.label} filter choices",
+            onError = { e ->
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        ) {
+            val results = SinemaApp.instance.api.findEntities(
+                kind,
+                page = 1,
+                perPage = 100,
+                searchTerm = query.ifBlank { null },
+                sort = "name",
+                direction = "ASC"
+            ).second
+            val existing = current.entities.map {
+                EntityItem(it.id, it.name, sceneCount = 0, imagePath = null, kind = kind)
+            }
+            val entities = (existing + results).distinctBy { it.id }
+            if (entities.isEmpty()) {
+                Toast.makeText(context, "No ${kind.label.lowercase()} found", Toast.LENGTH_SHORT).show()
+                return@launchSafely
+            }
+            showPicker(context, kind, current, entities, onChosen)
         }
     }
 

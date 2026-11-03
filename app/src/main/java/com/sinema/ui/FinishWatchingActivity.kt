@@ -1,6 +1,5 @@
 package com.sinema.ui
 
-import android.os.Bundle
 import com.sinema.R
 import com.sinema.model.Scene
 
@@ -10,24 +9,9 @@ import com.sinema.model.Scene
  * Play All work like any scene grid. Near-end scenes are hidden (they count
  * as finished server-side once playback clears the resume point).
  */
-class FinishWatchingActivity : SinemaActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_grid)
-        if (savedInstanceState == null) {
-            val fragment = FinishWatchingFragment()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.main_frame, fragment)
-                .commit()
-            bindGridControls(fragment)
-        } else {
-            (supportFragmentManager.findFragmentById(R.id.main_frame) as? SortableScreen)
-                ?.let { bindGridControls(it) }
-        }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean =
-        if (handleSortMenuKey(keyCode)) true else super.onKeyDown(keyCode, event)
+class FinishWatchingActivity : GridActivity() {
+    override fun createGridFragment(): SceneGridFragment =
+        FinishWatchingFragment()
 }
 
 class FinishWatchingFragment : SceneGridFragment() {

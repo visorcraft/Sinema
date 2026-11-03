@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.LinkAddress
 import android.os.Bundle
+import android.view.View
 import android.widget.*
 import androidx.lifecycle.lifecycleScope
 import com.sinema.SinemaApp
@@ -120,59 +121,22 @@ class SetupActivity : SinemaActivity() {
     }
     
     private fun showStashLoginScreen() {
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(80, 60, 80, 60)
-            setBackgroundColor(0xFF1B1B1B.toInt())
-        }
-        
-        val title = TextView(this).apply {
-            text = "Sign in with Stash"
-            textSize = 28f
-            setTextColor(0xFFFFFFFF.toInt())
-        }
-        layout.addView(title, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 32 })
-        
-        layout.addView(TextView(this).apply {
-            text = "Server URL:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        })
-        
+        val layout = setupColumn()
+        layout.addTitle("Sign in with Stash")
+
+        layout.addLabel("Server URL:")
         val urlEdit = createEditText(app.prefs.serverUrl.takeIf { it.isNotBlank() } ?: "http://")
-        layout.addView(urlEdit, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 24 })
-        
-        layout.addView(TextView(this).apply {
-            text = "Username:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        })
-        
+        layout.addSetupField(urlEdit)
+
+        layout.addLabel("Username:")
         val usernameEdit = createEditText("")
-        layout.addView(usernameEdit, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 24 })
-        
-        layout.addView(TextView(this).apply {
-            text = "Password:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        })
-        
+        layout.addSetupField(usernameEdit)
+
+        layout.addLabel("Password:")
         val passwordEdit = createEditText("").apply {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
-        layout.addView(passwordEdit, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 24 })
+        layout.addSetupField(passwordEdit)
 
         val selfSignedCheck = android.widget.CheckBox(this).apply {
             text = "Trust self-signed certificates"
@@ -180,22 +144,36 @@ class SetupActivity : SinemaActivity() {
             setTextColor(0xFFCCCCCC.toInt())
             isChecked = app.prefs.setupAllowSelfSigned
         }
-        layout.addView(selfSignedCheck, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 32 })
-        
+        layout.addSetupField(selfSignedCheck, bottomMargin = 32)
+
         val errorText = TextView(this).apply {
             textSize = 16f
             setTextColor(0xFFFF4444.toInt())
             visibility = android.view.View.GONE
         }
-        layout.addView(errorText, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 16 })
-        
+        layout.addSetupField(errorText, bottomMargin = 16)
+
         val signInBtn = createButton("Sign In") {}
+
+        fun attemptSignIn(serverUrl: String, username: String, password: String, trustSelfSigned: Boolean) {
+            errorText.visibility = android.view.View.GONE
+            signInBtn.isEnabled = false
+            signInBtn.text = "Signing in..."
+            lifecycleScope.launch {
+                try {
+                    val sessionCookie = performStashLogin(serverUrl, username, password, trustSelfSigned)
+                    showAuthModeChoice(serverUrl, username, password, sessionCookie, trustSelfSigned)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    errorText.text = "Login failed: ${e.message}"
+                    errorText.visibility = android.view.View.VISIBLE
+                    signInBtn.isEnabled = true
+                    signInBtn.text = "Sign In"
+                }
+            }
+        }
+
         signInBtn.setOnClickListener {
             val serverUrl = normalizeServerUrl(urlEdit.text.toString())
             val username = usernameEdit.text.toString().trim()
@@ -208,67 +186,16 @@ class SetupActivity : SinemaActivity() {
             }
 
             if (selfSignedCheck.isChecked) {
-                confirmSelfSignedTrust(serverUrl) {
-                    errorText.visibility = android.view.View.GONE
-                    signInBtn.isEnabled = false
-                    signInBtn.text = "Signing in..."
-
-                    lifecycleScope.launch {
-                        try {
-                            val sessionCookie = performStashLogin(serverUrl, username, password, true)
-                            showAuthModeChoice(serverUrl, username, password, sessionCookie, true)
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            errorText.text = "Login failed: ${e.message}"
-                            errorText.visibility = android.view.View.VISIBLE
-                            signInBtn.isEnabled = true
-                            signInBtn.text = "Sign In"
-                        }
-                    }
-                }
-                return@setOnClickListener
-            }
-
-            errorText.visibility = android.view.View.GONE
-            signInBtn.isEnabled = false
-            signInBtn.text = "Signing in..."
-
-            lifecycleScope.launch {
-                try {
-                    val sessionCookie = performStashLogin(serverUrl, username, password, false)
-                    showAuthModeChoice(serverUrl, username, password, sessionCookie, false)
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    errorText.text = "Login failed: ${e.message}"
-                    errorText.visibility = android.view.View.VISIBLE
-                    signInBtn.isEnabled = true
-                    signInBtn.text = "Sign In"
-                }
+                confirmSelfSignedTrust(serverUrl) { attemptSignIn(serverUrl, username, password, true) }
+            } else {
+                attemptSignIn(serverUrl, username, password, false)
             }
         }
-        layout.addView(signInBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 16 })
-        
-        val backBtn = createButton("Back") {
-            showMenuScreen()
-        }
-        layout.addView(backBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ))
-        
-        val scrollView = ScrollView(this).apply {
-            isFocusable = false
-            setBackgroundColor(0xFF1B1B1B.toInt())
-            addView(layout)
-        }
-        
-        setContentView(scrollView)
-        urlEdit.requestFocus()
+        layout.addSetupButton(signInBtn)
+
+        layout.addSetupButton(createButton("Back") { showMenuScreen() }, bottomMargin = 0)
+
+        finishSetupScreen(layout, urlEdit)
     }
     
     private suspend fun performStashLogin(
@@ -691,45 +618,16 @@ class SetupActivity : SinemaActivity() {
     }
     
     private fun showManualEntryScreen() {
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(80, 60, 80, 60)
-            setBackgroundColor(0xFF1B1B1B.toInt())
-        }
-        
-        val title = TextView(this).apply {
-            text = "Manual Setup"
-            textSize = 28f
-            setTextColor(0xFFFFFFFF.toInt())
-        }
-        layout.addView(title, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 32 })
-        
-        layout.addView(TextView(this).apply {
-            text = "Server URL:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        })
-        
+        val layout = setupColumn()
+        layout.addTitle("Manual Setup")
+
+        layout.addLabel("Server URL:")
         val urlEdit = createEditText(app.prefs.serverUrl.takeIf { it.isNotBlank() } ?: "http://")
-        layout.addView(urlEdit, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 24 })
-        
-        layout.addView(TextView(this).apply {
-            text = "API Key:"
-            textSize = 18f
-            setTextColor(0xFFCCCCCC.toInt())
-        })
-        
+        layout.addSetupField(urlEdit)
+
+        layout.addLabel("API Key:")
         val keyEdit = createEditText("")
-        layout.addView(keyEdit, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 24 })
+        layout.addSetupField(keyEdit)
 
         val selfSignedCheck = android.widget.CheckBox(this).apply {
             text = "Trust self-signed certificates"
@@ -737,10 +635,7 @@ class SetupActivity : SinemaActivity() {
             setTextColor(0xFFCCCCCC.toInt())
             isChecked = app.prefs.setupAllowSelfSigned
         }
-        layout.addView(selfSignedCheck, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 32 })
+        layout.addSetupField(selfSignedCheck, bottomMargin = 32)
 
         fun performManualSave() {
             val serverUrl = normalizeServerUrl(urlEdit.text.toString())
@@ -777,27 +672,11 @@ class SetupActivity : SinemaActivity() {
             }
             performManualSave()
         }
-        layout.addView(saveBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 16 })
-        
-        val backBtn = createButton("Back") {
-            showMenuScreen()
-        }
-        layout.addView(backBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ))
-        
-        val scrollView = ScrollView(this).apply {
-            isFocusable = false
-            setBackgroundColor(0xFF1B1B1B.toInt())
-            addView(layout)
-        }
-        
-        setContentView(scrollView)
-        urlEdit.requestFocus()
+        layout.addSetupButton(saveBtn)
+
+        layout.addSetupButton(createButton("Back") { showMenuScreen() }, bottomMargin = 0)
+
+        finishSetupScreen(layout, urlEdit)
     }
     
     private fun createButton(text: String, onClick: () -> Unit): Button {
@@ -808,13 +687,11 @@ class SetupActivity : SinemaActivity() {
             setBackgroundColor(0xFF333333.toInt())
             setTextColor(0xFFFFFFFF.toInt())
             setPadding(32, 24, 32, 24)
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF2AABE0.toInt() else 0xFF333333.toInt())
-            }
+            bindFocusBackground(normal = 0xFF333333.toInt())
             setOnClickListener { onClick() }
         }
     }
-    
+
     private fun createEditText(initialText: String): EditText {
         return EditText(this).apply {
             setText(initialText)
@@ -822,12 +699,65 @@ class SetupActivity : SinemaActivity() {
             isFocusable = true
             isFocusableInTouchMode = true
             setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFF333333.toInt())
             setPadding(24, 20, 24, 20)
-            setOnFocusChangeListener { _, hasFocus ->
-                setBackgroundColor(if (hasFocus) 0xFF555555.toInt() else 0xFF333333.toInt())
-            }
+            bindFocusBackground(normal = 0xFF333333.toInt(), focused = 0xFF555555.toInt())
         }
     }
 
+    /**
+     * Shared scaffolding for the setup screens: padded dark column
+     * ([setupColumn]), title ([addTitle]), and scroll wrapper
+     * ([finishSetupScreen]). Screen bodies add fields with
+     * [LinearLayout.addLabel] / [addSetupField] / [addSetupButton].
+     */
+    private fun setupColumn(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(80, 60, 80, 60)
+        setBackgroundColor(0xFF1B1B1B.toInt())
+    }
+
+    private fun LinearLayout.addTitle(text: String) {
+        addView(TextView(this@SetupActivity).apply {
+            this.text = text
+            textSize = 28f
+            setTextColor(0xFFFFFFFF.toInt())
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = 32 })
+    }
+
+    private fun finishSetupScreen(layout: LinearLayout, focus: View? = null) {
+        setContentView(ScrollView(this).apply {
+            isFocusable = false
+            setBackgroundColor(0xFF1B1B1B.toInt())
+            addView(layout)
+        })
+        focus?.requestFocus()
+    }
+
+    private fun LinearLayout.addLabel(text: String, bottomMargin: Int = 0) {
+        addView(TextView(this@SetupActivity).apply {
+            this.text = text
+            textSize = 18f
+            setTextColor(0xFFCCCCCC.toInt())
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { this.bottomMargin = bottomMargin })
+    }
+
+    private fun LinearLayout.addSetupField(view: View, bottomMargin: Int = 24) {
+        addView(view, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { this.bottomMargin = bottomMargin })
+    }
+
+    private fun LinearLayout.addSetupButton(button: Button, bottomMargin: Int = 16) {
+        addView(button, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { this.bottomMargin = bottomMargin })
+    }
 }

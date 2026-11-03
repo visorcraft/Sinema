@@ -93,19 +93,18 @@ class AmbientActivity : SinemaActivity() {
         // The gallery must outlast the normal screen timeout.
         root.keepScreenOn = true
 
-        lifecycleScope.launch {
-            try {
-                scenes = SinemaApp.instance.api.findFavoriteScenesPaged(
-                    page = 1, perPage = 50, sort = "rating", direction = "DESC", unwatchedOnly = false
-                ).second.filter { it.duration > 0.0 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.w("Sinema", "Ambient gallery load failed", e)
-            }
+        launchSafely(
+            "Ambient gallery load",
+            // A failed load leaves scenes empty; the old inline catch fell
+            // through to the same finish() the empty check performs.
+            onError = { finish() }
+        ) {
+            scenes = SinemaApp.instance.api.findFavoriteScenesPaged(
+                page = 1, perPage = 50, sort = "rating", direction = "DESC", unwatchedOnly = false
+            ).second.filter { it.duration > 0.0 }
             if (scenes.isEmpty() || isFinishing) {
                 finish()
-                return@launch
+                return@launchSafely
             }
             loaded = true
             if (running) startShow()
