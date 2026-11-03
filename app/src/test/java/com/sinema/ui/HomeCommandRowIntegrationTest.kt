@@ -8,14 +8,14 @@ import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
 import com.sinema.SinemaApp
+import com.sinema.api.testGraphqlErrorResponse
 import com.sinema.api.testScene
+import com.sinema.api.testSceneListResponse
+import com.sinema.api.withGraphqlServer
 import com.sinema.model.HomeLayoutSettings
 import com.sinema.model.HomeShortcut
-import com.sun.net.httpserver.HttpServer
-import java.net.InetSocketAddress
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -67,7 +67,12 @@ class HomeCommandRowIntegrationTest {
     @Test
     fun `cold launch uses safe provisional focus before delayed retry response`() {
         val responseGate = CountDownLatch(1)
-        withHomeServer("""{"errors":[{"message":"delayed"}]}""", responseGate, status = 500) {
+        withGraphqlServer(
+            testGraphqlErrorResponse("delayed"),
+            responseGate,
+            status = 500,
+            configureSinemaApp = true
+        ) { _, _ ->
             try {
                 val activity = launch(pin = true)
                 layoutHome(activity)
@@ -156,7 +161,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `initial browse focus waits for leanback layout and never lands on log out`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true, idleBeforeLayout = true)
             shadowOf(Looper.getMainLooper()).idle()
             layoutHome(activity)
@@ -167,7 +172,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `user focus move cancels pending automated focus retry`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitFocused(activity, "Search")
             val automatedTarget = itemView(activity, QUICK_ROW_ID, HomeCommandRow.REFRESH)
@@ -194,7 +199,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `browse up takes ownership from pending initial focus`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitFocused(activity, "Search")
             val initialTarget = itemView(activity, BROWSE_ROW_ID, "Search")
@@ -241,7 +246,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `hero receives initial focus when available`() {
-        withHomeServer(HERO_RESPONSE) {
+        withGraphqlServer(HERO_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitRow(activity, HERO_ROW_ID)
             awaitFocusedItem(activity) { it is HeroItem }
@@ -251,7 +256,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `hero down focuses refresh`() {
-        withHomeServer(HERO_RESPONSE) {
+        withGraphqlServer(HERO_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitRow(activity, HERO_ROW_ID)
             awaitFocusedItem(activity) { it is HeroItem }
@@ -262,7 +267,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `quick action down focuses first visible browse item`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitFocused(activity, "Search")
             focusItem(activity, QUICK_ROW_ID, HomeCommandRow.ABOUT)
@@ -273,7 +278,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `browse up focuses refresh instead of log out`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitFocused(activity, "Search")
             dispatchUp(activity)
@@ -284,7 +289,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `empty browse directional fallback focuses refresh`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitFocused(activity, "Search")
             focusItem(activity, QUICK_ROW_ID, HomeCommandRow.SETTINGS)
@@ -297,7 +302,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `reload restoration requests focus for originating quick action`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitFocused(activity, "Search")
             focusItem(activity, QUICK_ROW_ID, HomeCommandRow.SETTINGS)
@@ -311,7 +316,7 @@ class HomeCommandRowIntegrationTest {
 
     @Test
     fun `reload invalid item falls back to refresh rather than log out`() {
-        withHomeServer(EMPTY_RESPONSE) {
+        withGraphqlServer(EMPTY_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)
             awaitFocused(activity, "Search")
             mainFragment(activity).onItemViewClickedListener.onItemClicked(
@@ -500,41 +505,22 @@ class HomeCommandRowIntegrationTest {
         }.invoke(mainFragment(activity))
     }
 
-    private fun withHomeServer(
-        response: String,
-        responseGate: CountDownLatch? = null,
-        status: Int = 200,
-        block: () -> Unit
-    ) {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/graphql") { exchange ->
-            responseGate?.await(5, TimeUnit.SECONDS)
-            val bytes = response.toByteArray()
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(status, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
-        server.start()
-        try {
-            SinemaApp.instance.prefs.serverUrl = "http://127.0.0.1:${server.address.port}"
-            SinemaApp.instance.refreshApi()
-            block()
-        } finally {
-            server.stop(0)
-        }
-    }
-
     private companion object {
         const val HERO_ROW_ID = 1L
         const val BROWSE_ROW_ID = 6L
         const val QUICK_ROW_ID = 7L
         const val RETRY_ROW_ID = 14L
-        const val EMPTY_RESPONSE = """{"data":{"findScenes":{"count":0,"scenes":[]}}}"""
-        const val HERO_RESPONSE = """{"data":{"findScenes":{"count":1,"scenes":[
-            {"id":"hero","title":"Hero","play_count":1,"rating100":100,"resume_time":12.0,
-             "last_played_at":"2026-01-01T00:00:00Z",
-             "files":[{"path":"/data/hero.mp4","size":10,"duration":100.0,"width":1920,"height":1080}]}
-        ]}}}"""
+        val EMPTY_RESPONSE = testSceneListResponse()
+        val HERO_RESPONSE = testSceneListResponse(
+            testScene(
+                id = "hero",
+                title = "Hero",
+                durationSec = 100.0,
+                playCount = 1,
+                rating100 = 100,
+                resumeTimeSec = 12.0,
+                lastPlayedAt = "2026-01-01T00:00:00Z"
+            )
+        )
     }
 }
