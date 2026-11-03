@@ -32,6 +32,12 @@ class HeroPresenter(
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_hero_card, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
+        if (item !is HeroItem) return
+        val view = viewHolder.view
         view.setOnKeyListener { _, keyCode, event ->
             if (event.action == android.view.KeyEvent.ACTION_DOWN &&
                 keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN
@@ -42,12 +48,6 @@ class HeroPresenter(
                 false
             }
         }
-        return ViewHolder(view)
-    }
-
-    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
-        if (item !is HeroItem) return
-        val view = viewHolder.view
         view.findViewById<TextView>(R.id.hero_title).text = item.scene.displayTitle
         view.findViewById<TextView>(R.id.hero_meta).text =
             "${item.scene.formatDuration()}  •  ${item.scene.studio?.name ?: item.scene.filename}"

@@ -208,6 +208,7 @@ class MainFragment : RowsSupportFragment() {
     private lateinit var shortcutsRow: ListRow
     private lateinit var settingsRow: ListRow
     private var initialFocusApplied = false
+    private var focusAttempt: Runnable? = null
 
     private var logoView: android.widget.ImageView? = null
 
@@ -476,44 +477,113 @@ class MainFragment : RowsSupportFragment() {
     private fun indexOfRow(row: ListRow): Int =
         (0 until rowsAdapter.size()).indexOfFirst { rowsAdapter.get(it) === row }
 
-    private fun focusRow(row: ListRow?, itemKey: String? = null) {
-        row ?: return
-        val rowIndex = indexOfRow(row)
-        if (rowIndex < 0) return
-        setSelectedPosition(rowIndex)
-        verticalGridView?.post {
-            val grid = verticalGridView ?: return@post
-            val rowGrid = (grid.findViewHolderForAdapterPosition(rowIndex) as? ListRowPresenter.ViewHolder)?.gridView
-                ?: return@post
+    private fun cancelFocusAttempt() {
+        focusAttempt?.let { verticalGridView?.removeCallbacks(it) }
+        focusAttempt = null
+    }
+
+    private fun focusRow(
+        row: ListRow?,
+        itemKey: String? = null,
+        onFocused: (() -> Unit)? = null,
+        onFailure: (() -> Unit)? = null
+    ) {
+        cancelFocusAttempt()
+        val grid = verticalGridView
+        if (row == null || grid == null || indexOfRow(row) < 0) {
+            onFailure?.invoke()
+            return
+        }
+        var attempts = 0
+        lateinit var attempt: Runnable
+        attempt = Runnable {
+            if (focusAttempt !== attempt) return@Runnable
+            val currentGrid = verticalGridView
+            if (currentGrid == null) {
+                focusAttempt = null
+                return@Runnable
+            }
+            attempts++
+            val rowIndex = indexOfRow(row)
+            if (rowIndex >= 0) setSelectedPosition(rowIndex, false)
             val rowAdapter = row.adapter as ArrayObjectAdapter
             val keys = (0 until rowAdapter.size()).map { FocusRestore.keyOf(rowAdapter.get(it)!!) }
             val itemIndex = if (itemKey == null) 0 else keys.indexOf(itemKey)
-            if (itemIndex < 0) return@post
-            rowGrid.setSelectedPosition(itemIndex)
-            rowGrid.post {
-                val target = rowGrid.findViewHolderForAdapterPosition(itemIndex)?.itemView
-                if (target != null && target.isShown && target.isEnabled && target.isFocusable) {
-                    target.requestFocus()
+            val rowHolder = if (rowIndex >= 0) {
+                getRowViewHolder(rowIndex) as? ListRowPresenter.ViewHolder
+            } else {
+                null
+            }
+            if (rowHolder != null && itemIndex >= 0) {
+                rowHolder.gridView.setSelectedPosition(itemIndex)
+                val target = rowHolder.getItemViewHolder(itemIndex)?.view
+                if (target != null && target.isShown && target.isEnabled && target.isFocusable &&
+                    target.requestFocus() && target.hasFocus()
+                ) {
+                    focusAttempt = null
+                    onFocused?.invoke()
+                    return@Runnable
                 }
             }
+            if (attempts < FOCUS_MAX_ATTEMPTS) {
+                currentGrid.postOnAnimation(attempt)
+            } else {
+                focusAttempt = null
+                onFailure?.invoke()
+            }
         }
+        focusAttempt = attempt
+        grid.post(attempt)
+    }
+
+    override fun onDestroyView() {
+        cancelFocusAttempt()
+        super.onDestroyView()
     }
 
     private fun focusQuickActions() = focusRow(settingsRow, HomeCommandRow.REFRESH_KEY)
 
     private fun focusBrowse() {
         val adapter = shortcutsRow.adapter as ArrayObjectAdapter
-        if (adapter.size() > 0) focusRow(shortcutsRow) else focusQuickActions()
+        if (adapter.size() > 0) {
+            focusRow(shortcutsRow, onFailure = ::focusQuickActions)
+        } else {
+            focusQuickActions()
+        }
+    }
+
+    private fun focusSafeTarget(onFocused: (() -> Unit)? = null) {
+        fun quickActions() = focusRow(settingsRow, HomeCommandRow.REFRESH_KEY, onFocused = onFocused)
+        fun browse() {
+            val adapter = shortcutsRow.adapter as ArrayObjectAdapter
+            if (adapter.size() > 0) {
+                focusRow(shortcutsRow, onFocused = onFocused, onFailure = ::quickActions)
+            } else {
+                quickActions()
+            }
+        }
+        fun hero() {
+            if (heroRow != null) {
+                focusRow(heroRow, onFocused = onFocused, onFailure = ::browse)
+            } else {
+                browse()
+            }
+        }
+        val browseCount = (shortcutsRow.adapter as ArrayObjectAdapter).size()
+        when (HomeFocusPolicy.initialTarget(serverErrorRow != null, heroRow != null, browseCount)) {
+            HomeInitialTarget.RETRY -> focusRow(serverErrorRow, onFocused = onFocused, onFailure = ::hero)
+            HomeInitialTarget.HERO -> hero()
+            HomeInitialTarget.BROWSE -> browse()
+            HomeInitialTarget.REFRESH -> quickActions()
+        }
     }
 
     private fun applyInitialFocus() {
-        val browseCount = (shortcutsRow.adapter as ArrayObjectAdapter).size()
-        when (HomeFocusPolicy.initialTarget(serverErrorRow != null, heroRow != null, browseCount)) {
-            HomeInitialTarget.RETRY -> focusRow(serverErrorRow)
-            HomeInitialTarget.HERO -> focusRow(heroRow)
-            HomeInitialTarget.BROWSE -> focusBrowse()
-            HomeInitialTarget.REFRESH -> focusQuickActions()
-        }
+        focusSafeTarget(onFocused = { initialFocusApplied = true })
+    }
+
+    private fun scheduleInitialFocus() {
+        if (!initialFocusApplied && focusAttempt == null) applyInitialFocus()
     }
 
     private fun rowId(row: HomeContentRow): Long = when (row) {
@@ -659,10 +729,7 @@ class MainFragment : RowsSupportFragment() {
                 rowsAdapter.add(index, row)
             }
         }
-        if (!initialFocusApplied) {
-            initialFocusApplied = true
-            verticalGridView?.post { applyInitialFocus() }
-        }
+        if (!isLoading) scheduleInitialFocus()
     }
 
     private fun <T> applyResult(state: HomeRowState<T>, result: RowResult<List<T>>): HomeRowState<T> =
@@ -888,26 +955,26 @@ class MainFragment : RowsSupportFragment() {
             }
 
             // Restore focus to the same logical row/item after reconciliation.
-            if (focus.rowIndex >= 0) {
+            if (focus.rowIndex < 0) {
+                scheduleInitialFocus()
+            } else {
                 val newRowIndex = FocusRestore.positionAfterReload(focus.rowKey, focus.rowIndex,
                     (0 until rowsAdapter.size()).mapNotNull { i ->
                         (rowsAdapter.get(i) as? ListRow)?.let { rowKey(it) }
                     })
-                if (newRowIndex >= 0) {
-                    verticalGridView?.post {
-                        if (verticalGridView == null) return@post
-                        setSelectedPosition(newRowIndex)
-                        val rowAdapter = (rowsAdapter.get(newRowIndex) as? ListRow)
-                            ?.adapter as? ArrayObjectAdapter
-                        val itemKeys = (0 until (rowAdapter?.size() ?: 0))
-                            .map { FocusRestore.keyOf(rowAdapter!!.get(it)!!) }
-                        val newItemIndex = HomeFocusPolicy.restoredItemIndex(focus.itemKey, focus.itemIndex, itemKeys)
-                        if (newItemIndex >= 0) {
-                            (verticalGridView?.findViewHolderForAdapterPosition(newRowIndex)
-                                as? ListRowPresenter.ViewHolder)?.gridView
-                                ?.setSelectedPosition(newItemIndex)
-                        }
-                    }
+                val restoredRow = if (newRowIndex >= 0) rowsAdapter.get(newRowIndex) as? ListRow else null
+                val rowAdapter = restoredRow?.adapter as? ArrayObjectAdapter
+                val itemKeys = (0 until (rowAdapter?.size() ?: 0))
+                    .map { FocusRestore.keyOf(rowAdapter!!.get(it)!!) }
+                val newItemIndex = HomeFocusPolicy.restoredItemIndex(focus.itemKey, focus.itemIndex, itemKeys)
+                if (restoredRow != null && newItemIndex >= 0) {
+                    focusRow(
+                        restoredRow,
+                        itemKeys[newItemIndex],
+                        onFailure = { focusSafeTarget() }
+                    )
+                } else {
+                    focusSafeTarget()
                 }
             }
 
@@ -932,6 +999,7 @@ class MainFragment : RowsSupportFragment() {
     }
 
     companion object {
+        private const val FOCUS_MAX_ATTEMPTS = 60
         private const val HERO_ROW_ID = 1L
         private const val CONTINUE_ROW_ID = 2L
         private const val PLAYED_ROW_ID = 3L

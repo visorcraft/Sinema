@@ -317,8 +317,12 @@ class SettingsPresenter(private val onUp: (() -> Unit)? = null) : Presenter() {
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_folder_card, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         if (onUp != null) {
-            view.setOnKeyListener { _, keyCode, event ->
+            viewHolder.view.setOnKeyListener { _, keyCode, event ->
                 if (event.action == android.view.KeyEvent.ACTION_DOWN &&
                     keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP
                 ) {
@@ -328,11 +332,9 @@ class SettingsPresenter(private val onUp: (() -> Unit)? = null) : Presenter() {
                     false
                 }
             }
+        } else {
+            viewHolder.view.setOnKeyListener(null)
         }
-        return ViewHolder(view)
-    }
-
-    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val title = viewHolder.view.findViewById<TextView>(com.sinema.R.id.card_title)
         val content = viewHolder.view.findViewById<TextView>(com.sinema.R.id.card_content)
         val image = viewHolder.view.findViewById<ImageView>(com.sinema.R.id.card_image)
