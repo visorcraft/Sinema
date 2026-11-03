@@ -157,7 +157,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 - **🖥️ Multi-Server Profiles & Auth** — Add, rename, remove, and switch Stash servers with API-key or session-cookie authentication; server and playback options are organized into categorized Settings.
 - **🔐 Self-Signed HTTPS** — Per-server opt-in to trust self-signed certificates for self-hosted TLS setups.
 - **📺 Android TV Channels** — Optional Watch Next and Recently Added launcher rows with deep links back into Sinema; off by default.
-- **🔎 Global Search** — Optional Android TV system-search suggestions for scenes, with signature-level provider protection and PIN-aware deep links; off by default.
+- **🔎 Global Search** — Optional Android TV system-search suggestions for scenes, with signature-level provider protection and PIN-aware deep links. New suggestions are suppressed while locked or in decoy mode, although Android TV may retain previously cached results; off by default.
 - **🔗 Deep Links** — Open scene details or resume playback through Sinema scene/play links and launcher integrations.
 - **⬆️ In-App Updates** — Automatic once-per-session checks plus manual update checks and APK installation from GitHub releases.
 - **♿ Accessibility & Remote Guide** — Larger interface text, a high-visibility focus outline, reduced motion, TalkBack labels for controls and progress, and a built-in D-pad remote-control guide.

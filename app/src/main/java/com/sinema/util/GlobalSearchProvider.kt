@@ -33,6 +33,7 @@ class GlobalSearchProvider : ContentProvider() {
         // Defense in depth: the component is only enabled when the user opted
         // in, but re-check the pref so a stale component state cannot leak data.
         if (!app.prefs.globalSearchEnabled || !app.prefs.isConfigured) return null
+        if (app.decoySession || (app.prefs.hasPinSet() && !app.pinVerifiedThisSession)) return null
 
         val query = selectionArgs?.firstOrNull()
             ?.takeIf { uri.lastPathSegment == SearchManager.SUGGEST_URI_PATH_QUERY }

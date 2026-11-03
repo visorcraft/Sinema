@@ -195,6 +195,7 @@ Privacy behavior:
 - When disabled, the system search dialog cannot query Sinema at all — no requests are made and no titles leave the server.
 - While enabled, only the system search client can query Sinema. The suggestion provider requires Android's signature-level `GLOBAL_SEARCH` permission, so other installed apps are blocked from enumerating your library even when the feature is on.
 - While enabled, each keystroke in the system search dialog can trigger a query to your Stash server (title, filename, and metadata matching), like Sinema's in-app search.
+- Sinema returns no new suggestions while a configured PIN is unverified or a decoy session is active, and makes no Stash request for those queries. Android TV may retain results it cached before Sinema was locked.
 - Suggestions never embed credentials. Card artwork only renders when your Stash server allows unauthenticated media access; otherwise results appear without images.
 
 ## Updates
