@@ -49,9 +49,6 @@ class IdleLockGateTest {
 
     @Test
     fun recentActivityTransitionPreventsStaleLock() {
-        val now = 100_000L
-        val interaction = lastInteractionAfterActivityTransition(previousInteractionMs = 0L, transitionMs = 95_000L)
-
         assertFalse(
             shouldAutoLock(
                 isResumed = true,
@@ -59,7 +56,7 @@ class IdleLockGateTest {
                 pinVerified = true,
                 decoySession = false,
                 lockMinutes = 5,
-                idleMs = now - interaction
+                idleMs = 100_000L - 95_000L
             )
         )
     }

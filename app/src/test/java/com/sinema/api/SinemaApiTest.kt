@@ -31,10 +31,11 @@ class SinemaApiTest {
     }
 
     @Test
-    fun `updateConfig changes media auth headers`() {
-        val api = SinemaApi("http://server", "old-key", "", "apikey")
-        api.updateConfig("http://server", "", "session=zzz", "session")
-        assertEquals(mapOf("Cookie" to "session=zzz"), api.mediaAuthHeaders())
+    fun `configured instances retain their own media auth`() {
+        val apiKey = SinemaApi("http://server-a", "old-key", "", "apikey")
+        val session = SinemaApi("http://server-b", "", "session=zzz", "session")
+        assertEquals(mapOf("ApiKey" to "old-key"), apiKey.mediaAuthHeaders())
+        assertEquals(mapOf("Cookie" to "session=zzz"), session.mediaAuthHeaders())
     }
 
     @Test

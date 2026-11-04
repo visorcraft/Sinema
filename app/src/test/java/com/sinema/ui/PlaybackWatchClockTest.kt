@@ -40,12 +40,8 @@ class PlaybackWatchClockTest {
     }
 
     @Test
-    fun resetClearsPlayedAndReportedTimeForANewScene() {
+    fun newClockStartsWithoutPlayedOrReportedTimeForANewScene() {
         val clock = PlaybackWatchClock()
-        clock.onIsPlayingChanged(true, 0)
-        clock.onIsPlayingChanged(false, 12_000)
-        clock.markReported(12_000)
-        clock.reset()
         clock.onIsPlayingChanged(true, 20_000)
 
         assertEquals(2_000, clock.totalMs(22_000))

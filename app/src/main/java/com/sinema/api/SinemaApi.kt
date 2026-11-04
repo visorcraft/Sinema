@@ -146,20 +146,6 @@ class SinemaApi(
     var stashPassword: String = ""
     var onSessionRefreshed: ((String) -> Unit)? = null
 
-    fun updateConfig(
-        url: String,
-        key: String,
-        cookie: String = "",
-        mode: String = "apikey",
-        allowSelfSigned: Boolean = false
-    ) {
-        serverUrl = url.trimEnd('/')
-        apiKey = key
-        sessionCookie = cookie
-        authMode = mode
-        trustAllCerts = allowSelfSigned
-    }
-
     /**
      * Direct image endpoint per entity kind. Used as a fallback when list
      * queries no longer return image_path (newer Stash schemas).

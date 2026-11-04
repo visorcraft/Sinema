@@ -11,8 +11,3 @@ internal fun shouldAutoLock(
     val lockMs = lockMinutes.toLong() * 60_000L
     return isResumed && hasPin && pinVerified && !decoySession && lockMs > 0L && idleMs >= lockMs
 }
-
-internal fun lastInteractionAfterActivityTransition(
-    previousInteractionMs: Long,
-    transitionMs: Long
-): Long = maxOf(previousInteractionMs, transitionMs)

@@ -39,12 +39,12 @@ class PlaybackQueueTest {
     }
 
     @Test
-    fun `jumpTo plays the selected item and consumes skipped ones`() {
+    fun `jumpToItem plays the selected item and consumes skipped ones`() {
         PlaybackQueue.start(listOf(item("a"), item("b"), item("c"), item("d")), startAt = 0)
 
-        assertEquals("c", PlaybackQueue.jumpTo(1)?.id)
+        assertEquals("c", PlaybackQueue.jumpToItem("c")?.id)
         assertEquals(listOf("d"), PlaybackQueue.remaining().map { it.id })
-        assertNull(PlaybackQueue.jumpTo(99))
+        assertNull(PlaybackQueue.jumpToItem("unknown"))
     }
 
     @Test
@@ -62,7 +62,7 @@ class PlaybackQueueTest {
         // Shuffling again is fine while more than one item remains; it only
         // declines when the queue is down to at most one upcoming scene.
         assertTrue(PlaybackQueue.shuffleRemaining(Random(1)))
-        PlaybackQueue.jumpTo(PlaybackQueue.remainingCount() - 1)
+        PlaybackQueue.jumpToItem(PlaybackQueue.remaining().last().id)
         assertFalse(PlaybackQueue.shuffleRemaining())
     }
 
@@ -154,7 +154,7 @@ class PlaybackQueueTest {
         assertFalse(PlaybackQueue.isActive)
         assertNull(PlaybackQueue.current())
         assertTrue(PlaybackQueue.remaining().isEmpty())
-        assertNull(PlaybackQueue.jumpTo(0))
+        assertNull(PlaybackQueue.jumpToItem("missing"))
     }
 
     @Test

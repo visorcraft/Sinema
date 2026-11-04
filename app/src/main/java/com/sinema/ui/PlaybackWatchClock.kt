@@ -29,12 +29,4 @@ internal class PlaybackWatchClock {
     fun markReported(durationMs: Long) {
         reportedMs += durationMs.coerceAtLeast(0L)
     }
-
-    @Synchronized
-    fun reset() {
-        completedPlayingMs = 0L
-        playingSinceMs = null
-        reportedMs = 0L
-        playing = false
-    }
 }

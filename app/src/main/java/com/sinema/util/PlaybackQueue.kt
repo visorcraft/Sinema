@@ -41,19 +41,6 @@ object PlaybackQueue {
         if (index + 1 < items.size) items[++index] else null.also { clearInternal() }
 
     /**
-     * Jump to the item [positionInRemaining] slots ahead of the current one;
-     * skipped items are consumed. Returns the selected item.
-     */
-    @Synchronized
-    fun jumpTo(positionInRemaining: Int): Item? {
-        if (index < 0) return null
-        val target = index + 1 + positionInRemaining
-        if (target !in items.indices) return null
-        index = target
-        return items[target]
-    }
-
-    /**
      * Jump to a specific queued item by id, searching the remaining window.
      * Safer than a relative index when the queue advanced between snapshot
      * and selection. Returns null (no-op) when the id is unknown or current.
