@@ -56,7 +56,7 @@ class PausedSeekDwellTest {
     }
 
     @Test
-    fun `play request prevents pending dwell seek`() {
+    fun `cancel after play request prevents pending dwell seek`() {
         dwell.onPositionChanged(20_000L)
         playWhenReady = true
         dwell.cancel()

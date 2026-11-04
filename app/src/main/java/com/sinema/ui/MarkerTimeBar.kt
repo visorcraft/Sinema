@@ -17,15 +17,18 @@ class MarkerTimeBar @JvmOverloads constructor(
     interface ScrubPreviewListener {
         fun onPreviewStart(positionMs: Long)
         fun onPreviewMove(positionMs: Long)
-        fun onPreviewStop()
+        fun onPreviewStop(positionMs: Long, canceled: Boolean)
     }
 
     var scrubPreviewListener: ScrubPreviewListener? = null
     private var sceneMarkers: List<Pair<String, Double>> = emptyList()
     private var markerPositions: List<Float> = emptyList()
     private var timelineDurationMs = 0L
+    private var timelinePositionMs = 0L
     private var keyBackwardMs = 0L
     private var keyForwardMs = 0L
+    private var keyScrubbing = false
+    private var keyScrubPositionMs = 0L
     private val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF54C7EC.toInt()
         strokeWidth = 4f * resources.displayMetrics.density
@@ -43,7 +46,7 @@ class MarkerTimeBar @JvmOverloads constructor(
             }
 
             override fun onScrubStop(timeBar: TimeBar, position: Long, canceled: Boolean) {
-                scrubPreviewListener?.onPreviewStop()
+                scrubPreviewListener?.onPreviewStop(position, canceled)
             }
         })
     }
@@ -53,26 +56,46 @@ class MarkerTimeBar @JvmOverloads constructor(
         updateMarkerPositions()
     }
 
-    /**
-     * Asymmetric quick-seek amounts for D-pad scrubbing. DefaultTimeBar keeps
-     * a single keyTimeIncrement and negates it for DPAD_LEFT, so switch it per
-     * key direction before delegating; super.onKeyDown reads the increment
-     * synchronously, making this safe for repeat events.
-     */
     fun setKeyTimeIncrements(backwardMs: Long, forwardMs: Long) {
         keyBackwardMs = backwardMs
         keyForwardMs = forwardMs
-        setKeyTimeIncrement(forwardMs)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT ->
-                if (keyBackwardMs > 0) setKeyTimeIncrement(keyBackwardMs)
-            KeyEvent.KEYCODE_DPAD_RIGHT ->
-                if (keyForwardMs > 0) setKeyTimeIncrement(keyForwardMs)
+        if ((keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) && isEnabled) {
+            if (event.action != KeyEvent.ACTION_DOWN) return keyScrubbing
+            if (!keyScrubbing) {
+                keyScrubbing = true
+                keyScrubPositionMs = timelinePositionMs
+                scrubPreviewListener?.onPreviewStart(keyScrubPositionMs)
+            }
+            val increment = if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) -keyBackwardMs else keyForwardMs
+            keyScrubPositionMs = (keyScrubPositionMs + increment)
+                .coerceIn(0L, timelineDurationMs.coerceAtLeast(0L))
+            setPosition(keyScrubPositionMs)
+            scrubPreviewListener?.onPreviewMove(keyScrubPositionMs)
+            return true
+        }
+        if (keyScrubbing && event.action == KeyEvent.ACTION_DOWN &&
+            (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
+        ) {
+            finishKeyScrub(canceled = false)
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    fun cancelKeyScrub() {
+        keyScrubbing = false
+    }
+
+    private fun finishKeyScrub(canceled: Boolean) {
+        keyScrubbing = false
+        scrubPreviewListener?.onPreviewStop(keyScrubPositionMs, canceled)
+    }
+
+    override fun setPosition(position: Long) {
+        timelinePositionMs = position
+        super.setPosition(position)
     }
 
     override fun setDuration(duration: Long) {

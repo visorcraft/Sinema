@@ -474,8 +474,9 @@ class PlaybackActivity : SinemaActivity() {
                     showSeekPreview(positionMs)
                 }
                 override fun onPreviewMove(positionMs: Long) = showSeekPreview(positionMs)
-                override fun onPreviewStop() {
+                override fun onPreviewStop(positionMs: Long, canceled: Boolean) {
                     scrubbing = false
+                    if (!canceled) player?.seekTo(positionMs)
                     lastMarkerPositionMs = player?.currentPosition
                     hideSeekPreview()
                 }
@@ -602,6 +603,7 @@ class PlaybackActivity : SinemaActivity() {
     private fun hideSeekPreview() {
         seekDwell.cancel()
         if (!::playerView.isInitialized) return
+        playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).cancelKeyScrub()
         playerView.findViewById<View>(R.id.playback_preview_container).visibility = View.GONE
     }
 
