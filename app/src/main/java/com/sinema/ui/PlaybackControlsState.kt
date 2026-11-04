@@ -38,4 +38,7 @@ fun formatRemainingMs(positionMs: Long, durationMs: Long): String =
 fun shouldPromptResume(resumeMs: Long, thresholdMs: Long = RESUME_PROMPT_THRESHOLD_MS): Boolean =
     resumeMs >= thresholdMs
 
+fun shouldShowResumePrompt(promptAllowed: Boolean, resumeResolved: Boolean, resumeMs: Long): Boolean =
+    promptAllowed && !resumeResolved && shouldPromptResume(resumeMs)
+
 fun upNextChipLabel(remainingCount: Int): String = "Up Next · $remainingCount"

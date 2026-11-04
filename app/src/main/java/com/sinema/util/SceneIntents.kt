@@ -28,6 +28,7 @@ object SceneIntents {
     private const val KEY_MARKER_TITLES = "marker_titles"
     private const val KEY_MARKER_SECONDS = "marker_seconds"
     private const val KEY_RESUME_MS = "resume_position_ms"
+    private const val KEY_RESUME_CONFIRMED = "resume_confirmed"
     private const val KEY_AUTO_RESUME = "auto_resume"
     private const val KEY_RESTORE_SESSION = "restore_session"
 
@@ -89,13 +90,15 @@ object SceneIntents {
         sceneId: String,
         resumeMs: Long = 0L,
         width: Int = 0,
-        height: Int = 0
+        height: Int = 0,
+        resumeConfirmed: Boolean = false
     ): Intent =
         Intent(context, PlaybackActivity::class.java).apply {
             putExtra(KEY_ID, sceneId)
             putExtra(KEY_RESUME_MS, resumeMs)
             putExtra(KEY_WIDTH, width)
             putExtra(KEY_HEIGHT, height)
+            putExtra(KEY_RESUME_CONFIRMED, resumeConfirmed)
         }
 
     /**
@@ -115,6 +118,8 @@ object SceneIntents {
 
     fun resumeMsFrom(intent: Intent): Long = intent.getLongExtra(KEY_RESUME_MS, 0L)
 
+    fun resumeConfirmedFrom(intent: Intent): Boolean = intent.getBooleanExtra(KEY_RESUME_CONFIRMED, false)
+
     fun videoWidthFrom(intent: Intent): Int = intent.getIntExtra(KEY_WIDTH, 0)
 
     fun videoHeightFrom(intent: Intent): Int = intent.getIntExtra(KEY_HEIGHT, 0)
@@ -130,7 +135,8 @@ object SceneIntents {
         scenes: List<Scene>,
         startAt: Int = 0,
         shuffle: Boolean = false,
-        resumeMs: Long = 0L
+        resumeMs: Long = 0L,
+        resumeConfirmed: Boolean = false
     ) {
         val plan = QueuePlanning.plan(scenes, startAt, shuffle)
         if (plan.ordered.isEmpty()) return
@@ -139,6 +145,12 @@ object SceneIntents {
         }
         PlaybackQueue.start(QueuePlanning.toQueueItems(plan.ordered), startAt = 0)
         val first = plan.ordered[0]
-        context.startActivity(playback(context, first.id, resumeMs = resumeMs, width = first.width, height = first.height))
+        context.startActivity(
+            playback(
+                context, first.id, resumeMs = resumeMs,
+                width = first.width, height = first.height,
+                resumeConfirmed = resumeConfirmed
+            )
+        )
     }
 }

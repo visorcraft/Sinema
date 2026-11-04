@@ -295,7 +295,7 @@ class MainFragment : RowsSupportFragment() {
                     startActivity(
                         SceneIntents.playback(
                             requireContext(), item.scene.id, item.resumeMs,
-                            item.scene.width, item.scene.height
+                            item.scene.width, item.scene.height, resumeConfirmed = true
                         )
                     )
                 }

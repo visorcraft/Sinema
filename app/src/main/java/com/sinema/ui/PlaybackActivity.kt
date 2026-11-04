@@ -47,6 +47,7 @@ class PlaybackActivity : SinemaActivity() {
     private var forceAlignedHls = false
     private var hasVideoOutput = false
     private var resumePositionMs: Long = 0L
+    private var resumeConfirmed = false
     @Volatile private var watchClock = PlaybackWatchClock()
     private val saveQueue = PlaybackSaveQueue(SinemaApp.instance.appScope)
     private val playCountSentSceneIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
@@ -115,6 +116,7 @@ class PlaybackActivity : SinemaActivity() {
         videoWidth = SceneIntents.videoWidthFrom(intent)
         videoHeight = SceneIntents.videoHeightFrom(intent)
         resumePositionMs = SceneIntents.resumeMsFrom(intent)
+        resumeConfirmed = SceneIntents.resumeConfirmedFrom(intent)
         captions = SceneIntents.captionsFrom(intent)
         markers = SceneIntents.markersFrom(intent)
         if (SceneIntents.restoreSessionFrom(intent) && sceneId.isNotEmpty()) {
@@ -170,7 +172,11 @@ class PlaybackActivity : SinemaActivity() {
         // which must never silently approve resuming. Once resolved (choice
         // made or manual play), background restarts resume silently at the
         // live position onStop persisted.
-        val promptResume = promptAllowed && !resumePromptResolved && shouldPromptResume(resumePositionMs)
+        val promptResume = shouldShowResumePrompt(
+            promptAllowed = promptAllowed,
+            resumeResolved = resumePromptResolved || resumeConfirmed,
+            resumeMs = resumePositionMs
+        )
         resumeAwaitingChoice = promptResume
         initPlayer(startPaused = promptResume)
         if (promptResume) showResumePrompt()
@@ -437,6 +443,7 @@ class PlaybackActivity : SinemaActivity() {
                         sceneTitle = d.scene.displayTitle
                         videoWidth = d.scene.width
                         videoHeight = d.scene.height
+                        if (!resumeConfirmed) resumePositionMs = (d.scene.resumeTime * 1000).toLong()
                         applySceneMetadata(d)
                     }
                 }

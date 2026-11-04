@@ -132,7 +132,8 @@ class GroupScenesFragment : SceneGridFragment() {
             requireContext(),
             scenes,
             startAt = index,
-            resumeMs = GroupPlayback.resumePositionMs(scenes[index])
+            resumeMs = GroupPlayback.resumePositionMs(scenes[index]),
+            resumeConfirmed = true
         )
     }
 }

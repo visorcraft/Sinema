@@ -290,7 +290,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     SceneIntents.playback(
                         requireContext(), scene.id,
                         resumeMs = (scene.resumeTime * 1000).toLong(),
-                        width = scene.width, height = scene.height
+                        width = scene.width, height = scene.height,
+                        resumeConfirmed = scene.resumeTime > 0.0
                     )
                 )
             })

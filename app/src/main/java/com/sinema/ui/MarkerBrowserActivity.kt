@@ -171,7 +171,8 @@ class MarkerBrowserFragment : SceneGridFragment() {
                 SceneIntents.playback(
                     requireContext(), item.sceneId,
                     resumeMs = (item.seconds * 1000).toLong(),
-                    width = item.sceneWidth, height = item.sceneHeight
+                    width = item.sceneWidth, height = item.sceneHeight,
+                    resumeConfirmed = true
                 )
             )
         }

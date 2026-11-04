@@ -335,7 +335,7 @@ class SceneDetailActivity : SinemaActivity() {
             val resumeMs = (details.resumeTime * 1000).toLong()
             btnResume.visibility = View.VISIBLE
             btnResume.text = "▶ Resume ${formatMs(resumeMs)}"
-            btnResume.setOnClickListener { launchPlayback(resumeMs) }
+            btnResume.setOnClickListener { launchPlayback(resumeMs, resumeConfirmed = true) }
         } else {
             btnResume.visibility = View.GONE
         }
@@ -424,8 +424,10 @@ class SceneDetailActivity : SinemaActivity() {
         row.addView(chip, params)
     }
 
-    private fun launchPlayback(resumeMs: Long) {
-        val intent = SceneIntents.playback(this, scene.id, resumeMs, scene.width, scene.height).apply {
+    private fun launchPlayback(resumeMs: Long, resumeConfirmed: Boolean = false) {
+        val intent = SceneIntents.playback(
+            this, scene.id, resumeMs, scene.width, scene.height, resumeConfirmed
+        ).apply {
             SceneIntents.putCaptions(this, captions)
             SceneIntents.putMarkers(this, markers)
         }
@@ -462,7 +464,9 @@ class SceneDetailActivity : SinemaActivity() {
                     .into(image)
             }
             card.isFocusable = true
-            card.setOnClickListener { launchPlayback((marker.seconds * 1000).toLong()) }
+            card.setOnClickListener {
+                launchPlayback((marker.seconds * 1000).toLong(), resumeConfirmed = true)
+            }
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
             )

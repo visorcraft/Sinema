@@ -1,6 +1,7 @@
 package com.sinema.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -56,6 +57,13 @@ class PlaybackControlsStateTest {
         assertTrue(shouldPromptResume(45 * 60_000L))
         assertEquals(false, shouldPromptResume(RESUME_PROMPT_THRESHOLD_MS - 1))
         assertEquals(false, shouldPromptResume(0L))
+    }
+
+    @Test
+    fun `confirmed resume bypasses only the prompt`() {
+        assertFalse(shouldShowResumePrompt(promptAllowed = true, resumeResolved = true, resumeMs = 45_000L))
+        assertTrue(shouldShowResumePrompt(promptAllowed = true, resumeResolved = false, resumeMs = 45_000L))
+        assertFalse(shouldShowResumePrompt(promptAllowed = true, resumeResolved = false, resumeMs = 0L))
     }
 
     @Test
