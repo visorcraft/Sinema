@@ -258,6 +258,7 @@ class MainFragment : RowsSupportFragment() {
 
         // Add Sinema logo to activity's FrameLayout (not the fragment's RecyclerView!)
         val logo = android.widget.ImageView(requireContext()).apply {
+            id = R.id.home_logo
             setImageResource(R.drawable.sinema_logo)
             adjustViewBounds = true
             val logoW = (180 * density).toInt()
@@ -269,6 +270,14 @@ class MainFragment : RowsSupportFragment() {
         // Add to the activity's root FrameLayout, above the fragment
         (requireActivity().findViewById<View>(R.id.main_frame)?.parent as? ViewGroup)?.addView(logo)
         logoView = logo
+        fun applyLogoClearance(bottom: Int) {
+            val contentTop = bottom + (24 * density).toInt()
+            view.setPadding(hPad, contentTop, hPad, vPad)
+            verticalGridView?.setPadding(hPad, contentTop, hPad, vPad)
+        }
+        logo.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, _ ->
+            applyLogoClearance(bottom)
+        }
 
         // Scroll the logo away with content
         verticalGridView?.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {

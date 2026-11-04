@@ -65,6 +65,22 @@ class HomeCommandRowIntegrationTest {
     }
 
     @Test
+    fun `quick actions stay below rendered logo with focus clearance`() {
+        val activity = launch(pin = true)
+        val logo = activity.findViewById<android.widget.ImageView>(com.sinema.R.id.home_logo)
+        val quick = itemView(activity, QUICK_ROW_ID, HomeCommandRow.LOG_OUT)
+        focusItem(activity, QUICK_ROW_ID, HomeCommandRow.LOG_OUT)
+        layoutHome(activity)
+        val logoBounds = android.graphics.Rect()
+        val quickBounds = android.graphics.Rect()
+        logo.getGlobalVisibleRect(logoBounds)
+        quick.getGlobalVisibleRect(quickBounds)
+        val focusedQuickTop = quickBounds.top + ((quick.height * (quick.scaleY - 1f)) / 2f).toInt()
+        assertTrue(mainFragment(activity).requireView().paddingTop >= logo.bottom)
+        assertTrue(focusedQuickTop >= logoBounds.bottom)
+    }
+
+    @Test
     fun `cold launch uses safe provisional focus before delayed retry response`() {
         val responseGate = CountDownLatch(1)
         withGraphqlServer(
