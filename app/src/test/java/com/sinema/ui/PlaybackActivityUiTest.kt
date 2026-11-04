@@ -84,6 +84,22 @@ class PlaybackActivityUiTest {
     }
 
     @Test
+    fun `metadata clear hides outgoing marker controls`() = withPlayback(resumeTimeSec = 0.0) { activity, _ ->
+        val skip = activity.findViewById<android.view.View>(R.id.playback_skip_marker)
+        skip.visibility = android.view.View.VISIBLE
+        val markerButton = activity.findViewById<android.view.View>(R.id.playback_marker_button)
+        markerButton.isEnabled = true
+
+        PlaybackActivity::class.java.getDeclaredMethod("clearSceneMetadata")
+            .apply { isAccessible = true }
+            .invoke(activity)
+
+        org.junit.Assert.assertEquals(android.view.View.GONE, skip.visibility)
+        assertTrue(!markerButton.isEnabled)
+        activity.finish()
+    }
+
+    @Test
     fun `settings button opens Sinema player menu`() = withPlayback(resumeTimeSec = 0.0) { activity, previousDialog ->
         activity.findViewById<android.view.View>(R.id.playback_settings_button).performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()

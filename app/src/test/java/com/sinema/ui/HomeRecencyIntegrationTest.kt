@@ -66,7 +66,21 @@ class HomeRecencyIntegrationTest {
         }
     }
 
-    private fun withHome(recentlyPlayedVisible: Boolean, assertions: (MainActivity) -> Unit) {
+    @Test
+    fun `recency failure leaves independent row errors with one request`() {
+        withHome(recentlyPlayedVisible = true, recencyFailure = true) { activity ->
+            awaitRow(activity, HomeContentRow.RECENTLY_PLAYED)
+            assertTrue(row(activity, HomeContentRow.RECENTLY_PLAYED).headerItem.name.contains("Unavailable"))
+            assertEquals(1, recencyRequests.get())
+            assertTrue(runCatching { row(activity, HomeContentRow.DISCOVER) }.getOrNull() == null)
+        }
+    }
+
+    private fun withHome(
+        recentlyPlayedVisible: Boolean,
+        recencyFailure: Boolean = false,
+        assertions: (MainActivity) -> Unit
+    ) {
         val visible = buildList {
             if (recentlyPlayedVisible) add(HomeContentRow.RECENTLY_PLAYED)
             add(HomeContentRow.DISCOVER)
@@ -85,7 +99,11 @@ class HomeRecencyIntegrationTest {
                 when {
                     body.contains("\"play_count\":{\"value\":0") -> {
                         recencyRequests.incrementAndGet()
-                        SequencedResponse(testSceneListResponse(scene))
+                        if (recencyFailure) {
+                            SequencedResponse(testGraphqlErrorResponse("offline"), status = 500)
+                        } else {
+                            SequencedResponse(testSceneListResponse(scene))
+                        }
                     }
                     body.contains("findScene(id") -> SequencedResponse(
                         fullSceneResponse(45.0).replace(

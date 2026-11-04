@@ -197,6 +197,7 @@ class PlaybackActivity : SinemaActivity() {
     private fun clearSceneMetadata() {
         captions = emptyList()
         markers = emptyList()
+        hideMarkerSkip()
         if (::playerView.isInitialized) {
             playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress)
                 .setSceneMarkers(emptyList())
