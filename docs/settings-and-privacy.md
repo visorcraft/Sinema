@@ -148,10 +148,10 @@ On Android TV devices, `Settings` → `System` shows an Android TV Channels togg
 
 When enabled, Sinema can publish:
 
-- Watch Next entries for up to 10 Continue Playing scenes.
-- A Recently Added launcher channel with up to 20 scenes.
+- Watch Next entries for up to 10 Continue Playing scenes, opening playback directly at the saved position.
+- A Recently Added launcher channel with up to 20 scenes, opening scene details.
 
-These entries deep-link back into Sinema scene details.
+Provider IDs are `sinema:<profileId>:<sceneId>` so one server's entries cannot publish under another profile. Cleanup also recognizes legacy `sinema:<sceneId>` entries.
 
 Privacy behavior:
 
@@ -159,10 +159,7 @@ Privacy behavior:
 - Disabling channels clears Sinema's Watch Next entries and Sinema's Recently Added channel.
 - Sinema only deletes its own Watch Next entries.
 
-Artwork behavior:
-
-- API-key auth can include poster artwork URLs that Android TV can load.
-- Session auth may omit launcher artwork because Android TV launcher requests cannot include Sinema's session cookie.
+Launcher programs include titles, duration, progress, and deep links, but no poster/backdrop fields. The channel logo uses Sinema's app launcher icon.
 
 Channel sync happens when the main screen loads and when playback state is saved.
 

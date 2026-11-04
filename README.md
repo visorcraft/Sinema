@@ -138,7 +138,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 
 - **▶️ Resume & Watch Progress** — Resume positions, play counts, and watch history sync with Stash. Scene cards show watched checkmarks and partial-playback progress bars.
 - **🔄 Interrupted Session Restore** — After an app restart, explicitly restore the current scene, local position, and queue on the same server profile. Restoration is PIN-aware, discreet-friendly, and disabled by Incognito.
-- **🎮 Remote-First Player** — Marker-aware timeline, configurable quick seek, remaining time, frame previews while scrubbing, playback speed, looping, and D-pad/media-key controls.
+- **🎮 Remote-First Player** — Marker-aware timeline, configurable quick seek, remaining time, timestamp-only scrub previews with two-second paused seek, playback speed, looping, and D-pad/media-key controls.
 - **📑 Chapters with Thumbnails** — Jump between scene markers using a chapter dialog, timeline ticks, player buttons, media keys, or a contextual Skip button when entering a marker.
 - **⏭️ Editable Queues & Up Next** — Play All, Shuffle Play, and Play from here with automatic advance. Jump to an upcoming scene, reorder or remove items, shuffle the remainder, keep only unwatched scenes, or exit the queue.
 - **♾️ Endless Mix** — Automatically refill an exhausted queue with fresh unwatched favorites, falling back to recent unwatched scenes and avoiding repeats from the same session.

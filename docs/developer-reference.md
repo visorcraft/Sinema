@@ -135,7 +135,7 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 ## Playback UI
 
-`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for native scrubbing plus marker ticks. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`); `previewBucketMs` throttles authenticated timestamp screenshot requests to five-second buckets. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
+`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for marker ticks and a custom D-pad scrub lifecycle. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`). `PausedSeekDwell` seeks once after two stationary seconds while paused and completes without resuming; playback, movement, controller hide, and teardown cancel it. The preview is timestamp-only. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
 
 ### Deep links and Watch Next
 
@@ -169,8 +169,8 @@ Play All uses `PlaybackQueue`, an in-memory process-local queue capped by `Scene
 
 `TvChannels` publishes:
 
-- Watch Next entries with internal IDs prefixed by `sinema:`.
-- A Recently Added preview channel.
+- Watch Next entries with internal IDs `sinema:<profileId>:<sceneId>`, cleaned up alongside legacy `sinema:<sceneId>` entries.
+- A Recently Added preview channel whose programs open scene details.
 
 Deep links are handled by `DeepLinkActivity`:
 
@@ -223,7 +223,7 @@ Build release APK:
 - Folder views and full-screen Gallery loading cap displayed images at 10,000 items.
 - Play All queues up to 500 scenes.
 - Play All still requires a remote Menu key; Sort, Filter, and entity Search also have visible controls.
-- Android TV launcher artwork is only attached in API-key mode.
+- Android TV launcher programs include titles, duration, progress, and deep links, but no poster/backdrop fields; only the channel logo uses the app launcher icon.
 
 ## Baseline profiles
 
@@ -233,7 +233,7 @@ How it is wired:
 
 - `:baselineprofile` is a `com.android.test` module holding a UIAutomator-driven `BaselineProfileRule` generator (`baselineprofile/src/main/kotlin/.../BaselineProfileGenerator.kt`).
 - The app module applies the `androidx.baselineprofile` plugin, depends on `androidx.profileinstaller` (installs profiles on sideloaded updates), and commits the generated human-readable rules under `app/src/release/generated/baselineProfiles/baseline-prof.txt` (`baselineProfile { saveInSrc = true }`).
-- Because the rules are committed, release CI needs no emulator; R8 rewrites them for the shipped (obfuscated-safe, here non-minified) release dex at build time.
+- Because the rules are committed, release CI needs no emulator. Release builds currently set `isMinifyEnabled = false`, so R8 minification and obfuscation are not performed.
 
 Regenerating (requires an emulator with KVM; a fresh emulator exercises the setup flow, a configured one the home rows):
 

@@ -132,7 +132,7 @@ Check:
 - Return to the Sinema main screen to trigger a sync.
 - Some launchers require approving or pinning a new channel before it is visible.
 
-If you use session sign-in, launcher artwork may be missing because the Android TV launcher cannot attach Sinema's session cookie when loading poster URLs.
+Launcher programs contain titles, duration, progress, and deep links, but no poster/backdrop artwork. The channel logo uses Sinema's app launcher icon.
 
 ## Affected videos stutter or fall back to software decoding
 

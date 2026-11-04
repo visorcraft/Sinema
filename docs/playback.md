@@ -45,8 +45,8 @@ Common controls:
 - Timeline: focus the seek bar and use D-pad Left/Right to scrub (Left uses the preset's rewind amount, Right its forward amount). Marker positions appear as ticks.
 - Marker jumps: previous/next marker buttons flank play/pause; the action-row marker button also jumps to the next marker. Media keys Previous/Next do the same. The chapters dialog (Menu → Chapters) shows each marker's frame thumbnail and timestamp. Entering a marker during normal playback also offers a temporary `Skip` button that jumps to the following marker. Scrubbing does not trigger it; a quick seek that lands at a marker may offer it.
 - O counter: Menu → `🔥 O +1` records an O in Stash for the scene playing.
-- Resume prompt: opening a scene with saved progress ≥ 10 seconds asks whether to resume at that position or start over. Back leaves playback paused with controls shown.
-- Scrub preview: while actively scrubbing, Sinema shows a timestamp and an authenticated Stash frame near that position. Requests are throttled to five-second buckets; the image is hidden if the server cannot provide it.
+- Resume prompt: ordinary Play with saved progress ≥ 10 seconds asks whether to resume at that position or start over. Explicit Resume, Home hero resume, and timestamp markers jump directly without the prompt. Back leaves playback paused with controls shown.
+- Scrub preview: while actively scrubbing, Sinema shows the target timestamp. When paused, holding a stationary target for two seconds seeks there without resuming; Center/Play resumes. Moving the target or leaving playback cancels the dwell.
 - Remaining time: shown at the right side of the time row.
 - Up Next: when a queue is active (Play All, Play from here, or Shuffle), the top bar shows `Up Next · N` with a mini card for the next scene (frame thumbnail and title) — select either to open the dialog. Rows support jump (select), reorder (▲▼), and remove (✕); buttons filter to unwatched, shuffle the rest, or exit the queue.
 - Endless Mix: Menu → `♾ Endless Mix` — when the queue runs out, it refills itself with fresh unwatched favorites (falling back to recent unwatched), never repeating a scene from the same session. It stops cleanly when nothing new is left.
@@ -139,7 +139,7 @@ Behavior:
 - Sinema loads captions and markers for the next queued scene.
 - Playback continues automatically.
 - When the queue finishes, playback closes and the restorable session is cleared.
-- Finishing playback, such as pressing Back out of the player, clears the active queue but leaves an encrypted session snapshot for explicit restoration.
+- Finishing playback, such as pressing Back out of the player, clears the active queue but leaves a local session snapshot for explicit restoration. Sinema uses encrypted preferences when available, with the existing fallback to regular preferences.
 
 Session snapshots include the scene, local position, queue, queue index, and server profile. Home offers restoration after an app restart or device reboot; playback never resumes automatically. Incognito clears and suppresses snapshots, and a different server profile cannot restore them.
 

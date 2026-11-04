@@ -68,7 +68,7 @@ The `🌙 Tonight's Mix` card on the shortcut row builds a ~30-minute queue from
 
 ### Backup and restore
 
-`Settings` → `System` → `Export Settings Backup` writes a `sinema-backup.json` file with every setting and your server profiles. **The file contains credentials** — store it safely. `Import Settings Backup` restores it after confirmation; restart Sinema afterwards.
+`Settings` → `System` → `Export Settings Backup` writes a `sinema-backup.json` file with every setting and your server profiles. **The file contains credentials** — store it safely. `Import Settings Backup` restores it after confirmation and immediately reconciles Global Search, launcher channels, and the active server; no restart is required.
 
 ### Ambient gallery
 
@@ -335,7 +335,7 @@ Play All behavior:
 - Starts playback from the first visible scene.
 - Advances automatically when a scene ends.
 - Caps the queue at 500 scenes and shows a toast when it truncates the queue.
-- Saves an encrypted, profile-scoped session snapshot so Home can explicitly restore the scene, local position, and queue after an app restart. Incognito clears and suppresses these snapshots.
+- Saves a local, profile-scoped session snapshot so Home can explicitly restore the scene, local position, and queue after an app restart. Sinema uses encrypted preferences when available, with the existing fallback to regular preferences. Incognito clears and suppresses these snapshots.
 
 `Shuffle Play` in the same menu queues the loaded scenes in random order.
 
