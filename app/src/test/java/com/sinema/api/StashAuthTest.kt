@@ -64,6 +64,56 @@ class StashAuthTest {
         assertGenerateFailure(SequencedResponse("""{"data":{"generateAPIKey":null}}"""))
     }
 
+    @Test
+    fun `self signed client handles login and api key`() {
+        val keyStoreFile = java.io.File.createTempFile("sinema-test", ".jks")
+        keyStoreFile.delete()
+        val process = ProcessBuilder(
+            "keytool", "-J-Djava.security.egd=file:/dev/urandom",
+            "-genkeypair", "-alias", "test", "-keyalg", "RSA", "-keysize", "2048",
+            "-validity", "1", "-dname", "CN=localhost", "-storetype", "JKS",
+            "-keystore", keyStoreFile.absolutePath, "-storepass", "changeit", "-keypass", "changeit"
+        ).start()
+        assertEquals(0, process.waitFor())
+        val keyStore = java.security.KeyStore.getInstance("JKS").apply {
+            java.io.FileInputStream(keyStoreFile).use { load(it, "changeit".toCharArray()) }
+        }
+        val keyManagers = javax.net.ssl.KeyManagerFactory.getInstance(
+            javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm()
+        ).apply { init(keyStore, "changeit".toCharArray()) }.keyManagers
+        val sslContext = javax.net.ssl.SSLContext.getInstance("TLS").apply {
+            init(keyManagers, null, null)
+        }
+        val server = com.sun.net.httpserver.HttpsServer.create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
+        server.httpsConfigurator = com.sun.net.httpserver.HttpsConfigurator(sslContext)
+        server.createContext("/login") { exchange ->
+            exchange.responseHeaders.add("Set-Cookie", "session=abc; Path=/")
+            exchange.sendResponseHeaders(302, -1)
+            exchange.close()
+        }
+        server.createContext("/graphql") { exchange ->
+            val bytes = """{"data":{"generateAPIKey":"key"}}""".toByteArray()
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+            exchange.close()
+        }
+        server.start()
+        val serverUrl = "https://127.0.0.1:${server.address.port}"
+        try {
+            val api = SinemaApi(serverUrl, "", allowSelfSigned = true)
+            assertEquals(
+                LoginResult.Success("session=abc"),
+                StashAuth.login(api.client, serverUrl, "user", "pass")
+            )
+            assertEquals("key", StashAuth.generateApiKey(api.client, serverUrl, "session=abc"))
+            val strict = StashAuth.login(SinemaApi(serverUrl, "").client, serverUrl, "user", "pass")
+            assertTrue(strict is LoginResult.TransportFailure)
+        } finally {
+            server.stop(0)
+            keyStoreFile.delete()
+        }
+    }
+
     private fun loginFor(
         status: Int,
         headers: Map<String, String> = emptyMap(),

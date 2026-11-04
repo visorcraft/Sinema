@@ -36,10 +36,10 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class SinemaApi(
-    private var serverUrl: String,
-    private var apiKey: String,
+    private val serverUrl: String,
+    private val apiKey: String,
     @Volatile private var sessionCookie: String = "",
-    private var authMode: String = "apikey",
+    private val authMode: String = "apikey",
     allowSelfSigned: Boolean = false
 ) {
     private val refreshMutex = kotlinx.coroutines.sync.Mutex()
@@ -97,7 +97,7 @@ class SinemaApi(
      * (per profile, off by default). Disables certificate and hostname
      * verification for this server's connections only.
      */
-    private var trustAllCerts: Boolean = allowSelfSigned
+    private val trustAllCerts: Boolean = allowSelfSigned
 
     private fun baseClientBuilder(): OkHttpClient.Builder = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
