@@ -481,6 +481,7 @@ class PlaybackActivity : SinemaActivity() {
                 }
             }
         }
+        playerView.findViewById<View>(R.id.playback_settings_button).setOnClickListener { showPlayerMenu() }
         playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
             showAspectRatioDialog()
         }

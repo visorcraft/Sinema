@@ -43,4 +43,14 @@ class PlaybackControllerContractTest {
         assertTrue(activity.contains("R.id.playback_queue_chip"))
         assertTrue(activity.contains("showUpNextDialog"))
     }
+
+    @Test
+    fun `settings uses Sinema centered player menu instead of Media3 submenu`() {
+        val layout = String(Files.readAllBytes(Paths.get("src/main/res/layout/playback_controller.xml")))
+        val activity = String(Files.readAllBytes(Paths.get("src/main/java/com/sinema/ui/PlaybackActivity.kt")))
+        assertTrue(layout.contains("@+id/playback_settings_button"))
+        assertFalse(layout.contains("@id/exo_settings"))
+        assertTrue(activity.contains("R.id.playback_settings_button"))
+        assertTrue(activity.contains("setOnClickListener { showPlayerMenu() }"))
+    }
 }
