@@ -45,12 +45,25 @@ class PlaybackControllerContractTest {
     }
 
     @Test
-    fun `settings uses Sinema centered player menu instead of Media3 submenu`() {
+    fun `settings uses Sinema centered settings menu instead of Media3 submenu`() {
         val layout = String(Files.readAllBytes(Paths.get("src/main/res/layout/playback_controller.xml")))
         val activity = String(Files.readAllBytes(Paths.get("src/main/java/com/sinema/ui/PlaybackActivity.kt")))
         assertTrue(layout.contains("@+id/playback_settings_button"))
         assertFalse(layout.contains("@id/exo_settings"))
         assertTrue(activity.contains("R.id.playback_settings_button"))
-        assertTrue(activity.contains("setOnClickListener { showPlayerMenu() }"))
+        assertTrue(activity.contains("setOnClickListener { showSettingsMenu() }"))
+    }
+
+    @Test
+    fun `personalization button is immediately left of settings`() {
+        val layout = String(Files.readAllBytes(Paths.get("src/main/res/layout/playback_controller.xml")))
+        val activity = String(Files.readAllBytes(Paths.get("src/main/java/com/sinema/ui/PlaybackActivity.kt")))
+        val personalizationIndex = layout.indexOf("@+id/playback_personalization_button")
+        val settingsIndex = layout.indexOf("@+id/playback_settings_button")
+        assertTrue(personalizationIndex >= 0)
+        assertTrue(personalizationIndex < settingsIndex)
+        assertTrue(layout.contains("@drawable/ic_person"))
+        assertTrue(activity.contains("R.id.playback_personalization_button"))
+        assertTrue(activity.contains("showPersonalizationMenu()"))
     }
 }

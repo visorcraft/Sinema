@@ -123,6 +123,7 @@ After a PIN is set:
 - Sinema asks for the PIN on launch until it has been verified for the current app session.
 - The main screen shows `Log Out` as the left-most Quick actions command.
 - Selecting `Log Out` clears only current-session verification and exits the app; it does not change the configured PIN.
+- Back on Home offers `Minimize` or `Logout & Exit`. Minimize preserves the session subject to normal Auto-Lock; Logout & Exit clears only current-session verification and closes the app.
 
 ### Remove a PIN
 

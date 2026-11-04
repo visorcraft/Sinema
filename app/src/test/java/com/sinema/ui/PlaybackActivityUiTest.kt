@@ -100,14 +100,42 @@ class PlaybackActivityUiTest {
     }
 
     @Test
-    fun `settings button opens Sinema player menu`() = withPlayback(resumeTimeSec = 0.0) { activity, previousDialog ->
+    fun `settings button opens settings menu with only player configuration`() = withPlayback(resumeTimeSec = 0.0) { activity, previousDialog ->
         activity.findViewById<android.view.View>(R.id.playback_settings_button).performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
         assertNotSame(previousDialog, dialog)
         assertTrue(dialog.isShowing)
-        assertTrue(dialog.listView.count > 0)
+        org.junit.Assert.assertEquals("Settings menu", dialogTitle(dialog))
+        org.junit.Assert.assertEquals(
+            listOf("Aspect ratio", "Stream quality", "Seek buttons"), dialogItems(dialog)
+        )
         activity.finish()
     }
+
+    @Test
+    fun `personalization button opens scene personalization menu`() = withPlayback(resumeTimeSec = 0.0) { activity, previousDialog ->
+        SinemaApp.instance.prefs.incognitoMode = false
+        SinemaApp.instance.prefs.endlessMix = false
+        val controls = activity.findViewById<android.view.ViewGroup>(androidx.media3.ui.R.id.exo_basic_controls)
+        val button = (0 until controls.childCount).map { controls.getChildAt(it) }
+            .firstOrNull { it.contentDescription == "Personalization" }
+            ?: throw AssertionError("Personalization button is missing")
+        button.performClick()
+        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        assertNotSame(previousDialog, dialog)
+        assertTrue(dialog.isShowing)
+        org.junit.Assert.assertEquals("Personalization menu", dialogTitle(dialog))
+        org.junit.Assert.assertEquals(
+            listOf("★ Rate scene", "🔥 O +1", "🕶 Incognito: OFF", "♾ Endless Mix: OFF"),
+            dialogItems(dialog)
+        )
+        activity.finish()
+    }
+
+    private fun dialogTitle(dialog: AlertDialog): String = shadowOf(dialog).title.toString()
+
+    private fun dialogItems(dialog: AlertDialog): List<String> =
+        (0 until dialog.listView.count).map { dialog.listView.adapter.getItem(it).toString() }
 
     @Test
     fun `watch next keeps playback save profile after mid save switch`() {

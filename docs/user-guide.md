@@ -36,6 +36,8 @@ Scene cards show at a glance:
 
 The Quick actions row sits above Browse and contains Log Out (only when a PIN is set), Refresh, Settings, and About. Log Out is always the left-most command and exits immediately without changing the configured PIN. Refresh reloads the home rows, Settings opens preferences, and About shows version and update information.
 
+Pressing Back on Home opens **Exit Sinema?** with two choices. **Minimize** backgrounds Sinema and preserves the current session, subject to the normal Auto-Lock timeout. **Logout & Exit** clears current-session verification and closes Sinema without changing the configured PIN. Dismissing the dialog keeps Sinema open.
+
 When no hero or retry action is shown, Home starts focus on the first visible Browse item. Down from the hero or Up from Browse enters Quick actions at Refresh, leaving Log Out one intentional Left press away.
 
 Sinema refreshes the home screen when you return to it, so changes made in playback or scene detail screens are reflected quickly. Existing cards stay visible while rows refresh, and row headers show loading or refresh status. If a refresh fails, Sinema keeps the last loaded cards and marks that row as `Refresh failed`; if the first load fails, the row is marked `Unavailable`.

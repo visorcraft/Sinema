@@ -21,6 +21,15 @@ class SinemaApp : Application() {
         lastInteractionMs = android.os.SystemClock.elapsedRealtime()
     }
 
+    @Volatile private var internalActivityResume = false
+    private var lastResumedActivityName: String? = null
+
+    fun consumeInternalActivityResume(): Boolean {
+        val result = internalActivityResume
+        internalActivityResume = false
+        return result
+    }
+
     /** Small ring buffer of recent user-facing errors for the server dashboard. */
     private val recentErrorsBuffer = ArrayDeque<String>()
     val recentErrors: List<String> get() = synchronized(recentErrorsBuffer) { recentErrorsBuffer.toList() }
@@ -52,7 +61,10 @@ class SinemaApp : Application() {
                 applySecureFlag(activity)
             }
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
-            override fun onActivityResumed(activity: android.app.Activity) {}
+            override fun onActivityResumed(activity: android.app.Activity) {
+                internalActivityResume = lastResumedActivityName?.let { it != activity.javaClass.name } == true
+                lastResumedActivityName = activity.javaClass.name
+            }
             override fun onActivityPaused(activity: android.app.Activity) {
                 noteUserInteraction()
             }

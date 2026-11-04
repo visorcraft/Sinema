@@ -30,6 +30,7 @@ class MainActivity : SinemaActivity() {
     private var waitingForPin = false
     private var sessionRestoreOffered = false
     private var sessionRestoreDialog: android.app.AlertDialog? = null
+    private var exitDialog: android.app.AlertDialog? = null
     private val ambientHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val ambientCheck = object : Runnable {
         override fun run() {
@@ -72,6 +73,9 @@ class MainActivity : SinemaActivity() {
             return
         }
 
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() = showExitPrompt()
+        })
         supportFragmentManager.beginTransaction()
             .replace(R.id.main_frame, MainFragment())
             .commitNowAllowingStateLoss()
@@ -82,7 +86,8 @@ class MainActivity : SinemaActivity() {
     override fun onResume() {
         super.onResume()
         val returningFromPinSuccess = waitingForPin && app.pinVerifiedThisSession
-        if (returningFromPinSuccess) {
+        val internalActivityResume = app.consumeInternalActivityResume()
+        if (returningFromPinSuccess || internalActivityResume) {
             app.noteUserInteraction()
         } else {
             maybeAutoLock(android.os.SystemClock.elapsedRealtime() - app.lastInteractionMs)
@@ -115,9 +120,29 @@ class MainActivity : SinemaActivity() {
     }
 
     override fun onDestroy() {
+        exitDialog?.dismiss()
         sessionRestoreDialog?.dismiss()
         ambientHandler.removeCallbacks(ambientCheck)
         super.onDestroy()
+    }
+
+    private fun showExitPrompt() {
+        if (exitDialog?.isShowing == true || isFinishing || isDestroyed) return
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.exit_sinema_title)
+            .setItems(arrayOf(getString(R.string.exit_minimize), getString(R.string.exit_logout))) { _, which ->
+                when (which) {
+                    0 -> moveTaskToBack(true)
+                    1 -> {
+                        app.pinVerifiedThisSession = false
+                        finishAffinity()
+                    }
+                }
+            }
+            .setOnDismissListener { exitDialog = null }
+            .create()
+        exitDialog = dialog
+        dialog.show()
     }
 
     private fun maybeOfferPlaybackSessionRestore() {
@@ -223,9 +248,6 @@ class MainFragment : RowsSupportFragment() {
         }
     }
 
-    private var logoView: android.widget.ImageView? = null
-    private var logoScrollListener: androidx.recyclerview.widget.RecyclerView.OnScrollListener? = null
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         view.viewTreeObserver.addOnGlobalFocusChangeListener(focusOwnershipListener)
@@ -235,7 +257,7 @@ class MainFragment : RowsSupportFragment() {
         val density = resources.displayMetrics.density
         val hPad = (48 * density).toInt()
         val vPad = (27 * density).toInt()
-        val topPad = (80 * density).toInt()   // room for logo above content
+        val topPad = (24 * density).toInt()
         view.setPadding(hPad, topPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
         // Also set padding on the VerticalGridView (actual row container)
@@ -257,40 +279,6 @@ class MainFragment : RowsSupportFragment() {
                 false
             }
         }
-
-        // Add Sinema logo to activity's FrameLayout (not the fragment's RecyclerView!)
-        val logo = android.widget.ImageView(requireContext()).apply {
-            id = R.id.home_logo
-            setImageResource(R.drawable.sinema_logo)
-            adjustViewBounds = true
-            val logoW = (180 * density).toInt()
-            layoutParams = android.widget.FrameLayout.LayoutParams(logoW, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT).apply {
-                leftMargin = hPad
-                topMargin = (20 * density).toInt()
-            }
-        }
-        // Add to the activity's root FrameLayout, above the fragment
-        (requireActivity().findViewById<View>(R.id.main_frame)?.parent as? ViewGroup)?.addView(logo)
-        logoView = logo
-        fun applyLogoClearance(bottom: Int) {
-            val contentTop = bottom + (24 * density).toInt()
-            view.setPadding(hPad, contentTop, hPad, vPad)
-            verticalGridView?.setPadding(hPad, contentTop, hPad, vPad)
-        }
-        logo.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, _ ->
-            applyLogoClearance(bottom)
-        }
-
-        // Scroll the logo away with content
-        val scrollListener = object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
-            private var totalScrolled = 0
-            override fun onScrolled(rv: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
-                totalScrolled += dy
-                logoView?.translationY = -totalScrolled.toFloat()
-            }
-        }
-        logoScrollListener = scrollListener
-        verticalGridView?.addOnScrollListener(scrollListener)
 
         val lrp = ListRowPresenter(TvMotion.focusZoom(), false)
         lrp.shadowEnabled = false
@@ -609,10 +597,6 @@ class MainFragment : RowsSupportFragment() {
     override fun onDestroyView() {
         view?.viewTreeObserver?.removeOnGlobalFocusChangeListener(focusOwnershipListener)
         verticalGridView?.setOnKeyListener(null)
-        logoScrollListener?.let { verticalGridView?.removeOnScrollListener(it) }
-        logoScrollListener = null
-        logoView?.let { (it.parent as? ViewGroup)?.removeView(it) }
-        logoView = null
         cancelFocusAttempt()
         super.onDestroyView()
     }

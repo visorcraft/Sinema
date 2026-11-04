@@ -6,7 +6,6 @@ import com.sinema.SinemaApp
 import com.sinema.api.testGraphqlErrorResponse
 import com.sinema.api.withGraphqlServer
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,7 +27,7 @@ class HomeLogoLifecycleTest {
     }
 
     @Test
-    fun `logo and listener are removed and recreated cleanly`() {
+    fun `activity logo survives fragment recreation without duplicates`() {
         withGraphqlServer(testGraphqlErrorResponse("offline"), configureSinemaApp = true) { _, _ ->
             val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
             val activity = controller.get()
@@ -36,17 +35,13 @@ class HomeLogoLifecycleTest {
             assertEquals(1, logoCount(activity))
 
             fragment.onDestroyView()
-            assertEquals(0, logoCount(activity))
-            assertNull(field(fragment, "logoView").get(fragment))
-            assertNull(field(fragment, "logoScrollListener").get(fragment))
+            assertEquals(1, logoCount(activity))
             var view = fragment.onCreateView(android.view.LayoutInflater.from(activity), android.widget.FrameLayout(activity), null)
             fragment.onViewCreated(view!!, null)
             assertEquals(1, logoCount(activity))
 
             fragment.onDestroyView()
-            assertEquals(0, logoCount(activity))
-            assertNull(field(fragment, "logoView").get(fragment))
-            assertNull(field(fragment, "logoScrollListener").get(fragment))
+            assertEquals(1, logoCount(activity))
             view = fragment.onCreateView(android.view.LayoutInflater.from(activity), android.widget.FrameLayout(activity), null)
             fragment.onViewCreated(view!!, null)
             assertEquals(1, logoCount(activity))
@@ -61,7 +56,4 @@ class HomeLogoLifecycleTest {
         val root = activity.window.decorView as ViewGroup
         return ServerTransitionTestSupport.views(root).count { it.id == R.id.home_logo }
     }
-
-    private fun field(fragment: MainFragment, name: String) =
-        MainFragment::class.java.getDeclaredField(name).apply { isAccessible = true }
 }

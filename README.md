@@ -151,7 +151,7 @@ Sinema talks to your Stash server via its **GraphQL API**. Here's what you need:
 ### Privacy and Android TV integration
 
 - **🕶️ Privacy Modes** — Discreet Mode uses neutral titles and hides overlays and artwork on Scene, Group, Gallery, Entity, Folder, Image, and Marker cards until focused; navigation cards stay normal. Incognito pauses watch-history and search-history writes, and Block Screenshots protects app screens and recents thumbnails.
-- **🔒 PIN Lock, Auto-Lock & Decoy PIN** — Optional local four-digit PIN with a fixed left-most Log Out command and automatic locking after 5, 15, or 30 idle minutes. A separate Decoy PIN opens a blank “No content” shell instead of the library.
+- **🔒 PIN Lock, Auto-Lock & Decoy PIN** — Optional local four-digit PIN with a fixed left-most Log Out command, a Home Back prompt offering Minimize or Logout & Exit, and automatic locking after 5, 15, or 30 idle minutes. A separate Decoy PIN opens a blank “No content” shell instead of the library.
 - **💾 Settings Backup & Restore** — Export or import a JSON backup containing all settings and server profiles. Imports replace current settings and immediately reconcile Global Search, launcher channels, and the active server; backups contain credentials and must be stored safely.
 - **🌌 Ambient Gallery** — Optional idle slideshow of top-rated scenes with a clock, disabled while Discreet Mode or an unverified PIN is active.
 - **🖥️ Multi-Server Profiles & Auth** — Add, rename, remove, and switch Stash servers with API-key or session-cookie authentication; server and playback options are organized into categorized Settings.

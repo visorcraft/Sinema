@@ -113,8 +113,14 @@
     <string name="retry_connection">📡 Retry Connection</string>
     <string name="retry_connection_sub">Server unreachable</string>
 
-    <!-- Playback menu + core toasts -->
-    <string name="playback_menu_title">Playback menu</string>
+    <string name="exit_sinema_title">Exit Sinema?</string>
+    <string name="exit_minimize">Minimize</string>
+    <string name="exit_logout">Logout &amp; Exit</string>
+
+    <!-- Playback menus + core toasts -->
+    <string name="playback_menu_title">Settings menu</string>
+    <string name="personalization_menu_title">Personalization menu</string>
+    <string name="playback_personalization">Personalization</string>
     <string name="playback_menu_chapters">Chapters</string>
     <string name="playback_menu_rate">★ Rate scene</string>
     <string name="playback_menu_o">🔥 O +1</string>

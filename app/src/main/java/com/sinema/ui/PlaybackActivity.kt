@@ -55,7 +55,8 @@ class PlaybackActivity : SinemaActivity() {
     private var markers: List<Pair<String, Double>> = emptyList()
     private val chaptersDialog = DialogSlot()
     private val aspectRatioDialog = DialogSlot()
-    private val playerMenuDialog = DialogSlot()
+    private val settingsMenuDialog = DialogSlot()
+    private val personalizationMenuDialog = DialogSlot()
     private val rateDialog = DialogSlot()
     private val streamQualityDialog = DialogSlot()
     private val resumePromptDialog = DialogSlot()
@@ -275,8 +276,8 @@ class PlaybackActivity : SinemaActivity() {
     /** Shared teardown for onPause/onStop: identical dialog/job cleanup. */
     private fun dismissPlaybackDialogs() {
         listOf(
-            aspectRatioDialog, chaptersDialog, playerMenuDialog, rateDialog,
-            streamQualityDialog, upNextDialog, playbackErrorDialog
+            aspectRatioDialog, chaptersDialog, settingsMenuDialog, personalizationMenuDialog,
+            rateDialog, streamQualityDialog, upNextDialog, playbackErrorDialog
         ).forEach { it.dismiss() }
         rateFetchJob?.cancel()
         rateFetchJob = null
@@ -503,7 +504,10 @@ class PlaybackActivity : SinemaActivity() {
                 }
             }
         }
-        playerView.findViewById<View>(R.id.playback_settings_button).setOnClickListener { showPlayerMenu() }
+        playerView.findViewById<View>(R.id.playback_personalization_button).setOnClickListener {
+            showPersonalizationMenu()
+        }
+        playerView.findViewById<View>(R.id.playback_settings_button).setOnClickListener { showSettingsMenu() }
         playerView.findViewById<View>(R.id.aspect_ratio_button).setOnClickListener {
             showAspectRatioDialog()
         }
@@ -955,8 +959,8 @@ class PlaybackActivity : SinemaActivity() {
         )
     }
 
-    private fun showPlayerMenu() {
-        if (playerMenuDialog.isShowing) return
+    private fun showPersonalizationMenu() {
+        if (personalizationMenuDialog.isShowing) return
         val incognito = SinemaApp.instance.prefs.incognitoMode
         // Label→action pairs: localized labels are never identity keys.
         val entries = buildList {
@@ -989,18 +993,35 @@ class PlaybackActivity : SinemaActivity() {
                     ).show()
                 }
             )
-            add(getString(R.string.playback_menu_aspect) to Runnable { showAspectRatioDialog() })
-            add(getString(R.string.playback_menu_quality) to Runnable { showStreamQualityDialog() })
-            add(getString(R.string.playback_menu_seek) to Runnable { cycleSeekPreset() })
         }
-        playerMenuDialog.show(android.app.AlertDialog.Builder(this)
+        personalizationMenuDialog.show(android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.personalization_menu_title))
+            .setItems(entries.map { it.first }.toTypedArray()) { dialog, which ->
+                dialog.dismiss()
+                entries[which].second.run()
+            }
+            .setOnDismissListener {
+                personalizationMenuDialog.dialog?.let { d -> personalizationMenuDialog.dismissIf(d) }
+                playerView.requestFocus()
+            }
+        )
+    }
+
+    private fun showSettingsMenu() {
+        if (settingsMenuDialog.isShowing) return
+        val entries = listOf(
+            getString(R.string.playback_menu_aspect) to Runnable { showAspectRatioDialog() },
+            getString(R.string.playback_menu_quality) to Runnable { showStreamQualityDialog() },
+            getString(R.string.playback_menu_seek) to Runnable { cycleSeekPreset() }
+        )
+        settingsMenuDialog.show(android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.playback_menu_title))
             .setItems(entries.map { it.first }.toTypedArray()) { dialog, which ->
                 dialog.dismiss()
                 entries[which].second.run()
             }
             .setOnDismissListener {
-                playerMenuDialog.dialog?.let { d -> playerMenuDialog.dismissIf(d) }
+                settingsMenuDialog.dialog?.let { d -> settingsMenuDialog.dismissIf(d) }
                 playerView.requestFocus()
             }
         )
@@ -1285,7 +1306,7 @@ class PlaybackActivity : SinemaActivity() {
             playerSurfaceFocused = playerView.isFocused
         )
         when (keyCode) {
-            KeyEvent.KEYCODE_MENU -> { showPlayerMenu(); return true }
+            KeyEvent.KEYCODE_MENU -> { showSettingsMenu(); return true }
             KeyEvent.KEYCODE_MEDIA_NEXT -> { seekToAdjacentMarker(true); return true }
             KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { seekToAdjacentMarker(false); return true }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
