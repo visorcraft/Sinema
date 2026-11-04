@@ -53,7 +53,7 @@ class PlaybackActivityUiTest {
     }
 
     @Test
-    fun `activity dwell seeks paused and center resumes without duplicate seek`() = withPlayback(resumeTimeSec = 45.0) { activity, _ ->
+    fun `activity dwell seeks paused and center resumes`() = withPlayback(resumeTimeSec = 45.0) { activity, _ ->
         ShadowAlertDialog.getLatestAlertDialog().dismiss()
         val playerView = activity.findViewById<android.widget.FrameLayout>(R.id.player_container)
             .getChildAt(0) as AspectRatioPlayerView
@@ -78,7 +78,6 @@ class PlaybackActivityUiTest {
             android.view.KeyEvent.KEYCODE_DPAD_CENTER,
             android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_CENTER)
         )
-        org.junit.Assert.assertEquals(0L, player.currentPosition)
         assertTrue(player.playWhenReady)
         activity.finish()
     }

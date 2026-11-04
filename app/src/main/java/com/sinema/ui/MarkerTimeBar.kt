@@ -78,7 +78,7 @@ class MarkerTimeBar @JvmOverloads constructor(
             scrubPreviewListener?.onPreviewMove(keyScrubPositionMs)
             return true
         }
-        if (event.action == KeyEvent.ACTION_DOWN &&
+        if (isEnabled && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 &&
             (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
         ) {
             if (keyScrubbing) finishKeyScrub(canceled = false)

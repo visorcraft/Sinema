@@ -102,6 +102,23 @@ class MarkerTimeBarScrubTest {
     }
 
     @Test
+    fun `center repeats do not toggle transport again`() {
+        timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER))
+        timeBar.onKeyDown(
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, 1)
+        )
+        assertTrue(playWhenReady)
+    }
+
+    @Test
+    fun `disabled time bar does not toggle transport`() {
+        timeBar.isEnabled = false
+        timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER))
+        assertFalse(playWhenReady)
+    }
+
+    @Test
     fun `player progress cannot overwrite the displayed scrub target`() {
         timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
         timeBar.setPosition(90_000L)
