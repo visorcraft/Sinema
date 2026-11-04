@@ -224,6 +224,7 @@ class MainFragment : RowsSupportFragment() {
     }
 
     private var logoView: android.widget.ImageView? = null
+    private var logoScrollListener: androidx.recyclerview.widget.RecyclerView.OnScrollListener? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -281,13 +282,15 @@ class MainFragment : RowsSupportFragment() {
         }
 
         // Scroll the logo away with content
-        verticalGridView?.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+        val scrollListener = object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
             private var totalScrolled = 0
             override fun onScrolled(rv: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
                 totalScrolled += dy
                 logoView?.translationY = -totalScrolled.toFloat()
             }
-        })
+        }
+        logoScrollListener = scrollListener
+        verticalGridView?.addOnScrollListener(scrollListener)
 
         val lrp = ListRowPresenter(TvMotion.focusZoom(), false)
         lrp.shadowEnabled = false
@@ -606,6 +609,10 @@ class MainFragment : RowsSupportFragment() {
     override fun onDestroyView() {
         view?.viewTreeObserver?.removeOnGlobalFocusChangeListener(focusOwnershipListener)
         verticalGridView?.setOnKeyListener(null)
+        logoScrollListener?.let { verticalGridView?.removeOnScrollListener(it) }
+        logoScrollListener = null
+        logoView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+        logoView = null
         cancelFocusAttempt()
         super.onDestroyView()
     }

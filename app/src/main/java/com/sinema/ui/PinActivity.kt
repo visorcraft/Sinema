@@ -179,7 +179,19 @@ class PinActivity : SinemaActivity() {
             }
             Mode.CONFIRM -> {
                 if (setupPin == currentPin) {
-                    if (intent.getBooleanExtra("decoy_setup", false)) {
+                    val decoySetup = intent.getBooleanExtra("decoy_setup", false)
+                    val duplicate = if (decoySetup) {
+                        app.prefs.verifyPin(currentPin)
+                    } else {
+                        app.prefs.verifyDecoyPin(currentPin)
+                    }
+                    if (duplicate) {
+                        showError("PINs must be different")
+                        errorText.isFocusable = true
+                        errorText.requestFocus()
+                        return
+                    }
+                    if (decoySetup) {
                         app.prefs.setDecoyPinHash(currentPin)
                     } else {
                         app.prefs.setPinHash(currentPin)

@@ -23,7 +23,7 @@ class SinemaApp : Application() {
 
     /** Small ring buffer of recent user-facing errors for the server dashboard. */
     private val recentErrorsBuffer = ArrayDeque<String>()
-    val recentErrors: List<String> get() = recentErrorsBuffer.toList()
+    val recentErrors: List<String> get() = synchronized(recentErrorsBuffer) { recentErrorsBuffer.toList() }
 
     fun noteError(message: String) {
         synchronized(recentErrorsBuffer) {
