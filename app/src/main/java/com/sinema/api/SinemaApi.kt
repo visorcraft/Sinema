@@ -691,6 +691,15 @@ class SinemaApi(
         graphql(query, mapOf("id" to sceneId))
     }
 
+    suspend fun setSceneWatched(sceneId: String, watched: Boolean) {
+        if (watched) {
+            clearResumeTime(sceneId)
+            incrementPlayCount(sceneId)
+        } else {
+            resetPlayCount(sceneId)
+        }
+    }
+
     /** Increment the Stash O counter for a scene (playback menu / detail). */
     suspend fun sceneIncrementO(sceneId: String) {        val query = """
             mutation(${"$"}id: ID!) {

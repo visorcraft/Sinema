@@ -128,15 +128,7 @@ class SceneDetailActivity : SinemaActivity() {
             lifecycleScope.launch {
                 try {
                     val wasWatched = scene.isWatched
-                    if (wasWatched) {
-                        Log.d("Sinema", "Mark Unwatched: resetting play count for scene ${scene.id}")
-                        app.api.resetPlayCount(scene.id)
-                    } else {
-                        Log.d("Sinema", "Mark Watched: clearing resume_time for scene ${scene.id}")
-                        app.api.clearResumeTime(scene.id)
-                        Log.d("Sinema", "Mark Watched: incrementing play count for scene ${scene.id}")
-                        app.api.incrementPlayCount(scene.id)
-                    }
+                    app.api.setSceneWatched(scene.id, !wasWatched)
                     detailState.applyWatchedToggle(wasWatched)
                     bindWatchedButton()
                     Toast.makeText(this@SceneDetailActivity,

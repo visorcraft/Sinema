@@ -3,7 +3,12 @@ package com.sinema.api
 import com.sinema.model.CaptionRef
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = com.sinema.SinemaApp::class)
 class SinemaApiTest {
 
 
@@ -622,6 +627,25 @@ class SinemaApiTest {
             assertEquals("30", result.first().id)
             org.junit.Assert.assertTrue(result.none { it.id == "2" })
             org.junit.Assert.assertTrue(requestBody().contains("\"per_page\":-1"))
+        }
+    }
+
+    @Test
+    fun `watched clears resume before incrementing and unwatched resets`() {
+        withGraphqlServer(listOf(
+            SequencedResponse("""{"data":{"sceneSaveActivity":true}}"""),
+            SequencedResponse("""{"data":{"sceneIncrementPlayCount":true}}""")
+        )) { api, requests ->
+            kotlinx.coroutines.runBlocking { api.setSceneWatched("42", watched = true) }
+            assertEquals(2, requests().size)
+            org.junit.Assert.assertTrue(requests()[0].contains("sceneSaveActivity"))
+            org.junit.Assert.assertTrue(requests()[0].contains("\"resume_time\":0"))
+            org.junit.Assert.assertTrue(requests()[1].contains("sceneIncrementPlayCount"))
+        }
+        withGraphqlServer("""{"data":{"sceneResetPlayCount":true}}""") { api, requestBody ->
+            kotlinx.coroutines.runBlocking { api.setSceneWatched("42", watched = false) }
+            org.junit.Assert.assertTrue(requestBody().contains("sceneResetPlayCount"))
+            org.junit.Assert.assertTrue(requestBody().contains("\"id\":\"42\""))
         }
     }
 

@@ -217,8 +217,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     private fun markAllWatched() {
         bulkEdit(getString(R.string.bulk_mark_all_watched)) { scene ->
             if (!scene.isWatched) {
-                app.api.clearResumeTime(scene.id)
-                app.api.incrementPlayCount(scene.id)
+                app.api.setSceneWatched(scene.id, true)
             }
         }
     }
@@ -392,12 +391,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     private fun toggleWatched(scene: Scene, index: Int) {
         launchSafely("Watched toggle") {
             val wasWatched = scene.isWatched
-            if (wasWatched) {
-                app.api.resetPlayCount(scene.id)
-            } else {
-                app.api.clearResumeTime(scene.id)
-                app.api.incrementPlayCount(scene.id)
-            }
+            app.api.setSceneWatched(scene.id, !wasWatched)
             val updated = scene.copy(
                 playCount = WatchedToggle.nextPlayCount(scene.playCount, wasWatched),
                 resumeTime = if (wasWatched) scene.resumeTime else 0.0
