@@ -17,6 +17,10 @@ class StashAuthTest {
     fun `login maps all outcomes`() {
         assertEquals(LoginResult.InvalidCredentials, loginFor(status = 401))
         assertEquals(LoginResult.MissingCookie, loginFor(status = 302))
+        assertEquals(
+            LoginResult.MissingCookie,
+            loginFor(status = 302, headers = mapOf("Set-Cookie" to "session=; Path=/")
+        ))
         assertEquals(LoginResult.HttpFailure(500), loginFor(status = 500))
         assertEquals(
             LoginResult.Success("session=abc"),
@@ -34,12 +38,18 @@ class StashAuthTest {
     @Test
     fun `generate api key uses cookie mutation and gson parsing`() {
         val responses = listOf(SequencedResponse("""{"data":{"generateAPIKey":"key"}}"""))
-        withGraphqlServer(responses, configureSinemaApp = true) { _, requests ->
+        var requestCookie: String? = null
+        withGraphqlServer(
+            responses,
+            onGraphql = { requestCookie = it },
+            configureSinemaApp = true
+        ) { _, requests ->
             val serverUrl = com.sinema.SinemaApp.instance.prefs.serverUrl
             val client = SinemaApi(serverUrl, "", allowSelfSigned = true).client
             val key = StashAuth.generateApiKey(client, serverUrl, "session=abc")
 
             assertEquals("key", key)
+            assertEquals("session=abc", requestCookie)
             assertTrue(requests().single().contains("generateAPIKey(input: {})"))
         }
     }
@@ -51,6 +61,7 @@ class StashAuthTest {
         assertGenerateFailure(SequencedResponse("not-json"))
         assertGenerateFailure(SequencedResponse("""{"data":{}}"""))
         assertGenerateFailure(SequencedResponse("""{"data":{"generateAPIKey":""}}"""))
+        assertGenerateFailure(SequencedResponse("""{"data":{"generateAPIKey":null}}"""))
     }
 
     private fun loginFor(

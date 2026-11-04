@@ -651,7 +651,7 @@ class SettingsFragment : Fragment() {
                     .setNegativeButton("Cancel", null)
                     .show()
             }
-            addDescription(layout, "Restores settings from a sinema-backup.json file. Restart Sinema afterwards.")
+            addDescription(layout, "Restores settings from a sinema-backup.json file and applies them immediately.")
             firstButton
         }
     }
@@ -681,10 +681,13 @@ class SettingsFragment : Fragment() {
             } ?: throw java.io.IOException("Could not read file")
             val previousProfileId = app.prefs.activeProfileId
             val previousServerUrl = app.prefs.serverUrl
-            val written = app.prefs.importSnapshot(json)
-            com.sinema.util.SystemIntegrations.reconcileAfterImport(
-                requireContext(), previousProfileId, previousServerUrl
-            )
+            var written = 0
+            com.sinema.util.TvChannels.withSyncLock {
+                written = app.prefs.importSnapshot(json)
+                com.sinema.util.SystemIntegrations.reconcileAfterImport(
+                    requireContext(), previousProfileId, previousServerUrl
+                )
+            }
             Toast.makeText(
                 requireContext(),
                 "Imported $written entries", Toast.LENGTH_LONG

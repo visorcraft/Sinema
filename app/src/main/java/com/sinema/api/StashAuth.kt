@@ -41,7 +41,7 @@ object StashAuth {
                     else -> response.headers("Set-Cookie")
                         .firstOrNull { it.contains("session") }
                         ?.substringBefore(';')
-                        ?.takeIf { it.isNotBlank() }
+                        ?.takeIf { it.substringAfter('=', "").isNotBlank() }
                         ?.let(LoginResult::Success)
                         ?: LoginResult.MissingCookie
                 }
@@ -71,7 +71,10 @@ object StashAuth {
                 val message = errors[0].asJsonObject.get("message")?.asString ?: "GraphQL error"
                 throw IOException("Failed to generate API key: $message")
             }
-            val key = obj.getAsJsonObject("data")?.get("generateAPIKey")?.asString
+            val keyNode = obj.getAsJsonObject("data")?.get("generateAPIKey")
+            val key = keyNode
+                ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString
                 ?: throw IOException("API key missing from server response")
             if (key.isBlank()) throw IOException("API key missing from server response")
             return key

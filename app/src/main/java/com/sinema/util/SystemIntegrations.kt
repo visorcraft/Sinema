@@ -40,6 +40,8 @@ object SystemIntegrations {
             prefs.serverUrl.trimEnd('/') != previousServerUrl.trimEnd('/')
         ) {
             onActiveServerChanged(context) {}
+        } else {
+            SinemaApp.instance.refreshApi()
         }
     }
 

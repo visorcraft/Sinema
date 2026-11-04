@@ -56,10 +56,16 @@ class SettingsImportIntegrationTest {
 
     @Test
     fun `unchanged identity and channels preserve launcher entries`() {
-        val json = snapshot { }
+        val json = snapshot {
+            app.prefs.profiles = listOf(app.prefs.profiles.single().copy(apiKey = "key-b"))
+            app.prefs.applyProfile(app.prefs.profiles.single())
+        }
+        val previousApi = app.api
 
         importBackup(json)
 
+        org.junit.Assert.assertNotSame(previousApi, app.api)
+        assertEquals(mapOf("ApiKey" to "key-b"), app.api.mediaAuthHeaders())
         assertEquals("sinema:legacy", TvChannelsIsolationTest.RecordingProvider.watchRows[1L])
     }
 
