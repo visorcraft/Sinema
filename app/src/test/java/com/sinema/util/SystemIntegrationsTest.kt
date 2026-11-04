@@ -36,6 +36,25 @@ class SystemIntegrationsTest {
     }
 
     @Test
+    fun `unchanged and manifest default disabled states need no write`() {
+        org.junit.Assert.assertNull(componentWriteState(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, false))
+        org.junit.Assert.assertNull(componentWriteState(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, false))
+        org.junit.Assert.assertNull(componentWriteState(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, true))
+    }
+
+    @Test
+    fun `only a real state change requests a write`() {
+        assertEquals(
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            componentWriteState(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, true)
+        )
+        assertEquals(
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            componentWriteState(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, false)
+        )
+    }
+
+    @Test
     fun `profile mutation and clear hold lock against stale sync`() {
         assertAtomicTransition(activeProfileId = "profile-b", serverUrl = "http://server-b")
     }
@@ -79,8 +98,13 @@ class SystemIntegrationsTest {
 
             assertEquals(0, requestsA.get())
             assertTrue(requestsB.get() > 0)
-            val providerIds = TvChannelsIsolationTest.RecordingProvider.inserts.mapNotNull {
-                it.getAsString(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID)
+            var providerIds = listOf<String>()
+            repeat(50) {
+                providerIds = TvChannelsIsolationTest.RecordingProvider.inserts.mapNotNull {
+                    it.getAsString(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID)
+                }
+                if (providerIds.contains("sinema:profile-b:scene-b")) return@repeat
+                Thread.sleep(20)
             }
             assertTrue(providerIds.contains("sinema:profile-b:scene-b"))
             assertTrue(providerIds.none { it.endsWith(":scene-a") })

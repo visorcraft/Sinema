@@ -623,22 +623,7 @@ class SettingsFragment : Fragment() {
                 { app.prefs.globalSearchEnabled },
                 { value ->
                     app.prefs.globalSearchEnabled = value
-                    val flag = android.content.pm.PackageManager.DONT_KILL_APP
-                    val state = if (value) {
-                        android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    } else {
-                        android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                    }
-                    pm.setComponentEnabledSetting(
-                        android.content.ComponentName(requireContext(), com.sinema.util.GlobalSearchProvider::class.java),
-                        state,
-                        flag
-                    )
-                    pm.setComponentEnabledSetting(
-                        android.content.ComponentName(requireContext(), GlobalSearchActivity::class.java),
-                        state,
-                        flag
-                    )
+                    com.sinema.util.SystemIntegrations.applyGlobalSearchState(requireContext())
                     Toast.makeText(
                         requireContext(),
                         if (value) "Global search enabled — Sinema scenes appear in Android TV search"
@@ -694,13 +679,15 @@ class SettingsFragment : Fragment() {
             val json = requireContext().contentResolver.openInputStream(uri)?.use { input ->
                 input.readBytes().toString(Charsets.UTF_8)
             } ?: throw java.io.IOException("Could not read file")
-            var written = 0
-            com.sinema.util.SystemIntegrations.onActiveServerChanged(requireContext()) {
-                written = app.prefs.importSnapshot(json)
-            }
+            val previousProfileId = app.prefs.activeProfileId
+            val previousServerUrl = app.prefs.serverUrl
+            val written = app.prefs.importSnapshot(json)
+            com.sinema.util.SystemIntegrations.reconcileAfterImport(
+                requireContext(), previousProfileId, previousServerUrl
+            )
             Toast.makeText(
                 requireContext(),
-                "Imported $written entries — restart Sinema to apply fully", Toast.LENGTH_LONG
+                "Imported $written entries", Toast.LENGTH_LONG
             ).show()
         } catch (e: Exception) {
             android.util.Log.e("Sinema", "Backup import failed", e)

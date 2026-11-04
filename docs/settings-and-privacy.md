@@ -198,6 +198,10 @@ Privacy behavior:
 - Sinema returns no new suggestions while a configured PIN is unverified or a decoy session is active, and makes no Stash request for those queries. Android TV may retain results it cached before Sinema was locked.
 - Suggestions never embed credentials. Card artwork only renders when your Stash server allows unauthenticated media access; otherwise results appear without images.
 
+## Settings backup
+
+`Settings` → `System` can export or import a JSON backup of settings and server profiles. Imports replace current settings and immediately apply Global Search component state, clear disabled or changed-server launcher content, and refresh the active API client; no restart is required. Backups include credentials, so store them safely.
+
 ## Updates
 
 Sinema checks GitHub releases once per app session from the main screen.

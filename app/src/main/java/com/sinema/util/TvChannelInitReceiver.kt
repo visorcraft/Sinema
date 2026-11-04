@@ -37,7 +37,7 @@ class TvChannelInitReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 android.util.Log.e("Sinema", "TV channel init sync failed", e)
             } finally {
-                pending.finish()
+                pending?.finish()
             }
         }
     }

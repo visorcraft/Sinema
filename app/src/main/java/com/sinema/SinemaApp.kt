@@ -44,6 +44,7 @@ class SinemaApp : Application() {
         prefs.migrateToProfilesIfNeeded()
         api = buildConfiguredApi()
         configureGlideTransport(api)
+        com.sinema.util.SystemIntegrations.applyGlobalSearchState(this)
         // FLAG_SECURE must cover every activity, including ones opened before
         // the setting flips — re-apply on each start.
         registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
