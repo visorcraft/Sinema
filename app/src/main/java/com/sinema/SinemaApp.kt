@@ -21,13 +21,12 @@ class SinemaApp : Application() {
         lastInteractionMs = android.os.SystemClock.elapsedRealtime()
     }
 
-    @Volatile private var internalActivityResume = false
-    private var lastResumedActivityName: String? = null
+    private val startedActivityIds = mutableSetOf<Int>()
+    val startedActivityCount: Int get() = startedActivityIds.size
 
-    fun consumeInternalActivityResume(): Boolean {
-        val result = internalActivityResume
-        internalActivityResume = false
-        return result
+    fun hasOtherStartedActivity(activity: android.app.Activity): Boolean {
+        val currentId = System.identityHashCode(activity)
+        return startedActivityIds.any { it != currentId }
     }
 
     /** Small ring buffer of recent user-facing errors for the server dashboard. */
@@ -58,17 +57,17 @@ class SinemaApp : Application() {
         // the setting flips — re-apply on each start.
         registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) {
+                startedActivityIds.add(System.identityHashCode(activity))
                 applySecureFlag(activity)
             }
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
-            override fun onActivityResumed(activity: android.app.Activity) {
-                internalActivityResume = lastResumedActivityName?.let { it != activity.javaClass.name } == true
-                lastResumedActivityName = activity.javaClass.name
-            }
+            override fun onActivityResumed(activity: android.app.Activity) {}
             override fun onActivityPaused(activity: android.app.Activity) {
                 noteUserInteraction()
             }
-            override fun onActivityStopped(activity: android.app.Activity) {}
+            override fun onActivityStopped(activity: android.app.Activity) {
+                startedActivityIds.remove(System.identityHashCode(activity))
+            }
             override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
             override fun onActivityDestroyed(activity: android.app.Activity) {}
         })

@@ -28,6 +28,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class MainActivity : SinemaActivity() {
     private val app get() = SinemaApp.instance
     private var waitingForPin = false
+    private var resumeFromBackground = true
     private var sessionRestoreOffered = false
     private var sessionRestoreDialog: android.app.AlertDialog? = null
     private var exitDialog: android.app.AlertDialog? = null
@@ -83,15 +84,23 @@ class MainActivity : SinemaActivity() {
         maybeOfferPlaybackSessionRestore()
     }
 
+    override fun onStart() {
+        resumeFromBackground = !app.hasOtherStartedActivity(this)
+        super.onStart()
+    }
+
     override fun onResume() {
         super.onResume()
         val returningFromPinSuccess = waitingForPin && app.pinVerifiedThisSession
-        val internalActivityResume = app.consumeInternalActivityResume()
-        if (returningFromPinSuccess || internalActivityResume) {
+        if (returningFromPinSuccess || !resumeFromBackground) {
             app.noteUserInteraction()
         } else {
-            maybeAutoLock(android.os.SystemClock.elapsedRealtime() - app.lastInteractionMs)
+            maybeAutoLock(
+                android.os.SystemClock.elapsedRealtime() - app.lastInteractionMs,
+                isResumed = true
+            )
         }
+        resumeFromBackground = false
         // A decoy session must never fall through to the real library.
         if (app.decoySession && !isFinishing) {
             startActivity(Intent(this, DecoyActivity::class.java))
@@ -185,9 +194,12 @@ class MainActivity : SinemaActivity() {
         ambientHandler.postDelayed(ambientCheck, AMBIENT_CHECK_MS)
     }
 
-    private fun maybeAutoLock(idleMs: Long) {
+    private fun maybeAutoLock(
+        idleMs: Long,
+        isResumed: Boolean = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+    ) {
         if (!shouldAutoLock(
-                isResumed = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED),
+                isResumed = isResumed,
                 hasPin = app.prefs.hasPinSet(),
                 pinVerified = app.pinVerifiedThisSession,
                 decoySession = app.decoySession,

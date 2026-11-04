@@ -65,11 +65,45 @@ class MainActivityNavigationTest {
     }
 
     @Test
+    fun `returning from playback stays unlocked if resume marker is overwritten`() {
+        withGraphqlServer(testGraphqlErrorResponse("offline"), configureSinemaApp = true) { _, _ ->
+            val main = Robolectric.buildActivity(MainActivity::class.java).setup()
+            main.pause().stop()
+            withGraphqlServer(fullSceneResponse(0.0), configureSinemaApp = true) { _, _ ->
+                val intent = SceneIntents.playback(
+                    RuntimeEnvironment.getApplication(), "scene", resumeConfirmed = true
+                )
+                val playback = Robolectric.buildActivity(PlaybackActivity::class.java, intent).setup()
+
+                playback.pause()
+                runCatching {
+                    SinemaApp::class.java.getDeclaredField("lastResumedActivityName").apply {
+                        isAccessible = true
+                    }.set(SinemaApp.instance, MainActivity::class.java.name)
+                }
+                runCatching {
+                    SinemaApp::class.java.getDeclaredField("internalActivityResume").apply {
+                        isAccessible = true
+                    }.setBoolean(SinemaApp.instance, false)
+                }
+                setStaleInteraction()
+                resume(main)
+
+                assertTrue(SinemaApp.instance.pinVerifiedThisSession)
+                assertNull(shadowOf(main.get()).nextStartedActivity)
+                playback.stop().destroy()
+                main.destroy()
+            }
+        }
+    }
+
+    @Test
     fun `returning from background still locks after idle timeout`() {
         withGraphqlServer(testGraphqlErrorResponse("offline"), configureSinemaApp = true) { _, _ ->
             val main = Robolectric.buildActivity(MainActivity::class.java).setup()
             main.pause().stop()
             setStaleInteraction()
+            assertEquals(0, SinemaApp.instance.startedActivityCount)
 
             resume(main)
 
@@ -121,7 +155,7 @@ class MainActivityNavigationTest {
     }
 
     private fun resume(controller: ActivityController<MainActivity>) {
-        controller.restart().resume()
+        controller.start().resume()
         MainActivity::class.java.getDeclaredMethod("onResume").apply {
             isAccessible = true
         }.invoke(controller.get())
