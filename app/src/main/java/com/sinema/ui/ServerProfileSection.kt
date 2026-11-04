@@ -48,7 +48,6 @@ object ServerProfileSection {
         com.sinema.util.SystemIntegrations.onActiveServerChanged(ctx) {
             app.prefs.applyProfile(profile)
         }
-        app.refreshApi()
         val intent = Intent(ctx, MainActivity::class.java)
         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
         ctx.startActivity(intent)
@@ -188,7 +187,6 @@ object ServerProfileSection {
             com.sinema.util.SystemIntegrations.onActiveServerChanged(ctx) {
                 remaining.firstOrNull()?.let { app.prefs.applyProfile(it) }
             }
-            remaining.firstOrNull()?.let { app.refreshApi() }
         }
         (ctx as? android.app.Activity)?.recreate()
     }

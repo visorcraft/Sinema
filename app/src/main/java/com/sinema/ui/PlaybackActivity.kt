@@ -333,9 +333,9 @@ class PlaybackActivity : SinemaActivity() {
         // The app-scope FIFO drains after activity destruction without dropping
         // progress or allowing an older position to overwrite a newer one.
         val appCtx = applicationContext
-        val api = app.api
-        val profileId = app.prefs.activeProfileId
-        val serverUrl = app.prefs.serverUrl
+        val (profileId, serverUrl, api) = com.sinema.util.TvChannels.withSyncLock {
+            Triple(app.prefs.activeProfileId, app.prefs.serverUrl, app.api)
+        }
         saveQueue.enqueue {
             try {
                 val playDurationMs = savedWatchClock.pendingMs(nowMs)

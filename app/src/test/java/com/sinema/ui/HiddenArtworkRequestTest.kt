@@ -4,9 +4,12 @@ import android.widget.FrameLayout
 import androidx.leanback.widget.Presenter
 import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
+import com.sinema.api.testScene
 import com.sinema.model.EntityItem
 import com.sinema.model.FolderItem
+import com.sinema.model.GalleryItem
 import com.sinema.model.GroupItem
+import com.sinema.model.ImageItem
 import com.sinema.model.SceneMarkerItem
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
@@ -55,6 +58,13 @@ class HiddenArtworkRequestTest {
             Triple(cardPresenter, GroupItem("g", "Group", 1, frontImagePath = "$serverUrl/group.jpg"), "group"),
             Triple(cardPresenter, EntityItem("e", "Entity", 1, "$serverUrl/entity.jpg", EntityItem.Kind.TAG), "entity"),
             Triple(folderPresenter, FolderItem("Folder", "/private", true, firstSceneId = "scene"), "folder"),
+            Triple(cardPresenter, testScene(id = "scene", title = "Scene"), "scene"),
+            Triple(cardPresenter, GalleryItem("gallery", "Gallery", 1, coverImageId = "cover"), "gallery"),
+            Triple(
+                folderPresenter,
+                ImageItem("image", "Image", "$serverUrl/image.jpg", width = 10, height = 20),
+                "image"
+            ),
             Triple(
                 markerPresenter,
                 SceneMarkerItem("m", "Marker", 12.0, "scene", "Scene", 1920, 1080, "t", "Tag"),

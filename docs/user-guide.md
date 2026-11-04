@@ -24,7 +24,7 @@ By default, the Browse row below Quick actions contains:
 The content rows are loaded from Stash:
 
 - Continue Playing: scenes with `resume_time` greater than zero.
-- Recently Played: scenes with a play count and no active resume time, sorted by last played.
+- Recently Played: scenes with a play count and no active resume time, sorted by last played. Sinema fetches the complete filtered result once per Home load to order missing timestamps safely, returns at most 25 scenes, and shares that result with Because You Watched.
 - Recently Added: recently created scenes in Stash.
 - Favorites: rated scenes, where `rating100` is greater than zero.
 

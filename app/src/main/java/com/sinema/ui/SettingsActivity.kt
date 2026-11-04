@@ -132,7 +132,6 @@ class SettingsFragment : Fragment() {
             prefs.applyProfile(profile)
             prefs.setupAllowSelfSigned = false
         }
-        app.refreshApi()
         serverDraft = ServerSettingsDraft(prefs.serverUrl, prefs.apiKey)
         draftState.draftProfileId = prefs.activeProfileId
 
@@ -342,8 +341,8 @@ class SettingsFragment : Fragment() {
             com.sinema.util.SystemIntegrations.onActiveServerChanged(requireContext(), ::applyServerSettings)
         } else {
             applyServerSettings()
+            app.refreshApi()
         }
-        app.refreshApi()
         serverDraft = ServerSettingsDraft(app.prefs.serverUrl, app.prefs.apiKey)
         Toast.makeText(requireContext(), "Server settings saved", Toast.LENGTH_SHORT).show()
         showCategories()
@@ -699,7 +698,6 @@ class SettingsFragment : Fragment() {
             com.sinema.util.SystemIntegrations.onActiveServerChanged(requireContext()) {
                 written = app.prefs.importSnapshot(json)
             }
-            app.refreshApi()
             Toast.makeText(
                 requireContext(),
                 "Imported $written entries — restart Sinema to apply fully", Toast.LENGTH_LONG

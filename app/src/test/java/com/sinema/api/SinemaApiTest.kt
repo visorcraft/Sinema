@@ -604,6 +604,28 @@ class SinemaApiTest {
     }
 
     @Test
+    fun `home recency fetches all orders nulls last and slices`() {
+        val scenes = (1..30).map { index ->
+            testScene(
+                id = "$index",
+                playCount = 1,
+                lastPlayedAt = when (index) {
+                    30 -> "2026-11-03T12:00:00Z"
+                    2 -> null
+                    else -> "2026-10-${(index % 20) + 1}T00:00:00Z"
+                }
+            )
+        }
+        withGraphqlServer(testSceneListResponse(*scenes.toTypedArray())) { api, requestBody ->
+            val result = kotlinx.coroutines.runBlocking { api.findRecentlyPlayed(25) }
+            assertEquals(25, result.size)
+            assertEquals("30", result.first().id)
+            org.junit.Assert.assertTrue(result.none { it.id == "2" })
+            org.junit.Assert.assertTrue(requestBody().contains("\"per_page\":-1"))
+        }
+    }
+
+    @Test
     fun `alpha jump can filter titles instead of paths`() {
         withGraphqlServer("""{"data":{"findScenes":{"count":0,"scenes":[]}}}""") { api, requestBody ->
             kotlinx.coroutines.runBlocking {

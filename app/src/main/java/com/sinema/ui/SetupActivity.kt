@@ -353,7 +353,6 @@ class SetupActivity : SinemaActivity() {
                         app.prefs.setupAllowSelfSigned = trustSelfSigned
                         app.prefs.migrateToProfilesIfNeeded()
                     }
-                    app.refreshApi()
 
                     Toast.makeText(this@SetupActivity, "API key generated! You're all set.", Toast.LENGTH_SHORT).show()
                     finishWithSuccess()
@@ -410,7 +409,6 @@ class SetupActivity : SinemaActivity() {
                 app.prefs.setupAllowSelfSigned = trustSelfSigned
                 app.prefs.migrateToProfilesIfNeeded()
             }
-            app.refreshApi()
 
             Toast.makeText(this, "Connected! You're all set.", Toast.LENGTH_SHORT).show()
             finishWithSuccess()
@@ -574,7 +572,6 @@ class SetupActivity : SinemaActivity() {
                         app.prefs.stashPassword = ""
                         app.prefs.migrateToProfilesIfNeeded()
                     }
-                    app.refreshApi()
 
                     Toast.makeText(this, "Setup complete!", Toast.LENGTH_SHORT).show()
                     stopHttpServer()
@@ -663,7 +660,6 @@ class SetupActivity : SinemaActivity() {
                 app.prefs.setupAllowSelfSigned = selfSignedCheck.isChecked
                 app.prefs.migrateToProfilesIfNeeded()
             }
-            app.refreshApi()
 
             Toast.makeText(this@SetupActivity, "Settings saved!", Toast.LENGTH_SHORT).show()
             finishWithSuccess()

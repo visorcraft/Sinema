@@ -188,6 +188,7 @@ class MainFragment : RowsSupportFragment() {
     private val app get() = SinemaApp.instance
     private lateinit var rowsAdapter: ArrayObjectAdapter
     private var isLoading = false
+    private var launcherSyncJob: Job? = null
     private var continueState = HomeRowState<Pair<Scene, Double>>(CONTINUE_ROW_ID, "Continue Playing")
     private var recentlyPlayedState = HomeRowState<Scene>(PLAYED_ROW_ID, "Recently Played")
     private var recentlyAddedState = HomeRowState<Scene>(RECENT_ROW_ID, "Recently Added")
@@ -888,8 +889,9 @@ class MainFragment : RowsSupportFragment() {
             unwatchedPerformersState = unwatchedPerformersState.refreshing()
         }
         reconcileHomeRows()
-        val launcherProfileId = app.prefs.activeProfileId
-        val launcherServerUrl = app.prefs.serverUrl
+        val (launcherProfileId, launcherServerUrl, launcherApi) = com.sinema.util.TvChannels.withSyncLock {
+            Triple(app.prefs.activeProfileId, app.prefs.serverUrl, app.api)
+        }
         lifecycleScope.launch {
             try {
                 Log.d("Sinema", "loadContent starting")
@@ -907,56 +909,59 @@ class MainFragment : RowsSupportFragment() {
                         if (shouldLoadHomeRow(
                                 enabled(HomeContentRow.CONTINUE_PLAYING), app.prefs.channelsEnabled, feedsLauncher = true
                             )
-                        ) loadRow { app.api.findContinuePlaying() }
+                        ) loadRow { launcherApi.findContinuePlaying() }
                         else RowResult<List<Pair<Scene, Double>>>(emptyList())
                     }
                     val playedJob = async {
-                        if (enabled(HomeContentRow.RECENTLY_PLAYED)) loadRow { app.api.findRecentlyPlayed(25) }
+                        if (shouldLoadRecentlyPlayed(
+                                enabled(HomeContentRow.RECENTLY_PLAYED), enabled(HomeContentRow.DISCOVER)
+                            )
+                        ) loadRow { launcherApi.findRecentlyPlayed(25) }
                         else RowResult<List<Scene>>(emptyList())
                     }
                     val recentJob = async {
                         if (shouldLoadHomeRow(
                                 enabled(HomeContentRow.RECENTLY_ADDED), app.prefs.channelsEnabled, feedsLauncher = true
                             )
-                        ) loadRow { app.api.findRecentScenes(25) }
+                        ) loadRow { launcherApi.findRecentScenes(25) }
                         else RowResult<List<Scene>>(emptyList())
                     }
                     val favJob = async {
-                        if (enabled(HomeContentRow.FAVORITES)) loadRow { app.api.findFavoriteScenes() }
+                        if (enabled(HomeContentRow.FAVORITES)) loadRow { launcherApi.findFavoriteScenes() }
                         else RowResult<List<Scene>>(emptyList())
                     }
                     val unwatchedJob = async {
                         if (enabled(HomeContentRow.UNWATCHED_FAVORITES)) loadRow {
-                            app.api.findFavoriteScenesPaged(
+                            launcherApi.findFavoriteScenesPaged(
                                 page = 1, perPage = 25, sort = "updated_at", direction = "DESC", unwatchedOnly = true
                             ).second
                         } else RowResult<List<Scene>>(emptyList())
                     }
                     val releasedJob = async {
                         if (enabled(HomeContentRow.RECENTLY_RELEASED)) loadRow {
-                            app.api.findRecentlyReleasedPaged(page = 1, perPage = 25).second
+                            launcherApi.findRecentlyReleasedPaged(page = 1, perPage = 25).second
                         } else RowResult<List<Scene>>(emptyList())
                     }
                     val savedJob = async {
                         if (enabled(HomeContentRow.SAVED_FILTER)) loadRow {
                             val id = layoutSnapshot.savedFilterId
                             if (id.isBlank()) throw java.io.IOException("Choose a saved filter in Home Settings")
-                            val filter = app.api.findSavedSceneFilter(id)
+                            val filter = launcherApi.findSavedSceneFilter(id)
                                 ?: throw java.io.IOException("Saved filter no longer exists")
                             pinnedFilter = filter
                             savedFilterState = savedFilterState.copy(title = filter.name)
-                            app.api.findScenesForSavedFilter(filter, page = 1, perPage = 25).second
+                            launcherApi.findScenesForSavedFilter(filter, page = 1, perPage = 25).second
                         } else RowResult<List<Scene>>(emptyList())
                     }
                     val groupsJob = async {
                         if (enabled(HomeContentRow.GROUPS)) loadRow {
-                            app.api.findGroups(page = 1, perPage = 25).second
+                            launcherApi.findGroups(page = 1, perPage = 25).second
                         } else RowResult<List<GroupItem>>(emptyList())
                     }
                     val discoveryJob = async {
                         if (enabled(HomeContentRow.DISCOVER)) loadRow {
-                            val recent = app.api.findRecentlyPlayed(1).firstOrNull()
-                            val full = recent?.let { app.api.findSceneFull(it.id)?.scene }
+                            val recent = playedJob.await().value.orEmpty().firstOrNull()
+                            val full = recent?.let { launcherApi.findSceneFull(it.id)?.scene }
                             if (full == null) {
                                 emptyList()
                             } else {
@@ -964,7 +969,7 @@ class MainFragment : RowsSupportFragment() {
                                 discoveryState = discoveryState.copy(
                                     title = "Because You Watched · ${full.displayTitle}"
                                 )
-                                app.api.findRelatedScenes(full).take(25)
+                                launcherApi.findRelatedScenes(full).take(25)
                             }
                         } else RowResult<List<Scene>>(emptyList())
                     }
@@ -1017,7 +1022,7 @@ class MainFragment : RowsSupportFragment() {
                 // Watch Next / Recently Added on a single network blip.
                 val appCtx = context?.applicationContext
                 if (appCtx != null) {
-                    app.appScope.launch {
+                    launcherSyncJob = app.appScope.launch {
                         if (shouldSyncTvChannelRow(rows.continuePlaying)) {
                             com.sinema.util.TvChannels.syncWatchNext(
                                 appCtx, continuePairs, launcherProfileId, launcherServerUrl
@@ -1127,6 +1132,9 @@ class MainFragment : RowsSupportFragment() {
 
 internal fun shouldLoadHomeRow(rowVisible: Boolean, channelsEnabled: Boolean, feedsLauncher: Boolean): Boolean =
     rowVisible || (channelsEnabled && feedsLauncher)
+
+internal fun shouldLoadRecentlyPlayed(rowVisible: Boolean, discoveryVisible: Boolean): Boolean =
+    rowVisible || discoveryVisible
 
 /** Reload the home dashboard at most this often on resume (Refresh forces). */
 internal const val HOME_RELOAD_TTL_MS = 15_000L

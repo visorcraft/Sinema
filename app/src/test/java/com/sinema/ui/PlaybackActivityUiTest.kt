@@ -131,6 +131,13 @@ class PlaybackActivityUiTest {
             assertTrue(saveEntered.await(2, java.util.concurrent.TimeUnit.SECONDS))
             SinemaApp.instance.prefs.activeProfileId = "profile-b"
             finishSave.countDown()
+            val saveQueue = PlaybackActivity::class.java.getDeclaredField("saveQueue")
+                .apply { isAccessible = true }
+                .get(controller.get()) as PlaybackSaveQueue
+            kotlinx.coroutines.runBlocking {
+                saveQueue.close()
+                saveQueue.join()
+            }
             controller.stop().destroy()
             shadowOf(Looper.getMainLooper()).idle()
             assertTrue(com.sinema.util.TvChannelsIsolationTest.RecordingProvider.inserts.isEmpty())

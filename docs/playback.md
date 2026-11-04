@@ -29,7 +29,7 @@ Rules:
 These Stash fields drive the home screen:
 
 - Continue Playing uses scenes with active resume time.
-- Recently Played uses scenes with play count and no active resume time.
+- Recently Played uses scenes with play count and no active resume time. Its default sort fetches the complete filtered result once per Home load for null-safe recency ordering, then returns at most 25 scenes shared with Because You Watched.
 - Watched checkmarks use play count greater than zero.
 
 ## Player controls

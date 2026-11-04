@@ -747,24 +747,8 @@ class SinemaApi(
             )
         )
 
-    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> {
-        // Server sorts by last_played_at DESC, but Stash's row order is
-        // unpredictable for scenes whose last_played_at is NULL even when
-        // play_count > 0. Request the timestamp and re-sort client-side with
-        // nulls last so Recently Played is always true recency order.
-        // Do not send a last_played_at scene_filter — see
-        // RECENTLY_PLAYED_SCENE_FILTER for why (compat + Stash no-op).
-        // last_played_at is appended on top of SCENE_FIELDS for the client-side
-        // recency re-sort below; resume_time already comes via SCENE_FIELDS.
-        val scenes = findScenesInternal(
-            perPage = perPage,
-            sort = "last_played_at",
-            direction = "DESC",
-            sceneFilter = RECENTLY_PLAYED_SCENE_FILTER,
-            fields = SCENE_FIELDS + " last_played_at"
-        ).second
-        return recencyOrdered(scenes)
-    }
+    suspend fun findRecentlyPlayed(perPage: Int = 25): List<Scene> =
+        findRecentlyPlayedPaged(page = 1, perPage = perPage).second
 
     suspend fun findContinuePlaying(): List<Pair<Scene, Double>> {
         // Same story as Recently Played: Stash's server-side

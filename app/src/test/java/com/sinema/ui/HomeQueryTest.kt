@@ -23,6 +23,14 @@ class HomeQueryTest {
     }
 
     @Test
+    fun `recency loads when either row or discovery is visible`() {
+        assertTrue(shouldLoadRecentlyPlayed(rowVisible = true, discoveryVisible = false))
+        assertTrue(shouldLoadRecentlyPlayed(rowVisible = false, discoveryVisible = true))
+        assertTrue(shouldLoadRecentlyPlayed(rowVisible = true, discoveryVisible = true))
+        assertFalse(shouldLoadRecentlyPlayed(rowVisible = false, discoveryVisible = false))
+    }
+
+    @Test
     fun `channel sync only runs for successfully loaded rows`() {
         assertTrue(shouldSyncTvChannelRow(RowResult(value = emptyList<Any>())))
         assertFalse(shouldSyncTvChannelRow(RowResult<Any>(error = java.io.IOException("server unreachable"))))

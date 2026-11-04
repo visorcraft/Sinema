@@ -22,7 +22,7 @@ object TvChannels {
     private const val MAX_RECENT = 20
     private val syncLock = Any()
 
-    internal fun withSyncLock(block: () -> Unit) = synchronized(syncLock) { block() }
+    internal fun <T> withSyncLock(block: () -> T): T = synchronized(syncLock) { block() }
 
     fun syncWatchNext(
         context: Context,

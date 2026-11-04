@@ -284,6 +284,10 @@ class HomeCommandRowIntegrationTest {
                 responseGate.countDown()
                 awaitRow(activity, HERO_ROW_ID)
                 shadowOf(Looper.getMainLooper()).idle()
+                val syncJob = MainFragment::class.java.getDeclaredField("launcherSyncJob")
+                    .apply { isAccessible = true }
+                    .get(mainFragment(activity)) as? kotlinx.coroutines.Job
+                syncJob?.let { job -> kotlinx.coroutines.runBlocking { job.join() } }
                 assertTrue(com.sinema.util.TvChannelsIsolationTest.RecordingProvider.inserts.isEmpty())
             } finally {
                 responseGate.countDown()
