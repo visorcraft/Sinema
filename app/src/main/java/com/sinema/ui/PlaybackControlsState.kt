@@ -2,7 +2,6 @@ package com.sinema.ui
 
 import com.sinema.util.TimeFormat
 
-private const val PREVIEW_BUCKET_MS = 5_000L
 const val RESUME_PROMPT_THRESHOLD_MS = 10_000L
 
 enum class SeekPreset(val backwardMs: Long, val forwardMs: Long, val label: String) {
@@ -17,11 +16,8 @@ enum class SeekPreset(val backwardMs: Long, val forwardMs: Long, val label: Stri
     }
 }
 
-fun previewBucketMs(positionMs: Long, durationMs: Long): Long {
-    if (durationMs <= 0L) return 0L
-    val position = positionMs.coerceIn(0L, durationMs)
-    return (position / PREVIEW_BUCKET_MS * PREVIEW_BUCKET_MS).coerceAtMost(durationMs)
-}
+fun clampSeekPositionMs(positionMs: Long, durationMs: Long): Long =
+    if (durationMs <= 0L) 0L else positionMs.coerceIn(0L, durationMs)
 
 fun markerFractions(markers: List<Pair<String, Double>>, durationMs: Long): List<Float> {
     if (durationMs <= 0L) return emptyList()

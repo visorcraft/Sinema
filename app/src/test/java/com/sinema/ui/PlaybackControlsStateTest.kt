@@ -19,12 +19,11 @@ class PlaybackControlsStateTest {
     }
 
     @Test
-    fun `preview buckets are throttled and clamped to duration`() {
-        assertEquals(5_000L, previewBucketMs(7_200L, 60_000L))
-        assertEquals(5_000L, previewBucketMs(9_999L, 60_000L))
-        assertEquals(0L, previewBucketMs(-100L, 60_000L))
-        assertEquals(60_000L, previewBucketMs(90_000L, 60_000L))
-        assertEquals(0L, previewBucketMs(10_000L, 0L))
+    fun `seek targets are exact and clamped to duration`() {
+        assertEquals(7_200L, clampSeekPositionMs(7_200L, 60_000L))
+        assertEquals(0L, clampSeekPositionMs(-100L, 60_000L))
+        assertEquals(60_000L, clampSeekPositionMs(90_000L, 60_000L))
+        assertEquals(0L, clampSeekPositionMs(10_000L, 0L))
     }
 
     @Test

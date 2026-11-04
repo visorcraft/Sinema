@@ -95,21 +95,14 @@
         android:orientation="vertical"
         android:visibility="gone">
 
-        <ImageView
-            android:id="@+id/playback_preview_image"
-            android:layout_width="240dp"
-            android:layout_height="135dp"
-            android:background="#333333"
-            android:contentDescription="@string/playback_seek_preview"
-            android:scaleType="centerCrop" />
-
         <TextView
             android:id="@+id/playback_preview_time"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="#CC000000"
             android:gravity="center"
-            android:padding="6dp"
+            android:minWidth="96dp"
+            android:padding="12dp"
             android:textColor="@android:color/white"
             android:textSize="18sp" />
     </LinearLayout>

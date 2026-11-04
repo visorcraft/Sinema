@@ -79,8 +79,6 @@ class PlaybackActivity : SinemaActivity() {
     private var recoveryQualityRestore: PlaybackStreamQuality? = null
     private var seekPreset = SeekPreset.TEN_THIRTY
     private var sceneTitle = ""
-    private var previewBucket = -1L
-    private var previewSceneId = ""
     private var nextThumbSceneId = ""
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
@@ -89,6 +87,9 @@ class PlaybackActivity : SinemaActivity() {
     private var scrubbing = false
     private var lastMarkerPositionMs: Long? = null
     private val handler = Handler(Looper.getMainLooper())
+    private val seekDwell by lazy {
+        PausedSeekDwell(handler, { player?.playWhenReady == true }, { player?.seekTo(it) })
+    }
     private val hideRunnable = Runnable { playerView.hideController() }
     private val hideMarkerSkipRunnable = Runnable { hideMarkerSkip() }
     private val progressRunnable = object : Runnable {
@@ -590,52 +591,17 @@ class PlaybackActivity : SinemaActivity() {
     private fun showSeekPreview(positionMs: Long) {
         if (!::playerView.isInitialized) return
         val exo = player ?: return
-        val bucket = previewBucketMs(positionMs, exo.duration)
-        val container = playerView.findViewById<View>(R.id.playback_preview_container)
-        container.visibility = View.VISIBLE
+        val target = clampSeekPositionMs(positionMs, exo.duration)
+        playerView.findViewById<View>(R.id.playback_preview_container).visibility = View.VISIBLE
         playerView.findViewById<android.widget.TextView>(R.id.playback_preview_time).text =
-            TimeFormat.formatMs(bucket)
-        if (bucket == previewBucket && previewSceneId == sceneId) return
-        previewBucket = bucket
-        previewSceneId = sceneId
-        val image = playerView.findViewById<android.widget.ImageView>(R.id.playback_preview_image)
-        Glide.with(image).clear(image)
-        Glide.with(image)
-            .load(GlideAuth.url(SinemaApp.instance.api,
-                SinemaApp.instance.api.getMarkerScreenshotUrl(sceneId, bucket / 1000.0)))
-            .centerCrop()
-            .listener(object : com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable> {
-                override fun onLoadFailed(
-                    e: com.bumptech.glide.load.engine.GlideException?,
-                    model: Any?,
-                    target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>,
-                    isFirstResource: Boolean
-                ): Boolean {
-                    if (previewSceneId == sceneId && previewBucket == bucket) image.visibility = View.INVISIBLE
-                    return false
-                }
-
-                override fun onResourceReady(
-                    resource: android.graphics.drawable.Drawable,
-                    model: Any,
-                    target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>,
-                    dataSource: com.bumptech.glide.load.DataSource,
-                    isFirstResource: Boolean
-                ): Boolean {
-                    if (previewSceneId == sceneId && previewBucket == bucket) image.visibility = View.VISIBLE
-                    return false
-                }
-            })
-            .into(image)
+            TimeFormat.formatMs(target)
+        seekDwell.onPositionChanged(target)
     }
 
     private fun hideSeekPreview() {
-        previewBucket = -1L
-        previewSceneId = ""
+        seekDwell.cancel()
         if (!::playerView.isInitialized) return
         playerView.findViewById<View>(R.id.playback_preview_container).visibility = View.GONE
-        val image = playerView.findViewById<android.widget.ImageView>(R.id.playback_preview_image)
-        Glide.with(image).clear(image)
     }
 
     private fun scheduleVideoOutputTimeout() {
@@ -733,6 +699,10 @@ class PlaybackActivity : SinemaActivity() {
 
                     override fun onRepeatModeChanged(repeatMode: Int) {
                         prefs.loopEnabled = repeatMode == Player.REPEAT_MODE_ONE
+                    }
+
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        if (playWhenReady) hideSeekPreview()
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -859,6 +829,7 @@ class PlaybackActivity : SinemaActivity() {
 
     private fun releasePlayer() {
         handler.removeCallbacks(videoOutputTimeout)
+        hideSeekPreview()
         hideMarkerSkip()
         lastMarkerPositionMs = null
         player?.release()
