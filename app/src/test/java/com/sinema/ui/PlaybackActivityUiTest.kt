@@ -53,6 +53,37 @@ class PlaybackActivityUiTest {
     }
 
     @Test
+    fun `activity dwell seeks paused and center resumes without duplicate seek`() = withPlayback(resumeTimeSec = 45.0) { activity, _ ->
+        ShadowAlertDialog.getLatestAlertDialog().dismiss()
+        val playerView = activity.findViewById<android.widget.FrameLayout>(R.id.player_container)
+            .getChildAt(0) as AspectRatioPlayerView
+        val player = playerView.player!!
+        val timeBar = activity.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).apply {
+            isEnabled = true
+            setDuration(120_000L)
+            setPosition(45_000L)
+        }
+        timeBar.onKeyDown(
+            android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+            android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_RIGHT)
+        )
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2))
+        org.junit.Assert.assertEquals(0L, player.currentPosition)
+        assertTrue(!player.playWhenReady)
+        org.junit.Assert.assertEquals(
+            android.view.View.GONE,
+            activity.findViewById<android.view.View>(R.id.playback_preview_container).visibility
+        )
+        timeBar.onKeyDown(
+            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+            android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_CENTER)
+        )
+        org.junit.Assert.assertEquals(0L, player.currentPosition)
+        assertTrue(player.playWhenReady)
+        activity.finish()
+    }
+
+    @Test
     fun `settings button opens Sinema player menu`() = withPlayback(resumeTimeSec = 0.0) { activity, previousDialog ->
         activity.findViewById<android.view.View>(R.id.playback_settings_button).performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()

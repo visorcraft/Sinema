@@ -17,7 +17,8 @@ class MarkerTimeBar @JvmOverloads constructor(
     interface ScrubPreviewListener {
         fun onPreviewStart(positionMs: Long)
         fun onPreviewMove(positionMs: Long)
-        fun onPreviewStop(positionMs: Long, canceled: Boolean)
+        fun onPreviewStop(positionMs: Long, canceled: Boolean, fromKeyScrub: Boolean)
+        fun onPreviewPlayPause()
     }
 
     var scrubPreviewListener: ScrubPreviewListener? = null
@@ -46,7 +47,7 @@ class MarkerTimeBar @JvmOverloads constructor(
             }
 
             override fun onScrubStop(timeBar: TimeBar, position: Long, canceled: Boolean) {
-                scrubPreviewListener?.onPreviewStop(position, canceled)
+                scrubPreviewListener?.onPreviewStop(position, canceled, fromKeyScrub = false)
             }
         })
     }
@@ -72,14 +73,17 @@ class MarkerTimeBar @JvmOverloads constructor(
             val increment = if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) -keyBackwardMs else keyForwardMs
             keyScrubPositionMs = (keyScrubPositionMs + increment)
                 .coerceIn(0L, timelineDurationMs.coerceAtLeast(0L))
-            setPosition(keyScrubPositionMs)
+            timelinePositionMs = keyScrubPositionMs
+            super.setPosition(keyScrubPositionMs)
             scrubPreviewListener?.onPreviewMove(keyScrubPositionMs)
             return true
         }
-        if (keyScrubbing && event.action == KeyEvent.ACTION_DOWN &&
+        if (event.action == KeyEvent.ACTION_DOWN &&
             (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
         ) {
-            finishKeyScrub(canceled = false)
+            if (keyScrubbing) finishKeyScrub(canceled = false)
+            scrubPreviewListener?.onPreviewPlayPause()
+            return true
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -90,10 +94,11 @@ class MarkerTimeBar @JvmOverloads constructor(
 
     private fun finishKeyScrub(canceled: Boolean) {
         keyScrubbing = false
-        scrubPreviewListener?.onPreviewStop(keyScrubPositionMs, canceled)
+        scrubPreviewListener?.onPreviewStop(keyScrubPositionMs, canceled, fromKeyScrub = true)
     }
 
     override fun setPosition(position: Long) {
+        if (keyScrubbing) return
         timelinePositionMs = position
         super.setPosition(position)
     }

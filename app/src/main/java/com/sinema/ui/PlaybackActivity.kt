@@ -88,7 +88,12 @@ class PlaybackActivity : SinemaActivity() {
     private var lastMarkerPositionMs: Long? = null
     private val handler = Handler(Looper.getMainLooper())
     private val seekDwell by lazy {
-        PausedSeekDwell(handler, { player?.playWhenReady == true }, { player?.seekTo(it) })
+        PausedSeekDwell(
+            handler,
+            { player?.playWhenReady == true },
+            { player?.seekTo(it) },
+            onComplete = { hideSeekPreview() }
+        )
     }
     private val hideRunnable = Runnable { playerView.hideController() }
     private val hideMarkerSkipRunnable = Runnable { hideMarkerSkip() }
@@ -474,11 +479,13 @@ class PlaybackActivity : SinemaActivity() {
                     showSeekPreview(positionMs)
                 }
                 override fun onPreviewMove(positionMs: Long) = showSeekPreview(positionMs)
-                override fun onPreviewStop(positionMs: Long, canceled: Boolean) {
-                    scrubbing = false
-                    if (!canceled) player?.seekTo(positionMs)
+                override fun onPreviewStop(positionMs: Long, canceled: Boolean, fromKeyScrub: Boolean) {
+                    if (!canceled && fromKeyScrub) player?.seekTo(positionMs)
                     lastMarkerPositionMs = player?.currentPosition
                     hideSeekPreview()
+                }
+                override fun onPreviewPlayPause() {
+                    player?.let { it.playWhenReady = !it.playWhenReady }
                 }
             }
         }
@@ -601,6 +608,7 @@ class PlaybackActivity : SinemaActivity() {
     }
 
     private fun hideSeekPreview() {
+        scrubbing = false
         seekDwell.cancel()
         if (!::playerView.isInitialized) return
         playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).cancelKeyScrub()

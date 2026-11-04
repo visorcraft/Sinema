@@ -30,7 +30,15 @@ class MarkerTimeBarScrubTest {
         playWhenReady = false
         previewStops = 0
         seeks.clear()
-        dwell = PausedSeekDwell(Handler(Looper.getMainLooper()), { playWhenReady }, { seeks += it })
+        dwell = PausedSeekDwell(
+            Handler(Looper.getMainLooper()),
+            { playWhenReady },
+            { seeks += it },
+            onComplete = {
+                previewStops++
+                timeBar.cancelKeyScrub()
+            }
+        )
         timeBar = MarkerTimeBar(RuntimeEnvironment.getApplication()).apply {
             setDuration(120_000L)
             setPosition(0L)
@@ -38,10 +46,13 @@ class MarkerTimeBarScrubTest {
             scrubPreviewListener = object : MarkerTimeBar.ScrubPreviewListener {
                 override fun onPreviewStart(positionMs: Long) = dwell.onPositionChanged(positionMs)
                 override fun onPreviewMove(positionMs: Long) = dwell.onPositionChanged(positionMs)
-                override fun onPreviewStop(positionMs: Long, canceled: Boolean) {
+                override fun onPreviewStop(positionMs: Long, canceled: Boolean, fromKeyScrub: Boolean) {
                     previewStops++
-                    if (!canceled) seeks += positionMs
+                    if (!canceled && fromKeyScrub) seeks += positionMs
                     dwell.cancel()
+                }
+                override fun onPreviewPlayPause() {
+                    playWhenReady = !playWhenReady
                 }
             }
         }
@@ -56,6 +67,7 @@ class MarkerTimeBarScrubTest {
         assertTrue(seeks.isEmpty())
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1))
         assertEquals(listOf(30_000L), seeks)
+        assertEquals(1, previewStops)
         assertFalse(playWhenReady)
     }
 
@@ -68,16 +80,36 @@ class MarkerTimeBarScrubTest {
         assertTrue(seeks.isEmpty())
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1))
         assertEquals(listOf(20_000L), seeks)
-        assertEquals(0, previewStops)
+        assertEquals(1, previewStops)
     }
 
     @Test
-    fun `center commits the target without requesting playback`() {
+    fun `center commits the target and resumes playback`() {
         timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
         timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER))
         assertEquals(listOf(30_000L), seeks)
         assertEquals(1, previewStops)
-        assertFalse(playWhenReady)
+        assertTrue(playWhenReady)
+    }
+
+    @Test
+    fun `center after dwell resumes without a duplicate seek`() {
+        timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER))
+        assertEquals(listOf(30_000L), seeks)
+        assertTrue(playWhenReady)
+    }
+
+    @Test
+    fun `player progress cannot overwrite the displayed scrub target`() {
+        timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+        timeBar.setPosition(90_000L)
+        timeBar.cancelKeyScrub()
+        dwell.cancel()
+        timeBar.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        assertEquals(listOf(60_000L), seeks)
     }
 
     @Test
