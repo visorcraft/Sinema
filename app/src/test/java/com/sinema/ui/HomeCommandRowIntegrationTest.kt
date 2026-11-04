@@ -70,6 +70,7 @@ class HomeCommandRowIntegrationTest {
         val logo = activity.findViewById<android.widget.ImageView>(com.sinema.R.id.home_logo)
         val quick = itemView(activity, QUICK_ROW_ID, HomeCommandRow.LOG_OUT)
         focusItem(activity, QUICK_ROW_ID, HomeCommandRow.LOG_OUT)
+        quick.scaleY = 1.2f
         layoutHome(activity)
         val logoBounds = android.graphics.Rect()
         val quickBounds = android.graphics.Rect()
@@ -359,6 +360,16 @@ class HomeCommandRowIntegrationTest {
         assertTrue(holder.view.requestFocus())
         assertTrue(holder.view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN)))
         assertEquals(1, calls)
+    }
+
+    @Test
+    fun `hero click emits confirmed resume intent`() {
+        val activity = launch(pin = false)
+        val hero = HeroItem(testScene(id = "hero", resumeTimeSec = 12.0), 12_000L)
+        mainFragment(activity).onItemViewClickedListener.onItemClicked(null, hero, null, null)
+        val intent = shadowOf(activity).nextStartedActivity
+        assertTrue(com.sinema.util.SceneIntents.resumeConfirmedFrom(intent))
+        assertEquals(12_000L, com.sinema.util.SceneIntents.resumeMsFrom(intent))
     }
 
     @Test
