@@ -889,6 +889,7 @@ class MainFragment : RowsSupportFragment() {
         }
         reconcileHomeRows()
         val launcherProfileId = app.prefs.activeProfileId
+        val launcherServerUrl = app.prefs.serverUrl
         lifecycleScope.launch {
             try {
                 Log.d("Sinema", "loadContent starting")
@@ -1018,10 +1019,14 @@ class MainFragment : RowsSupportFragment() {
                 if (appCtx != null) {
                     app.appScope.launch {
                         if (shouldSyncTvChannelRow(rows.continuePlaying)) {
-                            com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs, launcherProfileId)
+                            com.sinema.util.TvChannels.syncWatchNext(
+                                appCtx, continuePairs, launcherProfileId, launcherServerUrl
+                            )
                         }
                         if (shouldSyncTvChannelRow(rows.recentlyAdded)) {
-                            com.sinema.util.TvChannels.syncRecentlyAdded(appCtx, recentScenes, launcherProfileId)
+                            com.sinema.util.TvChannels.syncRecentlyAdded(
+                                appCtx, recentScenes, launcherProfileId, launcherServerUrl
+                            )
                         }
                     }
                 }

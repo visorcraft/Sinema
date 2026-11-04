@@ -64,7 +64,6 @@ class FolderCardPresenterDiscreetTest {
         )
         holder.view.requestFocus()
         presenter.onUnbindViewHolder(holder)
-        holder.view.clearFocus()
         presenter.onBindViewHolder(holder, ImageItem("i2", "Second image", "/second.jpg"))
 
         assertHidden(holder, "Sensitive folder")

@@ -272,6 +272,26 @@ class HomeCommandRowIntegrationTest {
     }
 
     @Test
+    fun `launcher sync keeps fetch time profile after mid load switch`() {
+        ServerTransitionTestSupport.reset()
+        SinemaApp.instance.prefs.channelsEnabled = true
+        SinemaApp.instance.prefs.activeProfileId = "profile-a"
+        val responseGate = CountDownLatch(1)
+        withGraphqlServer(HERO_RESPONSE, responseGate, configureSinemaApp = true) { _, _ ->
+            try {
+                val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+                SinemaApp.instance.prefs.activeProfileId = "profile-b"
+                responseGate.countDown()
+                awaitRow(activity, HERO_ROW_ID)
+                shadowOf(Looper.getMainLooper()).idle()
+                assertTrue(com.sinema.util.TvChannelsIsolationTest.RecordingProvider.inserts.isEmpty())
+            } finally {
+                responseGate.countDown()
+            }
+        }
+    }
+
+    @Test
     fun `hero down focuses refresh`() {
         withGraphqlServer(HERO_RESPONSE, configureSinemaApp = true) { _, _ ->
             val activity = launch(pin = true)

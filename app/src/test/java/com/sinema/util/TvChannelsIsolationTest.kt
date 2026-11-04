@@ -32,6 +32,7 @@ class TvChannelsIsolationTest {
         registerProviders()
         SinemaApp.instance.prefs.channelsEnabled = true
         SinemaApp.instance.prefs.activeProfileId = "profile-a"
+        SinemaApp.instance.prefs.serverUrl = "http://server-a"
     }
 
     @Test
@@ -39,11 +40,23 @@ class TvChannelsIsolationTest {
         SinemaApp.instance.prefs.activeProfileId = "profile-b"
         val scene = testScene("9")
 
-        TvChannels.syncWatchNext(context, listOf(scene to 10.0), "profile-a")
-        TvChannels.syncRecentlyAdded(context, listOf(scene), "profile-a")
+        TvChannels.syncWatchNext(context, listOf(scene to 10.0), "profile-a", "http://server-a")
+        TvChannels.syncRecentlyAdded(context, listOf(scene), "profile-a", "http://server-a")
 
         assertEquals(0, RecordingProvider.queries)
         assertEquals(emptyList<Long>(), RecordingProvider.deletes)
+        assertEquals(emptyList<ContentValues>(), RecordingProvider.inserts)
+    }
+
+    @Test
+    fun `same profile url change suppresses stale sync`() {
+        SinemaApp.instance.prefs.serverUrl = "http://server-b"
+        val scene = testScene("9")
+
+        TvChannels.syncWatchNext(context, listOf(scene to 10.0), "profile-a", "http://server-a")
+        TvChannels.syncRecentlyAdded(context, listOf(scene), "profile-a", "http://server-a")
+
+        assertEquals(0, RecordingProvider.queries)
         assertEquals(emptyList<ContentValues>(), RecordingProvider.inserts)
     }
 
@@ -62,7 +75,7 @@ class TvChannelsIsolationTest {
     @Test
     fun `matching watch next sync writes profile namespaced ids`() {
         val scene = testScene("9")
-        TvChannels.syncWatchNext(context, listOf(scene to 10.0), "profile-a")
+        TvChannels.syncWatchNext(context, listOf(scene to 10.0), "profile-a", "http://server-a")
 
         assertEquals(1, RecordingProvider.inserts.size)
         assertEquals(
@@ -71,6 +84,17 @@ class TvChannelsIsolationTest {
                 TvContractCompat.WatchNextPrograms.COLUMN_INTERNAL_PROVIDER_ID
             )
         )
+    }
+
+    @Test
+    fun `matching recently added sync writes profile namespaced ids`() {
+        RecordingProvider.channelRows[1L] = "Sinema — Recently Added"
+        TvChannels.syncRecentlyAdded(context, listOf(testScene("9")), "profile-a", "http://server-a")
+
+        val providerIds = RecordingProvider.inserts.mapNotNull {
+            it.getAsString(TvContractCompat.PreviewProgramColumns.COLUMN_INTERNAL_PROVIDER_ID)
+        }
+        assertEquals("Captured inserts: ${RecordingProvider.inserts}", listOf("sinema:profile-a:9"), providerIds)
     }
 
     private fun registerProviders() {
@@ -83,12 +107,14 @@ class TvChannelsIsolationTest {
     class RecordingProvider : ContentProvider() {
         companion object {
             val watchRows = mutableMapOf<Long, String>()
+            val channelRows = mutableMapOf<Long, String>()
             val deletes = mutableListOf<Long>()
             val inserts = mutableListOf<ContentValues>()
             var queries = 0
 
             fun reset() {
                 watchRows.clear()
+                channelRows.clear()
                 deletes.clear()
                 inserts.clear()
                 queries = 0
@@ -105,7 +131,7 @@ class TvChannelsIsolationTest {
             sortOrder: String?
         ): Cursor {
             queries++
-            return if (uri.authority == TvContractCompat.WatchNextPrograms.CONTENT_URI.authority) {
+            return if (uri == TvContractCompat.WatchNextPrograms.CONTENT_URI) {
                 MatrixCursor(arrayOf(
                     BaseColumns._ID,
                     TvContractCompat.WatchNextPrograms.COLUMN_INTERNAL_PROVIDER_ID
@@ -113,7 +139,9 @@ class TvChannelsIsolationTest {
                     watchRows.forEach { (id, providerId) -> addRow(listOf(id, providerId)) }
                 }
             } else {
-                MatrixCursor(arrayOf(BaseColumns._ID, TvContractCompat.Channels.COLUMN_DISPLAY_NAME))
+                MatrixCursor(arrayOf(BaseColumns._ID, TvContractCompat.Channels.COLUMN_DISPLAY_NAME)).apply {
+                    channelRows.forEach { (id, name) -> addRow(listOf(id, name)) }
+                }
             }
         }
 

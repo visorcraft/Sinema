@@ -74,6 +74,7 @@ class PlaybackActivityUiTest {
             android.view.View.GONE,
             activity.findViewById<android.view.View>(R.id.playback_preview_container).visibility
         )
+        timeBar.isEnabled = true
         timeBar.onKeyDown(
             android.view.KeyEvent.KEYCODE_DPAD_CENTER,
             android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_CENTER)
@@ -90,6 +91,50 @@ class PlaybackActivityUiTest {
         assertTrue(dialog.isShowing)
         assertTrue(dialog.listView.count > 0)
         activity.finish()
+    }
+
+    @Test
+    fun `watch next keeps playback save profile after mid save switch`() {
+        ServerTransitionTestSupport.reset()
+        SinemaApp.instance.prefs.channelsEnabled = true
+        SinemaApp.instance.prefs.incognitoMode = false
+        SinemaApp.instance.prefs.activeProfileId = "profile-a"
+        val saveEntered = java.util.concurrent.CountDownLatch(1)
+        val finishSave = java.util.concurrent.CountDownLatch(1)
+        val responses = listOf(
+            com.sinema.api.SequencedResponse(fullSceneResponse(45.0)),
+            com.sinema.api.SequencedResponse("""{"data":{"sceneSaveActivity":true}}"""),
+            com.sinema.api.SequencedResponse(com.sinema.api.testSceneListResponse(com.sinema.api.testScene("scene")))
+        )
+        withGraphqlServer(
+            responses,
+            responder = { body ->
+                when {
+                    body.contains("sceneSaveActivity") -> {
+                        saveEntered.countDown()
+                        finishSave.await(2, java.util.concurrent.TimeUnit.SECONDS)
+                        responses[1]
+                    }
+                    body.contains("findScenes") -> responses[2]
+                    else -> responses[0]
+                }
+            },
+            configureSinemaApp = true
+        ) { _, _ ->
+            val intent = SceneIntents.playback(
+                RuntimeEnvironment.getApplication(), "scene", 45_000L,
+                resumeConfirmed = true
+            )
+            val controller = Robolectric.buildActivity(PlaybackActivity::class.java, intent).setup()
+            shadowOf(Looper.getMainLooper()).idle()
+            controller.pause()
+            assertTrue(saveEntered.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            SinemaApp.instance.prefs.activeProfileId = "profile-b"
+            finishSave.countDown()
+            controller.stop().destroy()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(com.sinema.util.TvChannelsIsolationTest.RecordingProvider.inserts.isEmpty())
+        }
     }
 
     private fun withPlayback(

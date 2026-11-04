@@ -48,7 +48,6 @@ class MarkerCardPresenterDiscreetTest {
         presenter.onBindViewHolder(holder, marker("m1", "Sensitive marker"))
         holder.view.requestFocus()
         presenter.onUnbindViewHolder(holder)
-        holder.view.clearFocus()
         presenter.onBindViewHolder(holder, marker("m2", "Second marker"))
 
         assertHidden(holder, "Sensitive marker")

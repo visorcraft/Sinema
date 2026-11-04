@@ -232,6 +232,7 @@ class MarkerCardPresenter(private val api: SinemaApi) : Presenter() {
         val holder = viewHolder as MarkerHolder
         holder.item = null
         val view = holder.view
+        view.clearFocus()
         val image = view.findViewById<ImageView>(R.id.card_image)
         com.bumptech.glide.Glide.with(view.context).clear(image)
         image.setImageDrawable(null)

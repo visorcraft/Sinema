@@ -335,6 +335,7 @@ class PlaybackActivity : SinemaActivity() {
         val appCtx = applicationContext
         val api = app.api
         val profileId = app.prefs.activeProfileId
+        val serverUrl = app.prefs.serverUrl
         saveQueue.enqueue {
             try {
                 val playDurationMs = savedWatchClock.pendingMs(nowMs)
@@ -347,9 +348,11 @@ class PlaybackActivity : SinemaActivity() {
                     playCountSentSceneIds.add(savedSceneId)
                 }
                 // Refresh Watch Next only if the originating server is still active.
-                if (resumeTimeSec > 0 && app.prefs.activeProfileId == profileId) {
+                if (resumeTimeSec > 0 && app.prefs.activeProfileId == profileId &&
+                    app.prefs.serverUrl.trimEnd('/') == serverUrl.trimEnd('/')
+                ) {
                     val continuePairs = api.findContinuePlaying()
-                    com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs, profileId)
+                    com.sinema.util.TvChannels.syncWatchNext(appCtx, continuePairs, profileId, serverUrl)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

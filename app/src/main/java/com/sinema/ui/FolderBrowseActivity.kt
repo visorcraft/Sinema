@@ -46,6 +46,7 @@ class FolderBrowseActivity : SinemaActivity() {
 class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
     private val app get() = SinemaApp.instance
     private lateinit var gridAdapter: ArrayObjectAdapter
+    private val discreetRebind = DiscreetRebind()
     private var currentPath = "/data"
 
     private var sort: SortOption = SortOption.PATH_ASC
@@ -125,6 +126,11 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
         activity?.refreshGridControls()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        discreetRebind.onResume { gridAdapter.rebindCardsRecursively() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

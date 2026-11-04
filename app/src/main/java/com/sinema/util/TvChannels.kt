@@ -22,12 +22,19 @@ object TvChannels {
     private const val MAX_RECENT = 20
     private val syncLock = Any()
 
+    internal fun withSyncLock(block: () -> Unit) = synchronized(syncLock) { block() }
+
     fun syncWatchNext(
         context: Context,
         continuePairs: List<Pair<Scene, Double>>,
-        expectedProfileId: String
+        expectedProfileId: String,
+        expectedServerUrl: String
     ) = synchronized(syncLock) {
-        if (!isActiveProfile(expectedProfileId, SinemaApp.instance.prefs.activeProfileId)) {
+        if (!isActiveServer(
+                expectedProfileId, expectedServerUrl,
+                SinemaApp.instance.prefs.activeProfileId, SinemaApp.instance.prefs.serverUrl
+            )
+        ) {
             return@synchronized
         }
         syncWatchNextLocked(context, continuePairs, expectedProfileId)
@@ -80,9 +87,14 @@ object TvChannels {
     fun syncRecentlyAdded(
         context: Context,
         scenes: List<Scene>,
-        expectedProfileId: String
+        expectedProfileId: String,
+        expectedServerUrl: String
     ) = synchronized(syncLock) {
-        if (!isActiveProfile(expectedProfileId, SinemaApp.instance.prefs.activeProfileId)) {
+        if (!isActiveServer(
+                expectedProfileId, expectedServerUrl,
+                SinemaApp.instance.prefs.activeProfileId, SinemaApp.instance.prefs.serverUrl
+            )
+        ) {
             return@synchronized
         }
         syncRecentlyAddedLocked(context, scenes, expectedProfileId)

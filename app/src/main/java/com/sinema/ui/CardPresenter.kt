@@ -192,6 +192,7 @@ class CardPresenter(
         val holder = viewHolder as ContentHolder
         holder.item = null
         val view = holder.view
+        view.clearFocus()
         val image = view.findViewById<ImageView>(R.id.card_image)
         Glide.with(view.context).clear(image)
         image.setImageDrawable(null)
@@ -311,6 +312,7 @@ class FolderCardPresenter : Presenter() {
         val holder = viewHolder as FolderHolder
         holder.item = null
         val view = holder.view
+        view.clearFocus()
         val image = view.findViewById<ImageView>(R.id.card_image)
         Glide.with(view.context).clear(image)
         image.setImageDrawable(null)

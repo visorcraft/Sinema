@@ -34,6 +34,12 @@ class BrowseFoldersActivity : SinemaActivity() {
 class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
     private val app get() = SinemaApp.instance
     private lateinit var gridAdapter: ArrayObjectAdapter
+    private val discreetRebind = DiscreetRebind()
+
+    override fun onResume() {
+        super.onResume()
+        discreetRebind.onResume { gridAdapter.rebindCardsRecursively() }
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)

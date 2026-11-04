@@ -343,14 +343,16 @@ class SetupActivity : SinemaActivity() {
                 try {
                     val apiKey = generateApiKey(serverUrl, sessionCookie, trustSelfSigned)
 
-                    app.prefs.serverUrl = serverUrl
-                    app.prefs.apiKey = apiKey
-                    app.prefs.authMode = "apikey"
-                    app.prefs.sessionCookie = ""
-                    app.prefs.stashUsername = ""
-                    app.prefs.stashPassword = ""
-                    app.prefs.setupAllowSelfSigned = trustSelfSigned
-                    app.prefs.migrateToProfilesIfNeeded()
+                    com.sinema.util.SystemIntegrations.onActiveServerChanged(this@SetupActivity) {
+                        app.prefs.serverUrl = serverUrl
+                        app.prefs.apiKey = apiKey
+                        app.prefs.authMode = "apikey"
+                        app.prefs.sessionCookie = ""
+                        app.prefs.stashUsername = ""
+                        app.prefs.stashPassword = ""
+                        app.prefs.setupAllowSelfSigned = trustSelfSigned
+                        app.prefs.migrateToProfilesIfNeeded()
+                    }
                     app.refreshApi()
 
                     Toast.makeText(this@SetupActivity, "API key generated! You're all set.", Toast.LENGTH_SHORT).show()
@@ -398,14 +400,16 @@ class SetupActivity : SinemaActivity() {
         ).apply { bottomMargin = 12 })
 
         val sessionBtn = createButton("Use Session Sign-In") {
-            app.prefs.serverUrl = serverUrl
-            app.prefs.sessionCookie = sessionCookie
-            app.prefs.authMode = "session"
-            app.prefs.apiKey = ""
-            app.prefs.stashUsername = username
-            app.prefs.stashPassword = password
-            app.prefs.setupAllowSelfSigned = trustSelfSigned
-            app.prefs.migrateToProfilesIfNeeded()
+            com.sinema.util.SystemIntegrations.onActiveServerChanged(this@SetupActivity) {
+                app.prefs.serverUrl = serverUrl
+                app.prefs.sessionCookie = sessionCookie
+                app.prefs.authMode = "session"
+                app.prefs.apiKey = ""
+                app.prefs.stashUsername = username
+                app.prefs.stashPassword = password
+                app.prefs.setupAllowSelfSigned = trustSelfSigned
+                app.prefs.migrateToProfilesIfNeeded()
+            }
             app.refreshApi()
 
             Toast.makeText(this, "Connected! You're all set.", Toast.LENGTH_SHORT).show()
@@ -561,12 +565,15 @@ class SetupActivity : SinemaActivity() {
             webSetupServer = WebSetupServer.start(serverUrl, setupToken, onComplete = { newServerUrl, apiKey ->
                 runOnUiThread {
                     if (webSetupServer == null || isFinishing || isDestroyed) return@runOnUiThread
-                    app.prefs.serverUrl = newServerUrl
-                    app.prefs.apiKey = apiKey
-                    app.prefs.authMode = "apikey"
-                    app.prefs.sessionCookie = ""
-                    app.prefs.stashUsername = ""
-                    app.prefs.stashPassword = ""
+                    com.sinema.util.SystemIntegrations.onActiveServerChanged(this@SetupActivity) {
+                        app.prefs.serverUrl = newServerUrl
+                        app.prefs.apiKey = apiKey
+                        app.prefs.authMode = "apikey"
+                        app.prefs.sessionCookie = ""
+                        app.prefs.stashUsername = ""
+                        app.prefs.stashPassword = ""
+                        app.prefs.migrateToProfilesIfNeeded()
+                    }
                     app.refreshApi()
 
                     Toast.makeText(this, "Setup complete!", Toast.LENGTH_SHORT).show()
@@ -646,14 +653,16 @@ class SetupActivity : SinemaActivity() {
                 return
             }
 
-            app.prefs.serverUrl = serverUrl
-            app.prefs.apiKey = apiKey
-            app.prefs.authMode = "apikey"
-            app.prefs.sessionCookie = ""
-            app.prefs.stashUsername = ""
-            app.prefs.stashPassword = ""
-            app.prefs.setupAllowSelfSigned = selfSignedCheck.isChecked
-            app.prefs.migrateToProfilesIfNeeded()
+            com.sinema.util.SystemIntegrations.onActiveServerChanged(this@SetupActivity) {
+                app.prefs.serverUrl = serverUrl
+                app.prefs.apiKey = apiKey
+                app.prefs.authMode = "apikey"
+                app.prefs.sessionCookie = ""
+                app.prefs.stashUsername = ""
+                app.prefs.stashPassword = ""
+                app.prefs.setupAllowSelfSigned = selfSignedCheck.isChecked
+                app.prefs.migrateToProfilesIfNeeded()
+            }
             app.refreshApi()
 
             Toast.makeText(this@SetupActivity, "Settings saved!", Toast.LENGTH_SHORT).show()

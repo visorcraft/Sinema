@@ -25,4 +25,11 @@ class TvProviderIdentityTest {
         assertFalse(isActiveProfile("profile-a", "profile-b"))
         assertFalse(isActiveProfile("", "profile-b"))
     }
+
+    @Test
+    fun `active server requires matching profile and normalized url`() {
+        assertTrue(isActiveServer("profile-a", "http://server-a/", "profile-a", "http://server-a"))
+        assertFalse(isActiveServer("profile-a", "http://server-a", "profile-b", "http://server-a"))
+        assertFalse(isActiveServer("profile-a", "http://server-a", "profile-a", "http://server-b"))
+    }
 }

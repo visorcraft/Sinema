@@ -43,6 +43,18 @@ object ServerProfileSection {
         ).apply { topMargin = 8; bottomMargin = 16 })
     }
 
+    internal fun switchProfile(ctx: Context, profile: ServerProfile) {
+        val app = SinemaApp.instance
+        com.sinema.util.SystemIntegrations.onActiveServerChanged(ctx) {
+            app.prefs.applyProfile(profile)
+        }
+        app.refreshApi()
+        val intent = Intent(ctx, MainActivity::class.java)
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        ctx.startActivity(intent)
+        (ctx as? android.app.Activity)?.finish()
+    }
+
     private fun addProfileRow(ctx: Context, layout: LinearLayout, profile: ServerProfile, isActive: Boolean, isLast: Boolean): Button {
         val app = SinemaApp.instance
         val rowLayout = LinearLayout(ctx).apply {
@@ -69,14 +81,7 @@ object ServerProfileSection {
                     AlertDialog.Builder(ctx)
                         .setTitle("Switch Server")
                         .setMessage("Switch to ${profile.name}?")
-                        .setPositiveButton("Switch") { _, _ ->
-                            app.prefs.applyProfile(profile)
-                            app.refreshApi()
-                            val intent = Intent(ctx, MainActivity::class.java)
-                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                            ctx.startActivity(intent)
-                            (ctx as? android.app.Activity)?.finish()
-                        }
+                        .setPositiveButton("Switch") { _, _ -> switchProfile(ctx, profile) }
                         .setNegativeButton("Cancel", null)
                         .show()
                 }
@@ -171,8 +176,24 @@ object ServerProfileSection {
             .show()
     }
 
-    private fun removeProfile(ctx: Context, profile: ServerProfile, isLast: Boolean) {
+    internal fun applyProfileRemoval(ctx: Context, profile: ServerProfile, isLast: Boolean) {
         val app = SinemaApp.instance
+        if (isLast) {
+            Toast.makeText(ctx, "Cannot remove the last server", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val remaining = app.prefs.profiles.filter { it.id != profile.id }
+        app.prefs.profiles = remaining
+        if (app.prefs.activeProfileId == profile.id) {
+            com.sinema.util.SystemIntegrations.onActiveServerChanged(ctx) {
+                remaining.firstOrNull()?.let { app.prefs.applyProfile(it) }
+            }
+            remaining.firstOrNull()?.let { app.refreshApi() }
+        }
+        (ctx as? android.app.Activity)?.recreate()
+    }
+
+    private fun removeProfile(ctx: Context, profile: ServerProfile, isLast: Boolean) {
         if (isLast) {
             Toast.makeText(ctx, "Cannot remove the last server", Toast.LENGTH_SHORT).show()
             return
@@ -180,17 +201,7 @@ object ServerProfileSection {
         AlertDialog.Builder(ctx)
             .setTitle("Remove Server")
             .setMessage("Remove ${profile.name}?")
-            .setPositiveButton("Remove") { _, _ ->
-                val remaining = app.prefs.profiles.filter { it.id != profile.id }
-                app.prefs.profiles = remaining
-                if (app.prefs.activeProfileId == profile.id) {
-                    remaining.firstOrNull()?.let {
-                        app.prefs.applyProfile(it)
-                        app.refreshApi()
-                    }
-                }
-                (ctx as? android.app.Activity)?.recreate()
-            }
+            .setPositiveButton("Remove") { _, _ -> applyProfileRemoval(ctx, profile, isLast) }
             .setNegativeButton("Cancel", null)
             .show()
     }

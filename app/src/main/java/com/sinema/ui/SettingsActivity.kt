@@ -107,6 +107,10 @@ class SettingsFragment : Fragment() {
     ) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
 
+        completeProfileAddition()
+    }
+
+    internal fun completeProfileAddition() {
         val prefs = app.prefs
         val name = try {
             java.net.URI(prefs.serverUrl).host ?: prefs.serverUrl
@@ -123,9 +127,11 @@ class SettingsFragment : Fragment() {
             stashPassword = prefs.stashPassword,
             allowSelfSigned = prefs.setupAllowSelfSigned
         )
-        prefs.profiles = prefs.profiles + profile
-        prefs.applyProfile(profile)
-        prefs.setupAllowSelfSigned = false
+        com.sinema.util.SystemIntegrations.onActiveServerChanged(requireContext()) {
+            prefs.profiles = prefs.profiles + profile
+            prefs.applyProfile(profile)
+            prefs.setupAllowSelfSigned = false
+        }
         app.refreshApi()
         serverDraft = ServerSettingsDraft(prefs.serverUrl, prefs.apiKey)
         draftState.draftProfileId = prefs.activeProfileId
@@ -314,20 +320,28 @@ class SettingsFragment : Fragment() {
     }
 
     private fun saveServerSettings() {
-        app.prefs.serverUrl = serverDraft.normalizedUrl()
-        app.prefs.apiKey = serverDraft.normalizedApiKey()
-        val activeId = app.prefs.activeProfileId
-        if (activeId.isNotBlank()) {
-            app.prefs.profiles = app.prefs.profiles.map {
-                if (it.id == activeId) it.copy(
-                    serverUrl = app.prefs.serverUrl,
-                    apiKey = app.prefs.apiKey,
-                    sessionCookie = app.prefs.sessionCookie,
-                    authMode = app.prefs.authMode,
-                    stashUsername = app.prefs.stashUsername,
-                    stashPassword = app.prefs.stashPassword
-                ) else it
+        val serverChanged = app.prefs.serverUrl.trimEnd('/') != serverDraft.normalizedUrl().trimEnd('/')
+        fun applyServerSettings() {
+            app.prefs.serverUrl = serverDraft.normalizedUrl()
+            app.prefs.apiKey = serverDraft.normalizedApiKey()
+            val activeId = app.prefs.activeProfileId
+            if (activeId.isNotBlank()) {
+                app.prefs.profiles = app.prefs.profiles.map {
+                    if (it.id == activeId) it.copy(
+                        serverUrl = app.prefs.serverUrl,
+                        apiKey = app.prefs.apiKey,
+                        sessionCookie = app.prefs.sessionCookie,
+                        authMode = app.prefs.authMode,
+                        stashUsername = app.prefs.stashUsername,
+                        stashPassword = app.prefs.stashPassword
+                    ) else it
+                }
             }
+        }
+        if (serverChanged) {
+            com.sinema.util.SystemIntegrations.onActiveServerChanged(requireContext(), ::applyServerSettings)
+        } else {
+            applyServerSettings()
         }
         app.refreshApi()
         serverDraft = ServerSettingsDraft(app.prefs.serverUrl, app.prefs.apiKey)
@@ -681,7 +695,10 @@ class SettingsFragment : Fragment() {
             val json = requireContext().contentResolver.openInputStream(uri)?.use { input ->
                 input.readBytes().toString(Charsets.UTF_8)
             } ?: throw java.io.IOException("Could not read file")
-            val written = app.prefs.importSnapshot(json)
+            var written = 0
+            com.sinema.util.SystemIntegrations.onActiveServerChanged(requireContext()) {
+                written = app.prefs.importSnapshot(json)
+            }
             app.refreshApi()
             Toast.makeText(
                 requireContext(),

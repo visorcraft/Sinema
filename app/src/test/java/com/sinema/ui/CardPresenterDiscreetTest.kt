@@ -63,7 +63,6 @@ class CardPresenterDiscreetTest {
         presenter.onBindViewHolder(holder, first)
         holder.view.requestFocus()
         presenter.onUnbindViewHolder(holder)
-        holder.view.clearFocus()
 
         presenter.onBindViewHolder(holder, GalleryItem("g2", "Second gallery", 1))
         assertHidden(holder, "Sensitive group")
