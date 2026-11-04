@@ -24,6 +24,7 @@ import com.sinema.model.TagRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
 import okhttp3.FormBody
@@ -38,10 +39,11 @@ import java.util.concurrent.TimeUnit
 class SinemaApi(
     private var serverUrl: String,
     private var apiKey: String,
-    private var sessionCookie: String = "",
+    @Volatile private var sessionCookie: String = "",
     private var authMode: String = "apikey",
     allowSelfSigned: Boolean = false
 ) {
+    private val refreshMutex = kotlinx.coroutines.sync.Mutex()
 
     companion object {
         // Stash FindFilterType.PerPageAll — fetch every matching row.
@@ -277,14 +279,23 @@ class SinemaApi(
             val requestGson = if (serializeNulls) gsonWithNulls else gson
             val body = requestGson.toJson(mapOf("query" to query, "variables" to variables))
 
-            val first = executeGraphql(body)
+            val failedCookie = sessionCookie
+            val first = executeGraphql(body, failedCookie)
 
             if (authMode == "session" && first.code == 401) {
-                val refreshed = reLogin()
+                val refreshed = refreshMutex.withLock {
+                    val current = sessionCookie
+                    if (current.isNotBlank() && current != failedCookie) {
+                        current
+                    } else {
+                        reLogin()?.also { cookie ->
+                            sessionCookie = cookie
+                            onSessionRefreshed?.invoke(cookie)
+                        }
+                    }
+                }
                 if (!refreshed.isNullOrBlank()) {
-                    sessionCookie = refreshed
-                    onSessionRefreshed?.invoke(refreshed)
-                    val retry = executeGraphql(body)
+                    val retry = executeGraphql(body, refreshed)
                     return@withContext parseGraphqlResponse(retry.code, retry.body)
                 }
             }
@@ -295,13 +306,13 @@ class SinemaApi(
 
     private data class HttpResult(val code: Int, val body: String)
 
-    private fun executeGraphql(body: String): HttpResult {
+    private fun executeGraphql(body: String, cookie: String): HttpResult {
         val requestBuilder = Request.Builder()
             .url("$serverUrl/graphql")
             .addHeader("Content-Type", "application/json")
 
-        if (authMode == "session" && sessionCookie.isNotBlank()) {
-            requestBuilder.addHeader("Cookie", sessionCookie)
+        if (authMode == "session" && cookie.isNotBlank()) {
+            requestBuilder.addHeader("Cookie", cookie)
         } else {
             requestBuilder.addHeader("ApiKey", apiKey)
         }
