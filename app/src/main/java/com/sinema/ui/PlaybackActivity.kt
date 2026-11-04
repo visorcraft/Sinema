@@ -194,6 +194,16 @@ class PlaybackActivity : SinemaActivity() {
         markers = details.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
     }
 
+    private fun clearSceneMetadata() {
+        captions = emptyList()
+        markers = emptyList()
+        if (::playerView.isInitialized) {
+            playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress)
+                .setSceneMarkers(emptyList())
+            updatePlaybackText()
+        }
+    }
+
     /** Fetch scene metadata before silent Watch Next or stored-session playback. */
     private fun resolveAutoResume(preservePosition: Boolean = false) {
         val targetId = sceneId
@@ -1005,9 +1015,10 @@ class PlaybackActivity : SinemaActivity() {
         // appScope runs on Dispatchers.IO — Toast needs the main thread.
         val app = SinemaApp.instance
         val appCtx = applicationContext
+        val api = app.api
         app.appScope.launch {
             try {
-                app.api.sceneIncrementO(current)
+                api.sceneIncrementO(current)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
                     Toast.makeText(appCtx, "O counted", Toast.LENGTH_SHORT).show()
                 }
@@ -1106,17 +1117,20 @@ class PlaybackActivity : SinemaActivity() {
             var nextHeight = 0
             var nextTitle = fallbackTitle
             try {
-                val details = app.api.findSceneFull(nextId)
-                nextWidth = details?.scene?.width ?: 0
-                nextHeight = details?.scene?.height ?: 0
-                nextTitle = details?.scene?.displayTitle ?: fallbackTitle
-                details?.let { applySceneMetadata(it) }
+                loadSceneMetadataForSwitch(
+                    clear = ::clearSceneMetadata,
+                    fetch = { app.api.findSceneFull(nextId) },
+                    apply = { details ->
+                        nextWidth = details.scene.width
+                        nextHeight = details.scene.height
+                        nextTitle = details.scene.displayTitle
+                        applySceneMetadata(details)
+                    }
+                )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.w("Sinema", "Failed to fetch next scene metadata, playing without captions/markers", e)
-                captions = emptyList()
-                markers = emptyList()
             }
             if (isFinishing || isDestroyed) return@launch
             hideSeekPreview()
