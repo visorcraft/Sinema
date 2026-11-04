@@ -12,8 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.NetworkInterface
 import java.util.concurrent.TimeUnit
 
@@ -213,34 +211,14 @@ class SetupActivity : SinemaActivity() {
                     .let { if (trustSelfSigned) it.trustAllCertificates() else it }
                     .build()
             }
-            
-            // Login to get session cookie
-            val loginBody = FormBody.Builder()
-                .add("username", username)
-                .add("password", password)
-                .build()
-            
-            val loginRequest = Request.Builder()
-                .url("$serverUrl/login")
-                .post(loginBody)
-                .build()
-            
-            client.newCall(loginRequest).execute().use { loginResponse ->
-                // Stash returns 302 on success, 401 on failure
-                if (loginResponse.code == 401) {
-                    throw Exception("Invalid username or password")
-                }
-                if (loginResponse.code !in listOf(302, 303, 307, 308, 200)) {
-                    throw Exception("Unexpected login response: ${loginResponse.code}")
-                }
-
-                // Extract session cookie
-                val cookies = loginResponse.headers("Set-Cookie")
-                val sessionCookie = cookies.firstOrNull { it.contains("session") }
-                    ?: throw Exception("No session cookie received")
-
-                // Just need the cookie name=value part, not the attributes
-                sessionCookie.split(";").first()
+            when (val result = com.sinema.api.StashAuth.login(client, serverUrl, username, password)) {
+                is com.sinema.api.LoginResult.Success -> result.cookie
+                com.sinema.api.LoginResult.InvalidCredentials -> throw Exception("Invalid username or password")
+                com.sinema.api.LoginResult.MissingCookie -> throw Exception("No session cookie received")
+                is com.sinema.api.LoginResult.HttpFailure ->
+                    throw Exception("Unexpected login response: ${result.code}")
+                is com.sinema.api.LoginResult.TransportFailure ->
+                    throw Exception("Login failed: ${result.cause.message ?: "network error"}")
             }
         }
     }
@@ -258,31 +236,7 @@ class SetupActivity : SinemaActivity() {
                     .let { if (trustSelfSigned) it.trustAllCertificates() else it }
                     .build()
             }
-            
-            val graphqlQuery = """{"query":"mutation { generateAPIKey(input: {}) }"}"""
-            val graphqlBody = graphqlQuery.toRequestBody("application/json".toMediaType())
-            
-            val graphqlRequest = Request.Builder()
-                .url("$serverUrl/graphql")
-                .post(graphqlBody)
-                .addHeader("Cookie", sessionCookie)
-                .build()
-            
-            val responseBody = client.newCall(graphqlRequest).execute().use { graphqlResponse ->
-                if (!graphqlResponse.isSuccessful) {
-                    throw Exception("Failed to generate API key: ${graphqlResponse.code}")
-                }
-                graphqlResponse.body?.string()
-                    ?: throw Exception("Empty response from server")
-            }
-
-            // Extract API key from: {"data":{"generateAPIKey":"eyJhbGc..."}}
-            val keyStart = responseBody.indexOf("\"generateAPIKey\":\"")
-            if (keyStart == -1) throw Exception("Failed to extract API key")
-            val start = keyStart + 18
-            val end = responseBody.indexOf("\"", start)
-            if (end == -1) throw Exception("Failed to extract API key")
-            responseBody.substring(start, end)
+            com.sinema.api.StashAuth.generateApiKey(client, serverUrl, sessionCookie)
         }
     }
     

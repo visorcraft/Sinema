@@ -27,7 +27,6 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
-import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -344,32 +343,7 @@ class SinemaApi(
 
     private fun reLogin(): String? {
         if (stashUsername.isBlank() || stashPassword.isBlank()) return null
-        return try {
-            // Derive from the active client so self-signed trust applies.
-            val loginClient = client.newBuilder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .followRedirects(false)
-                .build()
-
-            val loginBody = FormBody.Builder()
-                .add("username", stashUsername)
-                .add("password", stashPassword)
-                .build()
-
-            val loginRequest = Request.Builder()
-                .url("$serverUrl/login")
-                .post(loginBody)
-                .build()
-
-            loginClient.newCall(loginRequest).execute().use { response ->
-                if (response.code !in listOf(200, 302, 303, 307, 308)) return null
-                val sessionCookie = response.headers("Set-Cookie").firstOrNull { it.contains("session") } ?: return null
-                sessionCookie.substringBefore(';')
-            }
-        } catch (e: Exception) {
-            null
-        }
+        return (StashAuth.login(client, serverUrl, stashUsername, stashPassword) as? LoginResult.Success)?.cookie
     }
 
 
