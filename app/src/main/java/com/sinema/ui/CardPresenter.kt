@@ -73,7 +73,7 @@ class CardPresenter(
 
         val identity = item?.let(::discreetIdentity)
         if (SinemaApp.instance.prefs.discreetMode && !view.hasFocus() && identity != null) {
-            Glide.with(view.context).clear(image)
+            Glide.with(view.context.applicationContext).clear(image)
             image.setImageDrawable(null)
             image.visibility = View.INVISIBLE
             title.text = DiscreetMode.neutralTitle(identity.first, identity.second)
@@ -116,7 +116,7 @@ class CardPresenter(
                 }
                 image.scaleType = ImageView.ScaleType.CENTER_CROP
                 image.setBackgroundColor(0xFF333333.toInt())
-                Glide.with(view.context)
+                Glide.with(view.context.applicationContext)
                     .load(GlideAuth.url(api, api.getScreenshotUrl(item.id)))
                     .centerCrop()
                     .into(image)
@@ -124,7 +124,7 @@ class CardPresenter(
             is HomeViewAll -> {
                 title.text = item.actionLabel
                 content.text = item.title
-                Glide.with(view.context).clear(image)
+                Glide.with(view.context.applicationContext).clear(image)
                 image.setImageResource(android.R.drawable.ic_menu_more)
                 image.scaleType = ImageView.ScaleType.CENTER
                 image.setBackgroundColor(0xFF444444.toInt())
@@ -135,12 +135,12 @@ class CardPresenter(
                 if (item.frontImagePath != null) {
                     image.scaleType = ImageView.ScaleType.CENTER_CROP
                     image.setBackgroundColor(0xFF333333.toInt())
-                    Glide.with(view.context)
+                    Glide.with(view.context.applicationContext)
                         .load(GlideAuth.url(api, item.frontImagePath))
                         .centerCrop()
                         .into(image)
                 } else {
-                    Glide.with(view.context).clear(image)
+                    Glide.with(view.context.applicationContext).clear(image)
                     image.setImageResource(android.R.drawable.ic_menu_agenda)
                     image.scaleType = ImageView.ScaleType.CENTER
                     image.setBackgroundColor(0xFF444444.toInt())
@@ -153,12 +153,12 @@ class CardPresenter(
                 if (item.coverImageId != null) {
                     image.scaleType = ImageView.ScaleType.CENTER_CROP
                     image.setBackgroundColor(0xFF333333.toInt())
-                    Glide.with(view.context)
+                    Glide.with(view.context.applicationContext)
                         .load(GlideAuth.url(api, api.getImageThumbnailUrl(item.coverImageId)))
                         .centerCrop()
                         .into(image)
                 } else {
-                    Glide.with(view.context).clear(image)
+                    Glide.with(view.context.applicationContext).clear(image)
                     image.setImageResource(android.R.drawable.ic_menu_gallery)
                     image.scaleType = ImageView.ScaleType.CENTER
                     image.setBackgroundColor(0xFF444444.toInt())
@@ -171,7 +171,7 @@ class CardPresenter(
                 image.scaleType = ImageView.ScaleType.CENTER_CROP
                 image.setBackgroundColor(0xFF333333.toInt())
                 val imageUrl = item.imagePath ?: api.entityImageUrl(item.kind, item.id)
-                Glide.with(view.context)
+                Glide.with(view.context.applicationContext)
                     .load(GlideAuth.url(api, imageUrl))
                     .centerCrop()
                     .error(android.R.drawable.ic_menu_agenda)
@@ -194,7 +194,7 @@ class CardPresenter(
         val view = holder.view
         view.clearFocus()
         val image = view.findViewById<ImageView>(R.id.card_image)
-        Glide.with(view.context).clear(image)
+        Glide.with(view.context.applicationContext).clear(image)
         image.setImageDrawable(null)
         image.visibility = View.VISIBLE
         view.findViewById<TextView>(R.id.card_title).text = ""
@@ -238,7 +238,7 @@ class FolderCardPresenter : Presenter() {
             else -> null
         }
         if (SinemaApp.instance.prefs.discreetMode && !view.hasFocus() && identity != null) {
-            Glide.with(view.context).clear(image)
+            Glide.with(view.context.applicationContext).clear(image)
             image.setImageDrawable(null)
             image.visibility = View.INVISIBLE
             title.text = DiscreetMode.neutralTitle(identity.first, identity.second)
@@ -250,7 +250,7 @@ class FolderCardPresenter : Presenter() {
         image.visibility = View.VISIBLE
         heart.visibility = View.GONE
         content.text = ""
-        Glide.with(view.context).clear(image)
+        Glide.with(view.context.applicationContext).clear(image)
         image.setImageDrawable(null)
         when (item) {
             is FolderItem -> {
@@ -302,7 +302,7 @@ class FolderCardPresenter : Presenter() {
     private fun loadArtwork(image: ImageView, url: String) {
         image.scaleType = ImageView.ScaleType.CENTER_CROP
         image.setBackgroundColor(0xFF333333.toInt())
-        Glide.with(image.context)
+        Glide.with(image.context.applicationContext)
             .load(GlideAuth.url(SinemaApp.instance.api, url))
             .centerCrop()
             .into(image)
@@ -314,7 +314,7 @@ class FolderCardPresenter : Presenter() {
         val view = holder.view
         view.clearFocus()
         val image = view.findViewById<ImageView>(R.id.card_image)
-        Glide.with(view.context).clear(image)
+        Glide.with(view.context.applicationContext).clear(image)
         image.setImageDrawable(null)
         image.visibility = View.VISIBLE
         view.findViewById<TextView>(R.id.card_title).text = ""

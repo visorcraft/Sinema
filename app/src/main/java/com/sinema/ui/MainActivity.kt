@@ -85,7 +85,7 @@ class MainActivity : SinemaActivity() {
     }
 
     override fun onStart() {
-        resumeFromBackground = !app.hasOtherStartedActivity(this)
+        resumeFromBackground = !app.isInternalActivityReturn(this)
         super.onStart()
     }
 

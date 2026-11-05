@@ -20,6 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
@@ -79,6 +80,21 @@ class CardPresenterDiscreetTest {
         presenter.onUnbindViewHolder(holder)
         assertEquals("", holder.view.findViewById<TextView>(R.id.card_title).text.toString())
         assertEquals("", holder.view.findViewById<TextView>(R.id.card_content).text.toString())
+        assertNull(holder.view.findViewById<ImageView>(R.id.card_image).drawable)
+    }
+
+    @Test
+    fun `bind and unbind after host activity destruction do not crash`() {
+        val host = Robolectric.buildActivity(androidx.fragment.app.FragmentActivity::class.java).setup()
+        val holder = presenter.onCreateViewHolder(FrameLayout(host.get()))
+        val item = GroupItem("g1", "Sensitive group", 3)
+        presenter.onBindViewHolder(holder, item)
+        host.destroy()
+        assertTrue(host.get().isDestroyed)
+
+        presenter.onBindViewHolder(holder, item)
+        presenter.onUnbindViewHolder(holder)
+
         assertNull(holder.view.findViewById<ImageView>(R.id.card_image).drawable)
     }
 

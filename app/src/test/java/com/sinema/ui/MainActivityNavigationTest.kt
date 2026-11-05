@@ -98,6 +98,25 @@ class MainActivityNavigationTest {
     }
 
     @Test
+    fun `returning from favorites stays unlocked when favorites stops first`() {
+        withGraphqlServer(testGraphqlErrorResponse("offline"), configureSinemaApp = true) { _, _ ->
+            val main = Robolectric.buildActivity(MainActivity::class.java).setup()
+            main.pause().stop()
+            val favorites = Robolectric.buildActivity(FavoritesActivity::class.java).setup()
+            favorites.pause().stop()
+            setStaleInteraction()
+            assertEquals(0, SinemaApp.instance.startedActivityCount)
+
+            resume(main)
+
+            assertTrue(SinemaApp.instance.pinVerifiedThisSession)
+            assertNull(shadowOf(main.get()).nextStartedActivity)
+            favorites.destroy()
+            main.destroy()
+        }
+    }
+
+    @Test
     fun `returning from background still locks after idle timeout`() {
         withGraphqlServer(testGraphqlErrorResponse("offline"), configureSinemaApp = true) { _, _ ->
             val main = Robolectric.buildActivity(MainActivity::class.java).setup()
@@ -110,6 +129,25 @@ class MainActivityNavigationTest {
             assertFalse(SinemaApp.instance.pinVerifiedThisSession)
             assertEquals(PinActivity::class.java.name, shadowOf(main.get()).nextStartedActivity.component?.className)
             main.destroy()
+        }
+    }
+
+    @Test
+    fun `recreated home still locks when returning from background`() {
+        withGraphqlServer(testGraphqlErrorResponse("offline"), configureSinemaApp = true) { _, _ ->
+            val original = Robolectric.buildActivity(MainActivity::class.java).setup()
+            original.pause().stop().destroy()
+            setStaleInteraction()
+            assertEquals(0, SinemaApp.instance.startedActivityCount)
+
+            val recreated = Robolectric.buildActivity(MainActivity::class.java).setup()
+
+            assertFalse(SinemaApp.instance.pinVerifiedThisSession)
+            assertEquals(
+                PinActivity::class.java.name,
+                shadowOf(recreated.get()).nextStartedActivity.component?.className
+            )
+            recreated.destroy()
         }
     }
 

@@ -22,11 +22,13 @@ class SinemaApp : Application() {
     }
 
     private val startedActivityIds = mutableSetOf<Int>()
+    private var lastResumedActivityName: String? = null
     val startedActivityCount: Int get() = startedActivityIds.size
 
-    fun hasOtherStartedActivity(activity: android.app.Activity): Boolean {
+    fun isInternalActivityReturn(activity: android.app.Activity): Boolean {
         val currentId = System.identityHashCode(activity)
-        return startedActivityIds.any { it != currentId }
+        return startedActivityIds.any { it != currentId } ||
+            (lastResumedActivityName != null && lastResumedActivityName != activity.javaClass.name)
     }
 
     /** Small ring buffer of recent user-facing errors for the server dashboard. */
@@ -61,7 +63,9 @@ class SinemaApp : Application() {
                 applySecureFlag(activity)
             }
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
-            override fun onActivityResumed(activity: android.app.Activity) {}
+            override fun onActivityResumed(activity: android.app.Activity) {
+                lastResumedActivityName = activity.javaClass.name
+            }
             override fun onActivityPaused(activity: android.app.Activity) {
                 noteUserInteraction()
             }
