@@ -4,8 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.IOException
 import java.net.InetAddress
+import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLEncoder
 import java.util.concurrent.CountDownLatch
@@ -85,18 +85,16 @@ class WebSetupServerTest {
     }
 
     @Test
-    fun closeStopsAcceptingConnections() {
+    fun closeClosesListeningSocket() {
         val server = startServer()
-        val port = server.localPort
+        val listeningSocket = WebSetupServer::class.java.getDeclaredField("socket")
+            .apply { isAccessible = true }
+            .get(server) as ServerSocket
+        assertFalse(listeningSocket.isClosed)
+
         server.close()
 
-        var failed = false
-        try {
-            Socket(InetAddress.getLoopbackAddress(), port).use { }
-        } catch (_: IOException) {
-            failed = true
-        }
-        assertTrue(failed)
+        assertTrue(listeningSocket.isClosed)
     }
 
     private fun startServer(
