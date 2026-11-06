@@ -137,7 +137,30 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" dist/* \
-            --title "Sinema $TAG" \
-            --generate-notes \
-            --verify-tag
+          if release_is_draft="$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+            if [[ "$release_is_draft" == "false" ]]; then
+              echo "Release $TAG is already published; nothing to do."
+              exit 0
+            fi
+          else
+            gh release create "$TAG" \
+              --draft \
+              --title "Sinema $TAG" \
+              --generate-notes \
+              --verify-tag
+          fi
+
+          for file in dist/*; do
+            for attempt in 1 2 3; do
+              if gh release upload "$TAG" "$file" --clobber; then
+                break
+              fi
+              if (( attempt == 3 )); then
+                echo "Failed to upload $file; leaving $TAG as a draft for retry." >&2
+                exit 1
+              fi
+              sleep "$((attempt * 10))"
+            done
+          done
+
+          gh release edit "$TAG" --draft=false
