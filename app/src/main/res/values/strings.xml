@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">Sinema</string>
     <string name="playback_aspect_ratio">Aspect ratio</string>
+    <string name="playback_open_folder">Open folder</string>
+    <string name="playback_folder_unavailable">This video\'s folder isn\'t available</string>
     <string name="playback_seek_preview">Seek preview</string>
     <string name="playback_previous_marker">Previous marker</string>
     <string name="playback_next_marker">Next marker</string>

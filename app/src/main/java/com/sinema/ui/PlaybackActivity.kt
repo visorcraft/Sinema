@@ -1,5 +1,6 @@
 package com.sinema.ui
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -80,6 +81,8 @@ class PlaybackActivity : SinemaActivity() {
     private var recoveryQualityRestore: PlaybackStreamQuality? = null
     private var seekPreset = SeekPreset.TEN_THIRTY
     private var sceneTitle = ""
+    /** Directory containing the current file, blank until metadata arrives. */
+    private var sceneFolder = ""
     private var nextThumbSceneId = ""
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
@@ -193,11 +196,13 @@ class PlaybackActivity : SinemaActivity() {
     private fun applySceneMetadata(details: com.sinema.model.SceneDetails) {
         captions = details.scene.captions
         markers = details.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
+        sceneFolder = folderContaining(details.scene.path)
     }
 
     private fun clearSceneMetadata() {
         captions = emptyList()
         markers = emptyList()
+        sceneFolder = ""
         hideMarkerSkip()
         if (::playerView.isInitialized) {
             playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress)
@@ -504,6 +509,9 @@ class PlaybackActivity : SinemaActivity() {
                 }
             }
         }
+        playerView.findViewById<View>(R.id.playback_folder_button).setOnClickListener {
+            openSceneFolder()
+        }
         playerView.findViewById<View>(R.id.playback_personalization_button).setOnClickListener {
             showPersonalizationMenu()
         }
@@ -545,6 +553,21 @@ class PlaybackActivity : SinemaActivity() {
             setOnClickListener { seekRelative(seekPreset.forwardMs) }
         }
         updatePlaybackText()
+    }
+
+    /** Parent directory of a media path, or blank when the file has no folder. */
+    private fun folderContaining(path: String): String {
+        if (!path.contains('/')) return ""
+        return path.substringBeforeLast('/').takeIf { it.isNotBlank() }.orEmpty()
+    }
+
+    private fun openSceneFolder() {
+        val folder = sceneFolder
+        if (folder.isBlank()) {
+            Toast.makeText(this, R.string.playback_folder_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(Intent(this, FolderBrowseActivity::class.java).putExtra("path", folder))
     }
 
     private fun updatePlaybackText() {

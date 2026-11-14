@@ -2,9 +2,14 @@ package com.sinema.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.TypefaceSpan
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.leanback.app.VerticalGridSupportFragment
 import androidx.leanback.widget.*
@@ -114,7 +119,17 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
     }
 
     private fun updateTitle() {
-        title = "$currentPath  •  ${sort.label}"
+        val name = currentPath.trimEnd('/').substringAfterLast('/').ifBlank { currentPath }
+        title = "$name  •  ${sort.label}"
+        showFolderPath()
+    }
+
+    private fun showFolderPath() {
+        val label = activity?.findViewById<TextView>(R.id.folder_path) ?: return
+        label.visibility = View.VISIBLE
+        val shown = currentPath.trimEnd('/').ifEmpty { currentPath }
+        label.text = FolderPathLabel.text(shown)
+        label.contentDescription = shown
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -125,6 +140,7 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         val vPad = (20 * density).toInt()
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
+        showFolderPath()
         activity?.refreshGridControls()
     }
 
@@ -240,4 +256,55 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         private const val PAGE_SIZE = 1000
         private const val MAX_ITEMS = 10_000
     }
+}
+
+/**
+ * Full folder path for the browse header. Zero-width spaces after each slash
+ * (and inside a very long segment) let the line wrap without changing the
+ * path the user reads.
+ */
+internal object FolderPathLabel {
+    private const val BREAK = "\u200B"
+    private const val SEGMENT_BREAK = 40
+    private const val ANCESTOR = 0xFFC4C4C4.toInt()
+    private const val SEPARATOR = 0xFF8E8E8E.toInt()
+    private const val CURRENT = 0xFFFFFFFF.toInt()
+
+    fun text(path: String): CharSequence {
+        if (path.isEmpty()) return path
+        val shown = path.trimEnd('/')
+        if (shown.isEmpty()) return path
+        val lastSegmentStart = shown.lastIndexOf('/').let { slash ->
+            if (slash in 0 until shown.lastIndex) slash + 1 else 0
+        }
+        val sb = SpannableStringBuilder()
+        var i = 0
+        while (i < shown.length) {
+            if (shown[i] == '/') {
+                val start = sb.length
+                sb.append('/')
+                sb.setSpan(ForegroundColorSpan(SEPARATOR), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                sb.append(BREAK)
+                i++
+            } else {
+                val segStart = i
+                while (i < shown.length && shown[i] != '/') i++
+                val start = sb.length
+                sb.append(softWrap(shown.substring(segStart, i)))
+                val current = segStart == lastSegmentStart
+                sb.setSpan(
+                    ForegroundColorSpan(if (current) CURRENT else ANCESTOR),
+                    start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                if (current) {
+                    sb.setSpan(TypefaceSpan("sans-serif-medium"), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+        }
+        return sb
+    }
+
+    private fun softWrap(segment: String): String =
+        if (segment.length <= SEGMENT_BREAK) segment
+        else segment.chunked(SEGMENT_BREAK).joinToString(BREAK)
 }

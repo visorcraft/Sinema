@@ -173,11 +173,15 @@ Sinema treats `/data` as the Stash media root:
 - It also lists loose video files and pictures directly under `/data`.
 - Folder cards are shown immediately by name, then count, thumbnail, and favorite state fill in as Sinema loads them.
 
-When you open a folder, Sinema shows immediate children:
+When you open a folder, the full path stays at the top of the screen and wraps onto extra lines when it is long, so parent directories stay readable. The large title shows the current folder's name.
+
+Sinema shows immediate children:
 
 - Subfolders first.
 - Video files next.
 - Picture files last.
+
+During playback, the folder button immediately left of Personalization opens the folder that contains the current file.
 
 Selecting an item:
 

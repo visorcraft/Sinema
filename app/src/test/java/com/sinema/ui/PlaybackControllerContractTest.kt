@@ -66,4 +66,17 @@ class PlaybackControllerContractTest {
         assertTrue(activity.contains("R.id.playback_personalization_button"))
         assertTrue(activity.contains("showPersonalizationMenu()"))
     }
+
+    @Test
+    fun `folder button is immediately left of personalization`() {
+        val layout = String(Files.readAllBytes(Paths.get("src/main/res/layout/playback_controller.xml")))
+        val activity = String(Files.readAllBytes(Paths.get("src/main/java/com/sinema/ui/PlaybackActivity.kt")))
+        val folderIndex = layout.indexOf("@+id/playback_folder_button")
+        val personalizationIndex = layout.indexOf("@+id/playback_personalization_button")
+        assertTrue(folderIndex >= 0)
+        assertTrue(folderIndex < personalizationIndex)
+        assertTrue(layout.contains("@drawable/ic_folder"))
+        assertTrue(activity.contains("R.id.playback_folder_button"))
+        assertTrue(activity.contains("openSceneFolder()"))
+    }
 }

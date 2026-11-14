@@ -6,7 +6,9 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.api.withGraphqlServer
 import com.sinema.util.SceneIntents
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -111,6 +113,39 @@ class PlaybackActivityUiTest {
         )
         activity.finish()
     }
+
+    @Test
+    fun `folder button opens the folder containing the video`() {
+        val response = fullSceneResponse(0.0).replace(
+            "\"path\":\"/scene.mp4\"",
+            "\"path\":\"/data/library/clip.mp4\""
+        )
+        withGraphqlServer(response, configureSinemaApp = true) { _, _ ->
+            val intent = SceneIntents.playback(
+                RuntimeEnvironment.getApplication(), "scene",
+                resumeConfirmed = true
+            )
+            val controller = Robolectric.buildActivity(PlaybackActivity::class.java, intent).setup()
+            shadowOf(Looper.getMainLooper()).idle()
+            val activity = controller.get()
+            val button = activity.findViewById<android.view.View>(R.id.playback_folder_button)
+            assertTrue(button.isEnabled)
+            button.performClick()
+            val next = shadowOf(activity).nextStartedActivity
+            assertEquals(FolderBrowseActivity::class.java.name, next.component?.className)
+            assertEquals("/data/library", next.getStringExtra("path"))
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
+    fun `folder button does not navigate when the file has no directory`() =
+        withPlayback(resumeTimeSec = 0.0, resumeConfirmed = true) { activity, _ ->
+            val button = activity.findViewById<android.view.View>(R.id.playback_folder_button)
+            assertTrue(button.isEnabled)
+            button.performClick()
+            assertNull(shadowOf(activity).nextStartedActivity)
+        }
 
     @Test
     fun `personalization button opens scene personalization menu`() = withPlayback(resumeTimeSec = 0.0) { activity, previousDialog ->

@@ -221,6 +221,11 @@
                 <ImageButton android:id="@id/exo_repeat_toggle" style="@style/ExoStyledControls.Button.Bottom.RepeatToggle" />
                 <ImageButton android:id="@id/exo_subtitle" style="@style/ExoStyledControls.Button.Bottom.CC" />
                 <ImageButton
+                    android:id="@+id/playback_folder_button"
+                    style="@style/ExoStyledControls.Button.Bottom"
+                    android:contentDescription="@string/playback_open_folder"
+                    android:src="@drawable/ic_folder" />
+                <ImageButton
                     android:id="@+id/playback_personalization_button"
                     style="@style/ExoStyledControls.Button.Bottom"
                     android:contentDescription="@string/playback_personalization"

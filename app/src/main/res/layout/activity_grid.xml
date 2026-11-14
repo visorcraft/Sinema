@@ -109,6 +109,22 @@
         </LinearLayout>
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/folder_path"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:breakStrategy="simple"
+        android:fontFamily="sans-serif-light"
+        android:hyphenationFrequency="none"
+        android:lineSpacingExtra="4dp"
+        android:paddingStart="48dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="48dp"
+        android:paddingBottom="2dp"
+        android:textColor="#FFC4C4C4"
+        android:textSize="22sp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/grid_controls"
         android:layout_width="match_parent"
