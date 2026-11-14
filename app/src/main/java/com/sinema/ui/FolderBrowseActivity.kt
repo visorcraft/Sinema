@@ -9,6 +9,7 @@ import android.text.style.TypefaceSpan
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.leanback.app.VerticalGridSupportFragment
@@ -119,15 +120,30 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
     }
 
     private fun updateTitle() {
-        val name = currentPath.trimEnd('/').substringAfterLast('/').ifBlank { currentPath }
-        title = "$name  •  ${sort.label}"
+        val discreet = app.prefs.discreetMode
+        if (discreet) {
+            title = "Folder"
+            showTitle(true)
+        } else {
+            // The wrapping path is the header. The 44sp Leanback title would
+            // repeat the folder name and cover the first row of posters.
+            title = ""
+            showTitle(false)
+        }
         showFolderPath()
+        activity?.findViewById<Button>(R.id.btn_grid_sort)?.text = "Sort: ${sort.label}"
     }
 
     private fun showFolderPath() {
         val label = activity?.findViewById<TextView>(R.id.folder_path) ?: return
-        label.visibility = View.VISIBLE
+        if (app.prefs.discreetMode) {
+            label.text = ""
+            label.contentDescription = null
+            label.visibility = View.GONE
+            return
+        }
         val shown = currentPath.trimEnd('/').ifEmpty { currentPath }
+        label.visibility = View.VISIBLE
         label.text = FolderPathLabel.text(shown)
         label.contentDescription = shown
     }
@@ -140,13 +156,14 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         val vPad = (20 * density).toInt()
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
-        showFolderPath()
+        updateTitle()
         activity?.refreshGridControls()
     }
 
     override fun onResume() {
         super.onResume()
         discreetRebind.onResume { gridAdapter.rebindCardsRecursively() }
+        updateTitle()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -154,7 +171,6 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         currentPath = arguments?.getString("path") ?: "/data"
         sort = SortOption.fromName(app.prefs.sortFor("folder"))
         updateTitle()
-        badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
 
         val gridPresenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false)
         gridPresenter.numberOfColumns = 4
@@ -259,13 +275,11 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
 }
 
 /**
- * Full folder path for the browse header. Zero-width spaces after each slash
- * (and inside a very long segment) let the line wrap without changing the
- * path the user reads.
+ * Full folder path for the browse header. A zero-width space after each slash
+ * lets the line wrap at directories without changing the path the user reads.
  */
 internal object FolderPathLabel {
     private const val BREAK = "\u200B"
-    private const val SEGMENT_BREAK = 40
     private const val ANCESTOR = 0xFFC4C4C4.toInt()
     private const val SEPARATOR = 0xFF8E8E8E.toInt()
     private const val CURRENT = 0xFFFFFFFF.toInt()
@@ -290,7 +304,7 @@ internal object FolderPathLabel {
                 val segStart = i
                 while (i < shown.length && shown[i] != '/') i++
                 val start = sb.length
-                sb.append(softWrap(shown.substring(segStart, i)))
+                sb.append(shown.substring(segStart, i))
                 val current = segStart == lastSegmentStart
                 sb.setSpan(
                     ForegroundColorSpan(if (current) CURRENT else ANCESTOR),
@@ -303,8 +317,4 @@ internal object FolderPathLabel {
         }
         return sb
     }
-
-    private fun softWrap(segment: String): String =
-        if (segment.length <= SEGMENT_BREAK) segment
-        else segment.chunked(SEGMENT_BREAK).joinToString(BREAK)
 }

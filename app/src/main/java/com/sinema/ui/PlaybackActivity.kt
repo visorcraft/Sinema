@@ -81,8 +81,14 @@ class PlaybackActivity : SinemaActivity() {
     private var recoveryQualityRestore: PlaybackStreamQuality? = null
     private var seekPreset = SeekPreset.TEN_THIRTY
     private var sceneTitle = ""
-    /** Directory containing the current file, blank until metadata arrives. */
-    private var sceneFolder = ""
+    /**
+     * Parent directory once lookup has settled. Null while the current scene's
+     * path is still unknown, so the folder button cannot claim it is missing.
+     */
+    private var sceneFolder: String? = null
+    /** Folder screen is up. Not an end-of-video: keep the position and play state. */
+    private var folderDetour = false
+    private var resumePausedAfterFolder = false
     private var nextThumbSceneId = ""
     private var isControllerVisible = false
     private val prefs by lazy { SinemaApp.instance.prefs }
@@ -164,11 +170,16 @@ class PlaybackActivity : SinemaActivity() {
         // Every first start resolves full scene metadata before the player is
         // built; the coroutine owns that initial start.
         if (autoResumePending) return
-        beginPlaybackSession()
+        val fromFolder = folderDetour
+        val stayPaused = resumePausedAfterFolder
+        folderDetour = false
+        resumePausedAfterFolder = false
+        if (fromFolder) beginPlaybackSession(promptAllowed = false, startPaused = stayPaused)
+        else beginPlaybackSession()
     }
 
-    private fun beginPlaybackSession(promptAllowed: Boolean = true) {
-        startPlayback(promptAllowed)
+    private fun beginPlaybackSession(promptAllowed: Boolean = true, startPaused: Boolean = false) {
+        startPlayback(promptAllowed, startPaused)
         handler.post(progressRunnable)
         watchClock.onIsPlayingChanged(
             player?.isPlaying == true,
@@ -176,7 +187,7 @@ class PlaybackActivity : SinemaActivity() {
         )
     }
 
-    private fun startPlayback(promptAllowed: Boolean = true) {
+    private fun startPlayback(promptAllowed: Boolean = true, startPaused: Boolean = false) {
         // Prompt whenever a meaningful saved position is still unresolved —
         // including after a lifecycle dismissal (backgrounding the dialog),
         // which must never silently approve resuming. Once resolved (choice
@@ -188,7 +199,7 @@ class PlaybackActivity : SinemaActivity() {
             resumeMs = resumePositionMs
         )
         resumeAwaitingChoice = promptResume
-        initPlayer(startPaused = promptResume)
+        initPlayer(startPaused = promptResume || startPaused)
         if (promptResume) showResumePrompt()
     }
 
@@ -197,12 +208,16 @@ class PlaybackActivity : SinemaActivity() {
         captions = details.scene.captions
         markers = details.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
         sceneFolder = folderContaining(details.scene.path)
+        bindFolderButton()
     }
 
     private fun clearSceneMetadata() {
         captions = emptyList()
         markers = emptyList()
-        sceneFolder = ""
+        // Unknown again until the next path arrives. Keeps the previous
+        // folder from opening against the new video, and stays quiet.
+        sceneFolder = null
+        bindFolderButton()
         hideMarkerSkip()
         if (::playerView.isInitialized) {
             playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress)
@@ -249,9 +264,8 @@ class PlaybackActivity : SinemaActivity() {
         val exo = player
         val positionMs = (exo?.currentPosition ?: resumePositionMs).coerceAtLeast(0L)
         val durationMs = exo?.duration ?: 0L
-        if (!com.sinema.util.PlaybackSessionRestore.shouldPersist(positionMs) ||
-            (durationMs > 0L && durationMs - positionMs < 30_000L)
-        ) {
+        val finished = !folderDetour && durationMs > 0L && durationMs - positionMs < 30_000L
+        if (!com.sinema.util.PlaybackSessionRestore.shouldPersist(positionMs) || finished) {
             prefs.playbackSessionJson = ""
             return
         }
@@ -303,10 +317,7 @@ class PlaybackActivity : SinemaActivity() {
         // update — leaving a stale value would jump backwards after seeks to
         // near the start, or forwards after seeking near the end.
         player?.let { exo ->
-            val pos = exo.currentPosition
-            val duration = exo.duration
-            val nearEnd = duration > 0 && duration - pos < 30_000
-            resumePositionMs = if (nearEnd) 0L else pos.coerceAtLeast(0L)
+            resumePositionMs = keptResumePositionMs(exo.currentPosition, exo.duration, folderDetour)
         }
         watchClock.onIsPlayingChanged(false, android.os.SystemClock.elapsedRealtime())
         releasePlayer()
@@ -339,13 +350,8 @@ class PlaybackActivity : SinemaActivity() {
         val duration = exo.duration
         val app = SinemaApp.instance
 
-        val resumeTimeSec = if (duration > 0 && (duration - pos) < 30_000) {
-            0.0
-        } else if (pos > 5_000) {
-            pos / 1000.0
-        } else {
-            return
-        }
+        val save = resumeSave(pos, duration, folderDetour) ?: return
+        val resumeTimeSec = save.resumeTimeSec
 
         // The app-scope FIFO drains after activity destruction without dropping
         // progress or allowing an older position to overwrite a newer one.
@@ -358,7 +364,7 @@ class PlaybackActivity : SinemaActivity() {
                 val playDurationMs = savedWatchClock.pendingMs(nowMs)
                 api.saveSceneActivity(savedSceneId, resumeTimeSec, playDurationMs / 1000.0)
                 savedWatchClock.markReported(playDurationMs)
-                val shouldIncrement = resumeTimeSec == 0.0 && totalPlayedMs > 5_000L &&
+                val shouldIncrement = save.countAsFinished && totalPlayedMs > 5_000L &&
                     savedSceneId !in playCountSentSceneIds
                 if (shouldIncrement) {
                     api.incrementPlayCount(savedSceneId)
@@ -512,6 +518,7 @@ class PlaybackActivity : SinemaActivity() {
         playerView.findViewById<View>(R.id.playback_folder_button).setOnClickListener {
             openSceneFolder()
         }
+        bindFolderButton()
         playerView.findViewById<View>(R.id.playback_personalization_button).setOnClickListener {
             showPersonalizationMenu()
         }
@@ -555,18 +562,26 @@ class PlaybackActivity : SinemaActivity() {
         updatePlaybackText()
     }
 
-    /** Parent directory of a media path, or blank when the file has no folder. */
-    private fun folderContaining(path: String): String {
-        if (!path.contains('/')) return ""
-        return path.substringBeforeLast('/').takeIf { it.isNotBlank() }.orEmpty()
+    private fun bindFolderButton() {
+        if (!::playerView.isInitialized) return
+        playerView.findViewById<View>(R.id.playback_folder_button)?.isEnabled =
+            !sceneFolder.isNullOrEmpty()
     }
 
     private fun openSceneFolder() {
         val folder = sceneFolder
-        if (folder.isBlank()) {
-            Toast.makeText(this, R.string.playback_folder_unavailable, Toast.LENGTH_SHORT).show()
+        if (folder.isNullOrEmpty()) {
+            // Still loading (null) stays quiet. A settled miss can say so.
+            if (folder != null) {
+                Toast.makeText(this, R.string.playback_folder_unavailable, Toast.LENGTH_SHORT).show()
+            }
             return
         }
+        // Release the player with the activity. Keeping the decoder would
+        // leave it running if this folder starts another video. The detour
+        // flag is what stops that release from counting as the end.
+        folderDetour = true
+        resumePausedAfterFolder = player?.playWhenReady != true
         startActivity(Intent(this, FolderBrowseActivity::class.java).putExtra("path", folder))
     }
 
@@ -1353,4 +1368,32 @@ class PlaybackActivity : SinemaActivity() {
         handler.removeCallbacks(hideRunnable)
         if (!isControllerVisible) playerView.showController()
     }
+}
+
+/** Parent directory of a media path. `/clip.mp4` lives in `/`. A bare filename has none. */
+internal fun folderContaining(path: String): String {
+    val trimmed = path.trim()
+    if (!trimmed.contains('/')) return ""
+    val parent = trimmed.substringBeforeLast('/')
+    return if (parent.isEmpty()) "/" else parent
+}
+
+internal data class ResumeSave(val resumeTimeSec: Double, val countAsFinished: Boolean)
+
+/**
+ * Position to write when leaving playback. A folder detour near the end is
+ * still that position. Leaving for good inside the last 30 seconds clears it.
+ * Null when playback is too short to record.
+ */
+internal fun resumeSave(positionMs: Long, durationMs: Long, folderDetour: Boolean): ResumeSave? {
+    val nearEnd = durationMs > 0L && durationMs - positionMs < 30_000L
+    if (!folderDetour && nearEnd) return ResumeSave(0.0, countAsFinished = true)
+    if (positionMs <= 5_000L) return null
+    return ResumeSave(positionMs / 1000.0, countAsFinished = false)
+}
+
+/** In-memory resume point after onStop. Same near-end rule as [resumeSave]. */
+internal fun keptResumePositionMs(positionMs: Long, durationMs: Long, folderDetour: Boolean): Long {
+    val nearEnd = !folderDetour && durationMs > 0L && durationMs - positionMs < 30_000L
+    return if (nearEnd) 0L else positionMs.coerceAtLeast(0L)
 }

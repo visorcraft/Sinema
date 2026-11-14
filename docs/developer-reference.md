@@ -87,7 +87,7 @@ Full details include:
 
 `BrowseFoldersActivity` lists top-level folders under `/data`.
 
-`FolderBrowseActivity` queries scenes and images for a path, then `FolderHelper.buildFolderContents` turns them into immediate children. The grid header shows the full path (`FolderPathLabel`, wrapping after slashes) and the Leanback title shows the folder name plus the current sort, so a long path is not clipped to the single-line 44sp title.
+`FolderBrowseActivity` queries scenes and images for a path, then `FolderHelper.buildFolderContents` turns them into immediate children. The grid header is the full path (`FolderPathLabel`, wrapping after slashes). The Leanback title and logo badge stay hidden so they do not repeat the name or cover the first poster row; the Sort button shows the active sort. Discreet mode hides the path and shows the neutral title `Folder`.
 
 ### Metadata browsing
 
@@ -135,7 +135,7 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 ## Playback UI
 
-`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for marker ticks and a custom D-pad scrub lifecycle. The folder button (`playback_folder_button`, immediately left of Personalization) opens `FolderBrowseActivity` for the current file's directory once `findSceneFull` has supplied a parent path. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`). `PausedSeekDwell` seeks once after two stationary seconds while paused and completes without resuming; playback, movement, controller hide, and teardown cancel it. The preview is timestamp-only. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
+`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for marker ticks and a custom D-pad scrub lifecycle. The folder button (`playback_folder_button`, immediately left of Personalization) stays disabled until `findSceneFull` supplies a parent path (`/` for a file directly under the root) and opens `FolderBrowseActivity`. That detour does not treat the last 30 seconds as finished; returning restores the position and the previous play or pause state. The player is still released while the folder screen is up so a video started from that folder does not keep a second decoder. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`). `PausedSeekDwell` seeks once after two stationary seconds while paused and completes without resuming; playback, movement, controller hide, and teardown cancel it. The preview is timestamp-only. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
 
 ### Deep links and Watch Next
 

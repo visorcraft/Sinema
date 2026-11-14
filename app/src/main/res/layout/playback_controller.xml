@@ -224,6 +224,7 @@
                     android:id="@+id/playback_folder_button"
                     style="@style/ExoStyledControls.Button.Bottom"
                     android:contentDescription="@string/playback_open_folder"
+                    android:enabled="false"
                     android:src="@drawable/ic_folder" />
                 <ImageButton
                     android:id="@+id/playback_personalization_button"

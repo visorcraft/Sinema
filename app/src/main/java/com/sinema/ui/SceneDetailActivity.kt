@@ -201,11 +201,15 @@ class SceneDetailActivity : SinemaActivity() {
             }
         }
 
-        // Browse Folder
+        // Browse Folder. Same parent rule as playback: `/clip.mp4` is `/`,
+        // and a path with no directory does not open an empty grid.
         btnFolder?.setOnClickListener {
-            val intent = Intent(this, FolderBrowseActivity::class.java)
-            intent.putExtra("path", scene.folder)
-            startActivity(intent)
+            val folder = folderContaining(scene.path)
+            if (folder.isEmpty()) {
+                Toast.makeText(this, R.string.playback_folder_unavailable, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            startActivity(Intent(this, FolderBrowseActivity::class.java).putExtra("path", folder))
         }
 
         // Initial focus

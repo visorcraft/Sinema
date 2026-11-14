@@ -139,13 +139,37 @@ class PlaybackActivityUiTest {
     }
 
     @Test
-    fun `folder button does not navigate when the file has no directory`() =
+    fun `folder button opens the filesystem root for a top-level file`() =
         withPlayback(resumeTimeSec = 0.0, resumeConfirmed = true) { activity, _ ->
             val button = activity.findViewById<android.view.View>(R.id.playback_folder_button)
             assertTrue(button.isEnabled)
             button.performClick()
-            assertNull(shadowOf(activity).nextStartedActivity)
+            val next = shadowOf(activity).nextStartedActivity
+            assertEquals(FolderBrowseActivity::class.java.name, next.component?.className)
+            assertEquals("/", next.getStringExtra("path"))
         }
+
+    @Test
+    fun `folder button stays disabled when the path has no directory`() {
+        val response = fullSceneResponse(0.0).replace(
+            "\"path\":\"/scene.mp4\"",
+            "\"path\":\"clip.mp4\""
+        )
+        withGraphqlServer(response, configureSinemaApp = true) { _, _ ->
+            val intent = SceneIntents.playback(
+                RuntimeEnvironment.getApplication(), "scene",
+                resumeConfirmed = true
+            )
+            val controller = Robolectric.buildActivity(PlaybackActivity::class.java, intent).setup()
+            shadowOf(Looper.getMainLooper()).idle()
+            val activity = controller.get()
+            val button = activity.findViewById<android.view.View>(R.id.playback_folder_button)
+            assertTrue(!button.isEnabled)
+            button.performClick()
+            assertNull(shadowOf(activity).nextStartedActivity)
+            controller.pause().stop().destroy()
+        }
+    }
 
     @Test
     fun `personalization button opens scene personalization menu`() = withPlayback(resumeTimeSec = 0.0) { activity, previousDialog ->
