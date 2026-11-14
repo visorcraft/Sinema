@@ -20,7 +20,9 @@ Current dependency versions and licenses are tracked in [CREDITS.md](../CREDITS.
 Important entry points:
 
 - `app/src/main/java/com/sinema/SinemaApp.kt`: application singleton, preferences, API client, app-scope background work.
-- `app/src/main/java/com/sinema/api/SinemaApi.kt`: Stash GraphQL and media URL wrapper.
+- `app/src/main/java/com/sinema/api/SinemaApi.kt`: Stash GraphQL transport, scene lists, and folder queries. `SinemaApiLibrary.kt` holds tags, performers, studios, groups, galleries, markers, stats, and saved filters; `SinemaApi` delegates to it.
+- `app/src/main/java/com/sinema/ui/MainFragment.kt`: home rows. `MainActivity` is launch, PIN, ambient, and session restore.
+- `app/src/main/java/com/sinema/ui/PlaybackDialogs.kt`: playback menus. `PlaybackActivity` keeps the player lifecycle.
 - `app/src/main/java/com/sinema/util/Prefs.kt`: local settings, profiles, PIN hash, sort state, and secure storage.
 - `app/src/main/java/com/sinema/ui/MainActivity.kt`: launch, setup/PIN gating, home rows, update checks, channel sync.
 - `app/src/main/java/com/sinema/ui/SetupActivity.kt`: first-run setup, Stash login, web setup, manual API-key entry.
@@ -67,7 +69,7 @@ Session mode can automatically re-login when Stash GraphQL returns 401, if the p
 
 Each Stash-backed row has a `HomeRowState` that retains its last successful items through loading and failures. `MainFragment` keeps persistent `ListRow` instances and reconciles only changed adapters, headers, and row positions instead of clearing the dashboard. Stable header IDs preserve focus across refresh-status changes and row insertion or removal. Empty successful results hide their rows; failures retain content or show an unavailable header when no content has loaded.
 
-`HomeLayoutSettings` persists normalized shortcut/row order, visibility, card size, hero visibility, Library grouping, and the pinned saved filter in `Prefs`. `HomeSettingsActivity` and `HomeOrderActivity` edit that value; `LibraryActivity` presents grouped secondary shortcuts. `HomeRowScenesActivity` provides paged View All grids, while optional dashboard rows use the same independent `RowResult` error isolation as the original four rows. Recently Played's default recency sort fetches the complete filtered result once per Home load before applying nulls-last ordering and slicing at 25 items because Stash orders null timestamps unpredictably; Because You Watched consumes the first item from that same result instead of issuing a second recency request, even when Recently Played is hidden. Other sorts remain server-paged. Returning to the home fragment within `HOME_RELOAD_TTL_MS` (15 s, elapsedRealtime-based `shouldReloadHome`) skips the reload; `Refresh` and layout changes force it.
+`HomeLayoutSettings` persists normalized shortcut/row order, visibility, card size, hero visibility, Library grouping, and the pinned saved filter in `Prefs`. `HomeSettingsActivity` and `HomeOrderActivity` edit that value; `LibraryActivity` presents grouped secondary shortcuts. `HomeRowScenesActivity` provides paged View All grids, while optional dashboard rows use the same independent `RowResult` error isolation as the original four rows. Recently Played's default recency sort walks fixed pages of 100 and stops once it has enough dated scenes for the requested page (null timestamps still sort last); Because You Watched consumes the first item from that same result instead of issuing a second recency request, even when Recently Played is hidden. An ascending last-played sort still reads through to the end, because nulls come first. Other sorts remain server-paged. Returning to the home fragment within `HOME_RELOAD_TTL_MS` (15 s, elapsedRealtime-based `shouldReloadHome`) skips the reload; `Refresh` and layout changes force it.
 
 ### Scene detail
 
@@ -85,9 +87,9 @@ Full details include:
 
 ### Folder browsing
 
-`BrowseFoldersActivity` lists top-level folders under `/data`.
+`BrowseFoldersActivity` lists top-level folders under `/data`, then fills counts and thumbnails only for the folders around the focused card (`summarizeFolder`: one scene query, one image query, and a favorite count, together).
 
-`FolderBrowseActivity` queries scenes and images for a path, then `FolderHelper.buildFolderContents` turns them into immediate children. The grid header is the full path (`FolderPathLabel`, wrapping after slashes). The Leanback title and logo badge stay hidden so they do not repeat the name or cover the first poster row; the Sort button shows the active sort. Discreet mode hides the path and shows the neutral title `Folder`.
+`FolderBrowseActivity` queries scenes and images for a path a page at a time and paints the first page before the rest arrive. `FolderHelper.buildFolderContents` turns each accumulated page into immediate children, and later pages patch the grid when the existing rows keep their order. The grid header is the full path (`FolderPathLabel`, wrapping after slashes). The Leanback title and logo badge stay hidden so they do not repeat the name or cover the first poster row; the Sort button shows the active sort. Discreet mode hides the path and shows the neutral title `Folder`.
 
 ### Metadata browsing
 
@@ -135,7 +137,7 @@ Scene sort options live in `SortOption.kt` and map to Stash `FindFilterType` sor
 
 ## Playback UI
 
-`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for marker ticks and a custom D-pad scrub lifecycle. The folder button (`playback_folder_button`, immediately left of Personalization) stays disabled until `findSceneFull` supplies a parent path (`/` for a file directly under the root) and opens `FolderBrowseActivity`. That detour does not treat the last 30 seconds as finished; returning restores the position and the previous play or pause state. The player is still released while the folder screen is up so a video started from that folder does not keep a second decoder. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`). `PausedSeekDwell` seeks once after two stationary seconds while paused and completes without resuming; playback, movement, controller hide, and teardown cancel it. The preview is timestamp-only. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
+`playback_controller.xml` keeps Media3 control IDs and uses `MarkerTimeBar` (`DefaultTimeBar`) for marker ticks and a custom D-pad scrub lifecycle. The folder button (`playback_folder_button`, immediately left of Personalization) stays disabled until `findSceneFull` supplies a parent path (`/` for a file directly under the root) and opens `FolderBrowseActivity`. That detour does not treat the last 30 seconds as finished. While another Sinema screen covers playback, the player stays paused and attached so Back continues without reopening the stream. Leaving the app releases it. Starting another playback claims the decoder and releases the one underneath. `PlaybackActivity.bindPlaybackControls()` reattaches custom actions after every PlayerView mount. `SeekPreset` persists quick-seek intervals (applied asymmetrically to D-pad scrubbing via `MarkerTimeBar.setKeyTimeIncrements`). `PausedSeekDwell` seeks once after two stationary seconds while paused and completes without resuming; playback, movement, controller hide, and teardown cancel it. The preview is timestamp-only. Marker jump buttons use custom ids (`playback_prev_marker_button` / `playback_next_marker_button`) because Media3's `exo_prev`/`exo_next` are disabled when the single-item player has no previous/next media item. PlayerView remains responsible for actual seeks, track selection, stream fallback, and queue playback.
 
 ### Deep links and Watch Next
 
@@ -233,7 +235,7 @@ How it is wired:
 
 - `:baselineprofile` is a `com.android.test` module holding a UIAutomator-driven `BaselineProfileRule` generator (`baselineprofile/src/main/kotlin/.../BaselineProfileGenerator.kt`).
 - The app module applies the `androidx.baselineprofile` plugin, depends on `androidx.profileinstaller` (installs profiles on sideloaded updates), and commits the generated human-readable rules under `app/src/release/generated/baselineProfiles/baseline-prof.txt` (`baselineProfile { saveInSrc = true }`).
-- Because the rules are committed, release CI needs no emulator. Release builds currently set `isMinifyEnabled = false`, so R8 minification and obfuscation are not performed.
+- Because the rules are committed, release CI needs no emulator. Release builds run R8 (`isMinifyEnabled = true`). `proguard-rules.pro` keeps `com.sinema.**` so Gson field names and the baseline profile stay valid; library code still shrinks.
 
 Regenerating (requires an emulator with KVM; a fresh emulator exercises the setup flow, a configured one the home rows):
 

@@ -92,7 +92,7 @@ class PlaybackActivityUiTest {
         val markerButton = activity.findViewById<android.view.View>(R.id.playback_marker_button)
         markerButton.isEnabled = true
 
-        PlaybackActivity::class.java.getDeclaredMethod("clearSceneMetadata")
+        PlaybackActivity::class.java.declaredMethods.first { it.name.startsWith("clearSceneMetadata") }
             .apply { isAccessible = true }
             .invoke(activity)
 

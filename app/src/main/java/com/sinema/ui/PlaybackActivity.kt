@@ -39,65 +39,68 @@ private const val VIDEO_OUTPUT_TIMEOUT_MS = 5_000L
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackActivity : SinemaActivity() {
-    private var player: ExoPlayer? = null
-    private lateinit var playerView: AspectRatioPlayerView
-    private var sceneId: String = ""
-    private var videoWidth: Int = 0
-    private var videoHeight: Int = 0
-    private var hasFallenBackToDirect = false
-    private var forceAlignedHls = false
-    private var hasVideoOutput = false
-    private var resumePositionMs: Long = 0L
-    private var resumeConfirmed = false
-    @Volatile private var watchClock = PlaybackWatchClock()
-    private val saveQueue = PlaybackSaveQueue(SinemaApp.instance.appScope)
-    private val playCountSentSceneIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-    private var captions: List<CaptionRef> = emptyList()
-    private var markers: List<Pair<String, Double>> = emptyList()
-    private val chaptersDialog = DialogSlot()
-    private val aspectRatioDialog = DialogSlot()
-    private val settingsMenuDialog = DialogSlot()
-    private val personalizationMenuDialog = DialogSlot()
-    private val rateDialog = DialogSlot()
-    private val streamQualityDialog = DialogSlot()
-    private val resumePromptDialog = DialogSlot()
-    private val upNextDialog = DialogSlot()
+    internal var player: ExoPlayer? = null
+    internal lateinit var playerView: AspectRatioPlayerView
+    internal var sceneId: String = ""
+    internal var videoWidth: Int = 0
+    internal var videoHeight: Int = 0
+    internal var hasFallenBackToDirect = false
+    internal var forceAlignedHls = false
+    internal var hasVideoOutput = false
+    internal var resumePositionMs: Long = 0L
+    internal var resumeConfirmed = false
+    @Volatile internal var watchClock = PlaybackWatchClock()
+    internal val saveQueue = PlaybackSaveQueue(SinemaApp.instance.appScope)
+    internal val playCountSentSceneIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    internal var captions: List<CaptionRef> = emptyList()
+    internal var markers: List<Pair<String, Double>> = emptyList()
+    internal val chaptersDialog = DialogSlot()
+    internal val aspectRatioDialog = DialogSlot()
+    internal val settingsMenuDialog = DialogSlot()
+    internal val personalizationMenuDialog = DialogSlot()
+    internal val rateDialog = DialogSlot()
+    internal var rateFetchJob: kotlinx.coroutines.Job? = null
+    internal val streamQualityDialog = DialogSlot()
+    internal val resumePromptDialog = DialogSlot()
+    internal val upNextDialog = DialogSlot()
     /** Scenes already played in the current Endless Mix session. */
-    private val endlessPlayedIds = mutableSetOf<String>()
-    private var endlessJob: kotlinx.coroutines.Job? = null
-    private val playbackErrorDialog = DialogSlot()
+    internal val endlessPlayedIds = mutableSetOf<String>()
+    internal var endlessJob: kotlinx.coroutines.Job? = null
+    internal val playbackErrorDialog = DialogSlot()
     /** True once the user picked Resume/Start-over or started playback manually. */
-    private var resumePromptResolved = false
+    internal var resumePromptResolved = false
     /** Paused with the resume prompt outstanding (Back keeps it outstanding). */
-    private var resumeAwaitingChoice = false
+    internal var resumeAwaitingChoice = false
     /** First start: resolve metadata (and resume position when needed) before building the player. */
-    private var autoResumePending = false
+    internal var autoResumePending = false
     /** Scene viewed (partly) under incognito — stays unrecorded. */
-    private var incognitoLatchSceneId: String? = null
-    private var suppressingPromptDismiss = false
-    private var sceneSwitchJob: kotlinx.coroutines.Job? = null
-    private var aspectRatio = PlaybackAspectRatio.AUTO
-    private var streamQuality = PlaybackStreamQuality.AUTO
-    private var recoveryQualityRestore: PlaybackStreamQuality? = null
-    private var seekPreset = SeekPreset.TEN_THIRTY
-    private var sceneTitle = ""
+    internal var incognitoLatchSceneId: String? = null
+    internal var suppressingPromptDismiss = false
+    internal var sceneSwitchJob: kotlinx.coroutines.Job? = null
+    internal var aspectRatio = PlaybackAspectRatio.AUTO
+    internal var streamQuality = PlaybackStreamQuality.AUTO
+    internal var recoveryQualityRestore: PlaybackStreamQuality? = null
+    internal var seekPreset = SeekPreset.TEN_THIRTY
+    internal var sceneTitle = ""
     /**
      * Parent directory once lookup has settled. Null while the current scene's
      * path is still unknown, so the folder button cannot claim it is missing.
      */
-    private var sceneFolder: String? = null
+    internal var sceneFolder: String? = null
     /** Folder screen is up. Not an end-of-video: keep the position and play state. */
-    private var folderDetour = false
-    private var resumePausedAfterFolder = false
-    private var nextThumbSceneId = ""
-    private var isControllerVisible = false
-    private val prefs by lazy { SinemaApp.instance.prefs }
-    private val renderersFactory by lazy { PlaybackRenderersFactory(this) }
-    private var isPaused = false
-    private var scrubbing = false
-    private var lastMarkerPositionMs: Long? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private val seekDwell by lazy {
+    internal var folderDetour = false
+    internal var resumePausedAfterFolder = false
+    /** playWhenReady captured before the player is paused for a covered activity. */
+    internal var heldPlayWhenStopped = false
+    internal var nextThumbSceneId = ""
+    internal var isControllerVisible = false
+    internal val prefs by lazy { SinemaApp.instance.prefs }
+    internal val renderersFactory by lazy { PlaybackRenderersFactory(this) }
+    internal var isPaused = false
+    internal var scrubbing = false
+    internal var lastMarkerPositionMs: Long? = null
+    internal val handler = Handler(Looper.getMainLooper())
+    internal val seekDwell by lazy {
         PausedSeekDwell(
             handler,
             { player?.playWhenReady == true },
@@ -105,25 +108,26 @@ class PlaybackActivity : SinemaActivity() {
             onComplete = { hideSeekPreview() }
         )
     }
-    private val hideRunnable = Runnable { playerView.hideController() }
-    private val hideMarkerSkipRunnable = Runnable { hideMarkerSkip() }
-    private val progressRunnable = object : Runnable {
+    internal val hideRunnable = Runnable { playerView.hideController() }
+    internal val hideMarkerSkipRunnable = Runnable { hideMarkerSkip() }
+    internal val progressRunnable = object : Runnable {
         override fun run() {
             updatePlaybackText()
             updateMarkerSkip()
             handler.postDelayed(this, 500L)
         }
     }
-    private val videoOutputTimeout = Runnable {
+    internal val videoOutputTimeout = Runnable {
         val exo = player
         if (exo != null && shouldRetryWithoutVideoOutput(exo.playWhenReady, hasVideoOutput)) {
             fallbackToAlignedHls()
         }
     }
-    private val hideDelayMs = 3000L
+    internal val hideDelayMs = 3000L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        claimPlayback(this)
         setContentView(R.layout.activity_playback)
         aspectRatio = PlaybackAspectRatio.fromName(prefs.playbackAspectRatio)
         streamQuality = PlaybackStreamQuality.fromName(prefs.playbackStreamQuality)
@@ -170,15 +174,31 @@ class PlaybackActivity : SinemaActivity() {
         // Every first start resolves full scene metadata before the player is
         // built; the coroutine owns that initial start.
         if (autoResumePending) return
-        val fromFolder = folderDetour
-        val stayPaused = resumePausedAfterFolder
-        folderDetour = false
-        resumePausedAfterFolder = false
-        if (fromFolder) beginPlaybackSession(promptAllowed = false, startPaused = stayPaused)
-        else beginPlaybackSession()
+        if (resumeHeldPlayer()) return
+        beginPlaybackSession()
     }
 
-    private fun beginPlaybackSession(promptAllowed: Boolean = true, startPaused: Boolean = false) {
+    /**
+     * The decoder is still ours when another Sinema screen covered this one.
+     * Reattach the surface and continue. A second playback releases us first.
+     */
+    internal fun resumeHeldPlayer(): Boolean {
+        val exo = player ?: return false
+        if (::playerView.isInitialized) {
+            playerView.onResume()
+            playerView.player = exo
+        }
+        val play = if (folderDetour) !resumePausedAfterFolder else heldPlayWhenStopped
+        folderDetour = false
+        resumePausedAfterFolder = false
+        exo.playWhenReady = play
+        if (!hasVideoOutput) scheduleVideoOutputTimeout()
+        handler.post(progressRunnable)
+        watchClock.onIsPlayingChanged(play, android.os.SystemClock.elapsedRealtime())
+        return true
+    }
+
+    internal fun beginPlaybackSession(promptAllowed: Boolean = true, startPaused: Boolean = false) {
         startPlayback(promptAllowed, startPaused)
         handler.post(progressRunnable)
         watchClock.onIsPlayingChanged(
@@ -187,7 +207,7 @@ class PlaybackActivity : SinemaActivity() {
         )
     }
 
-    private fun startPlayback(promptAllowed: Boolean = true, startPaused: Boolean = false) {
+    internal fun startPlayback(promptAllowed: Boolean = true, startPaused: Boolean = false) {
         // Prompt whenever a meaningful saved position is still unresolved —
         // including after a lifecycle dismissal (backgrounding the dialog),
         // which must never silently approve resuming. Once resolved (choice
@@ -204,14 +224,14 @@ class PlaybackActivity : SinemaActivity() {
     }
 
     /** Maps full-scene metadata (captions, markers) shared by every switch path. */
-    private fun applySceneMetadata(details: com.sinema.model.SceneDetails) {
+    internal fun applySceneMetadata(details: com.sinema.model.SceneDetails) {
         captions = details.scene.captions
         markers = details.markers.map { it.title.ifBlank { it.primaryTag } to it.seconds }
         sceneFolder = folderContaining(details.scene.path)
         bindFolderButton()
     }
 
-    private fun clearSceneMetadata() {
+    internal fun clearSceneMetadata() {
         captions = emptyList()
         markers = emptyList()
         // Unknown again until the next path arrives. Keeps the previous
@@ -227,7 +247,7 @@ class PlaybackActivity : SinemaActivity() {
     }
 
     /** Fetch scene metadata before silent Watch Next or stored-session playback. */
-    private fun resolveAutoResume(preservePosition: Boolean = false) {
+    internal fun resolveAutoResume(preservePosition: Boolean = false) {
         val targetId = sceneId
         lifecycleScope.launch {
             try {
@@ -255,7 +275,7 @@ class PlaybackActivity : SinemaActivity() {
         }
     }
 
-    private fun persistPlaybackSession() {
+    internal fun persistPlaybackSession() {
         if (sceneId.isBlank()) return
         if (prefs.incognitoMode || incognitoLatchSceneId == sceneId) {
             prefs.playbackSessionJson = ""
@@ -293,7 +313,7 @@ class PlaybackActivity : SinemaActivity() {
 
 
     /** Shared teardown for onPause/onStop: identical dialog/job cleanup. */
-    private fun dismissPlaybackDialogs() {
+    internal fun dismissPlaybackDialogs() {
         listOf(
             aspectRatioDialog, chaptersDialog, settingsMenuDialog, personalizationMenuDialog,
             rateDialog, streamQualityDialog, upNextDialog, playbackErrorDialog
@@ -318,20 +338,39 @@ class PlaybackActivity : SinemaActivity() {
         // near the start, or forwards after seeking near the end.
         player?.let { exo ->
             resumePositionMs = keptResumePositionMs(exo.currentPosition, exo.duration, folderDetour)
+            heldPlayWhenStopped = exo.playWhenReady
         }
+        handler.removeCallbacks(videoOutputTimeout)
         watchClock.onIsPlayingChanged(false, android.os.SystemClock.elapsedRealtime())
-        releasePlayer()
+        // Home leaves the app and drops the decoder. A Sinema screen on top
+        // keeps it so Back does not reopen the stream. A new player claims
+        // the decoder in onCreate and this release becomes a no-op.
+        val keep = player != null && !isFinishing && !isChangingConfigurations &&
+            SinemaApp.instance.isInternalActivityReturn(this)
+        if (keep) {
+            player?.playWhenReady = false
+            if (::playerView.isInitialized) playerView.onPause()
+        } else {
+            releasePlayer()
+        }
         if (isFinishing) PlaybackQueue.clear()
     }
 
     override fun onDestroy() {
         handler.removeCallbacks(hideRunnable)
         handler.removeCallbacks(progressRunnable)
+        releasePlayer()
+        releasePlaybackClaim(this)
         saveQueue.close()
         super.onDestroy()
     }
 
-    private fun savePlayback() {
+    /** Called when another playback screen needs the decoder. */
+    fun releaseHeldPlayer() {
+        releasePlayer()
+    }
+
+    internal fun savePlayback() {
         val exo = player ?: return
         // Incognito: never write watch history (resume, play count, duration)
         // or feed Watch Next from this session. The latch keeps viewing that
@@ -385,7 +424,7 @@ class PlaybackActivity : SinemaActivity() {
         }
     }
 
-    private fun buildMediaItem(): MediaItem {
+    internal fun buildMediaItem(): MediaItem {
         val app = SinemaApp.instance
         val streamUrl = when {
             // Manual direct-only: never transcode.
@@ -425,7 +464,7 @@ class PlaybackActivity : SinemaActivity() {
             .build()
     }
 
-    private fun mountPlayerView(width: Int = videoWidth, height: Int = videoHeight) {
+    internal fun mountPlayerView(width: Int = videoWidth, height: Int = videoHeight) {
         val container = findViewById<FrameLayout>(R.id.player_container)
         val wantTexture = videoFrameNeedsSoftwareOutput(width, height)
         val existing = container.findViewById<AspectRatioPlayerView>(R.id.player_view)
@@ -462,7 +501,7 @@ class PlaybackActivity : SinemaActivity() {
         )
     }
 
-    private fun loadInitialMetadata() {
+    internal fun loadInitialMetadata() {
         val requestedScene = sceneId
         // Raw launch on purpose: a metadata failure must still fall through
         // to clear autoResumePending and begin the playback session —
@@ -491,7 +530,7 @@ class PlaybackActivity : SinemaActivity() {
         }
     }
 
-    private fun bindPlaybackControls() {
+    internal fun bindPlaybackControls() {
         if (!::playerView.isInitialized) return
         SubtitleAppearance.apply(playerView, prefs)
         playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
@@ -562,13 +601,13 @@ class PlaybackActivity : SinemaActivity() {
         updatePlaybackText()
     }
 
-    private fun bindFolderButton() {
+    internal fun bindFolderButton() {
         if (!::playerView.isInitialized) return
         playerView.findViewById<View>(R.id.playback_folder_button)?.isEnabled =
             !sceneFolder.isNullOrEmpty()
     }
 
-    private fun openSceneFolder() {
+    internal fun openSceneFolder() {
         val folder = sceneFolder
         if (folder.isNullOrEmpty()) {
             // Still loading (null) stays quiet. A settled miss can say so.
@@ -577,15 +616,12 @@ class PlaybackActivity : SinemaActivity() {
             }
             return
         }
-        // Release the player with the activity. Keeping the decoder would
-        // leave it running if this folder starts another video. The detour
-        // flag is what stops that release from counting as the end.
         folderDetour = true
         resumePausedAfterFolder = player?.playWhenReady != true
         startActivity(Intent(this, FolderBrowseActivity::class.java).putExtra("path", folder))
     }
 
-    private fun updatePlaybackText() {
+    internal fun updatePlaybackText() {
         if (!::playerView.isInitialized) return
         playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
         val exo = player
@@ -628,7 +664,7 @@ class PlaybackActivity : SinemaActivity() {
         }
     }
 
-    private fun seekRelative(deltaMs: Long) {
+    internal fun seekRelative(deltaMs: Long) {
         val exo = player ?: return
         val duration = exo.duration
         val target = (exo.currentPosition + deltaMs).coerceIn(
@@ -640,7 +676,7 @@ class PlaybackActivity : SinemaActivity() {
         updatePlaybackText()
     }
 
-    private fun cycleSeekPreset() {
+    internal fun cycleSeekPreset() {
         seekPreset = seekPreset.next()
         prefs.playbackSeekPreset = seekPreset.name
         applySeekPreset()
@@ -648,12 +684,12 @@ class PlaybackActivity : SinemaActivity() {
         Toast.makeText(this, "Seek buttons ${seekPreset.label}", Toast.LENGTH_SHORT).show()
     }
 
-    private fun applySeekPreset(target: ExoPlayer? = player) {
+    internal fun applySeekPreset(target: ExoPlayer? = player) {
         target?.setSeekBackIncrementMs(seekPreset.backwardMs)
         target?.setSeekForwardIncrementMs(seekPreset.forwardMs)
     }
 
-    private fun showSeekPreview(positionMs: Long) {
+    internal fun showSeekPreview(positionMs: Long) {
         if (!::playerView.isInitialized) return
         val exo = player ?: return
         val target = clampSeekPositionMs(positionMs, exo.duration)
@@ -663,7 +699,7 @@ class PlaybackActivity : SinemaActivity() {
         seekDwell.onPositionChanged(target)
     }
 
-    private fun hideSeekPreview() {
+    internal fun hideSeekPreview() {
         scrubbing = false
         seekDwell.cancel()
         if (!::playerView.isInitialized) return
@@ -671,7 +707,7 @@ class PlaybackActivity : SinemaActivity() {
         playerView.findViewById<View>(R.id.playback_preview_container).visibility = View.GONE
     }
 
-    private fun scheduleVideoOutputTimeout() {
+    internal fun scheduleVideoOutputTimeout() {
         handler.removeCallbacks(videoOutputTimeout)
         if (hasVideoOutput) return
         // Only AUTO retries a silent direct stream; manual modes surface
@@ -682,7 +718,7 @@ class PlaybackActivity : SinemaActivity() {
         handler.postDelayed(videoOutputTimeout, VIDEO_OUTPUT_TIMEOUT_MS)
     }
 
-    private fun fallbackToAlignedHls() {
+    internal fun fallbackToAlignedHls() {
         val exo = player ?: return
         if (!allowsNoVideoRetry(streamQuality)) return
         val originalKind = playbackStreamKindForFrame(videoWidth, videoHeight)
@@ -695,7 +731,7 @@ class PlaybackActivity : SinemaActivity() {
     }
 
     /** Stops, rebuilds the media item at the current/resume position, and plays. */
-    private fun rebuildCurrentStream() {
+    internal fun rebuildCurrentStream() {
         val exo = player ?: return
         val positionMs = exo.currentPosition.takeIf { it > 0L } ?: resumePositionMs
         resumePositionMs = positionMs
@@ -711,7 +747,7 @@ class PlaybackActivity : SinemaActivity() {
         scheduleVideoOutputTimeout()
     }
 
-    private fun initPlayer(startPaused: Boolean = false) {
+    internal fun initPlayer(startPaused: Boolean = false) {
         if (sceneId.isEmpty()) return
         hasVideoOutput = false
         mountPlayerView()
@@ -856,7 +892,7 @@ class PlaybackActivity : SinemaActivity() {
             }
     }
 
-    private fun hideMarkerSkip() {
+    internal fun hideMarkerSkip() {
         handler.removeCallbacks(hideMarkerSkipRunnable)
         if (::playerView.isInitialized) {
             playerView.findViewById<View>(R.id.playback_skip_marker)?.visibility = View.GONE
@@ -864,7 +900,7 @@ class PlaybackActivity : SinemaActivity() {
         }
     }
 
-    private fun updateMarkerSkip() {
+    internal fun updateMarkerSkip() {
         val exo = player ?: return
         val currentMs = exo.currentPosition
         val previousMs = lastMarkerPositionMs
@@ -894,7 +930,7 @@ class PlaybackActivity : SinemaActivity() {
         handler.postDelayed(hideMarkerSkipRunnable, 6_000L)
     }
 
-    private fun releasePlayer() {
+    internal fun releasePlayer() {
         handler.removeCallbacks(videoOutputTimeout)
         hideSeekPreview()
         hideMarkerSkip()
@@ -903,63 +939,7 @@ class PlaybackActivity : SinemaActivity() {
         player = null
     }
 
-    private fun showAspectRatioDialog() {
-        if (aspectRatioDialog.isShowing) return
-        val dialog = AspectRatioDialog.show(this, aspectRatio) { chosen ->
-            aspectRatio = chosen
-            prefs.playbackAspectRatio = chosen.name
-            playerView.playbackAspectRatio = chosen
-        }
-        aspectRatioDialog.dialog = dialog
-        dialog.setOnDismissListener {
-            aspectRatioDialog.dismissIf(dialog)
-            playerView.requestFocus()
-        }
-    }
-
-    private fun showStreamQualityDialog() {
-        if (streamQualityDialog.isShowing) return
-        val dialog = StreamQualityDialog.show(this, streamQuality) { chosen ->
-            if (chosen != streamQuality) applyStreamQuality(chosen)
-        }
-        streamQualityDialog.dialog = dialog
-        dialog.setOnDismissListener {
-            streamQualityDialog.dismissIf(dialog)
-            playerView.requestFocus()
-        }
-    }
-
-    private fun showPlaybackRecovery(error: androidx.media3.common.PlaybackException) {
-        if (playbackErrorDialog.isShowing) return
-        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) ||
-            isFinishing || isDestroyed
-        ) return
-        resumePositionMs = player?.currentPosition?.takeIf { it > 0L } ?: resumePositionMs
-        player?.playWhenReady = false
-        val message = playbackRecoveryMessage(error.errorCode) +
-            sceneTitle.takeIf { it.isNotBlank() }?.let { "\n\n$it" }.orEmpty()
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle("Playback problem")
-            .setMessage(message)
-            .setItems(PlaybackRecoveryAction.entries.map { it.label }.toTypedArray()) { _, which ->
-                when (PlaybackRecoveryAction.entries[which]) {
-                    PlaybackRecoveryAction.RETRY -> recoverPlayback()
-                    PlaybackRecoveryAction.TRANSCODED_720P ->
-                        recoverPlayback(PlaybackStreamQuality.HLS_720P)
-                    PlaybackRecoveryAction.DIRECT -> recoverPlayback(PlaybackStreamQuality.DIRECT)
-                }
-            }
-            .setNegativeButton("Back") { _, _ -> finish() }
-            .setCancelable(false)
-            .create()
-        playbackErrorDialog.dialog = dialog
-        dialog.setOnDismissListener {
-            playbackErrorDialog.dismissIf(dialog)
-        }
-        dialog.show()
-    }
-
-    private fun recoverPlayback(temporaryQuality: PlaybackStreamQuality? = null) {
+    internal fun recoverPlayback(temporaryQuality: PlaybackStreamQuality? = null) {
         playbackErrorDialog.dismiss()
         val selection = recoveryQualitySelection(streamQuality, recoveryQualityRestore, temporaryQuality)
         streamQuality = selection.quality
@@ -968,7 +948,7 @@ class PlaybackActivity : SinemaActivity() {
     }
 
     /** Switch stream quality mid-playback, preserving the current position. */
-    private fun applyStreamQuality(chosen: PlaybackStreamQuality) {
+    internal fun applyStreamQuality(chosen: PlaybackStreamQuality) {
         streamQuality = chosen
         recoveryQualityRestore = null
         prefs.playbackStreamQuality = chosen.name
@@ -976,7 +956,7 @@ class PlaybackActivity : SinemaActivity() {
         android.util.Log.i("Sinema", "Stream quality changed to ${chosen.name}")
     }
 
-    private fun restartCurrentStream() {
+    internal fun restartCurrentStream() {
         if (player == null) return
         forceAlignedHls = false
         hasFallenBackToDirect = false
@@ -984,91 +964,7 @@ class PlaybackActivity : SinemaActivity() {
         rebuildCurrentStream()
     }
 
-    private fun showChapters() {
-        if (markers.isEmpty()) return
-        if (chaptersDialog.isShowing) return
-        val scene = sceneId
-        chaptersDialog.show(android.app.AlertDialog.Builder(this)
-            .setTitle("Chapters")
-            .setAdapter(ChapterListAdapter(this, SinemaApp.instance.api, scene, markers)) { _, which ->
-                markers.getOrNull(which)?.let { player?.seekTo((it.second * 1000).toLong()) }
-            }
-            .setOnDismissListener { playerView.requestFocus() }
-        )
-    }
-
-    private fun showPersonalizationMenu() {
-        if (personalizationMenuDialog.isShowing) return
-        val incognito = SinemaApp.instance.prefs.incognitoMode
-        // Label→action pairs: localized labels are never identity keys.
-        val entries = buildList {
-            if (markers.isNotEmpty()) {
-                add(getString(R.string.playback_menu_chapters) to Runnable { showChapters() })
-            }
-            add(getString(R.string.playback_menu_rate) to Runnable { showRateDialog() })
-            add(getString(R.string.playback_menu_o) to Runnable { incrementOCount() })
-            add(
-                (if (incognito) "🕶 Incognito: ON" else "🕶 Incognito: OFF") to Runnable {
-                    SinemaApp.instance.prefs.incognitoMode = !incognito
-                    if (incognito) {
-                        Toast.makeText(this@PlaybackActivity, "Incognito off", Toast.LENGTH_SHORT).show()
-                    } else {
-                        // Viewing from here on stays unrecorded for this scene
-                        // even if incognito is disabled before exit.
-                        incognitoLatchSceneId = sceneId
-                        Toast.makeText(this@PlaybackActivity, "Incognito on — watch history paused", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-            add(
-                (if (SinemaApp.instance.prefs.endlessMix) "♾ Endless Mix: ON" else "♾ Endless Mix: OFF") to Runnable {
-                    val enable = !SinemaApp.instance.prefs.endlessMix
-                    SinemaApp.instance.prefs.endlessMix = enable
-                    Toast.makeText(
-                        this@PlaybackActivity,
-                        getString(if (enable) R.string.endless_on_toast else R.string.endless_off_toast),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            )
-        }
-        personalizationMenuDialog.show(android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.personalization_menu_title))
-            .setItems(entries.map { it.first }.toTypedArray()) { dialog, which ->
-                dialog.dismiss()
-                entries[which].second.run()
-            }
-            .setOnDismissListener {
-                personalizationMenuDialog.dialog?.let { d -> personalizationMenuDialog.dismissIf(d) }
-                playerView.requestFocus()
-            }
-        )
-    }
-
-    private fun showSettingsMenu() {
-        if (settingsMenuDialog.isShowing) return
-        val entries = listOf(
-            getString(R.string.playback_menu_aspect) to Runnable { showAspectRatioDialog() },
-            getString(R.string.playback_menu_quality) to Runnable { showStreamQualityDialog() },
-            getString(R.string.playback_menu_seek) to Runnable { cycleSeekPreset() }
-        )
-        settingsMenuDialog.show(android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.playback_menu_title))
-            .setItems(entries.map { it.first }.toTypedArray()) { dialog, which ->
-                dialog.dismiss()
-                entries[which].second.run()
-            }
-            .setOnDismissListener {
-                settingsMenuDialog.dialog?.let { d -> settingsMenuDialog.dismissIf(d) }
-                playerView.requestFocus()
-            }
-        )
-    }
-
-    private var rateFetchJob: kotlinx.coroutines.Job? = null
-
-    /** Count one O for the scene currently loaded in the player. */
-    private fun incrementOCount() {
+    internal fun incrementOCount() {
         val current = sceneId
         if (current.isEmpty()) return
         // appScope: the mutation must survive an immediate back-press exit.
@@ -1093,58 +989,7 @@ class PlaybackActivity : SinemaActivity() {
         }
     }
 
-    private fun showRateDialog() {
-        val current = sceneId
-        if (current.isEmpty()) return
-        if (rateDialog.isShowing || rateFetchJob?.isActive == true) return
-        rateFetchJob = lifecycleScope.launch {
-            var stars = 0
-            try {
-                stars = StarRating.fromRating100(SinemaApp.instance.api.getSceneRating(current))
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.w("Sinema", "Could not fetch rating before rate dialog", e)
-            }
-            // The fetch can outlive onPause/onStop dismissal; never show a
-            // dialog on a stopped or finishing activity.
-            if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) ||
-                isFinishing || isDestroyed
-            ) return@launch
-            val options = (0..StarRating.MAX_STARS).map { count ->
-                if (count == 0) "No rating" else StarRating.glyphs(count)
-            }
-            rateDialog.show(android.app.AlertDialog.Builder(this@PlaybackActivity)
-                .setTitle("Rate scene")
-                .setSingleChoiceItems(options.toTypedArray(), stars) { dialog, which ->
-                    dialog.dismiss()
-                    val chosen = which
-                    lifecycleScope.launch {
-                        try {
-                            SinemaApp.instance.api.setSceneRating(current, StarRating.toRating100(chosen))
-                            Toast.makeText(
-                                this@PlaybackActivity,
-                                if (chosen > 0) "Rated ${StarRating.glyphs(chosen)}" else "Rating cleared",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            android.util.Log.e("Sinema", "Failed to set rating for $current", e)
-                            Toast.makeText(this@PlaybackActivity,
-                                "Failed to set rating: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-                .setOnDismissListener {
-                    rateDialog.dialog?.let { d -> rateDialog.dismissIf(d) }
-                    playerView.requestFocus()
-                }
-        )
-        }
-    }
-
-    private fun seekToAdjacentMarker(forward: Boolean) {
+    internal fun seekToAdjacentMarker(forward: Boolean) {
         val exo = player ?: return
         val posSec = exo.currentPosition / 1000.0
         val target = if (forward)
@@ -1155,7 +1000,7 @@ class PlaybackActivity : SinemaActivity() {
     }
 
     /** Swap the player to [nextId] (queue advance or Up Next jump). */
-    private fun playSceneNow(
+    internal fun playSceneNow(
         nextId: String,
         fallbackTitle: String = "",
         saveCurrent: Boolean = false
@@ -1226,7 +1071,7 @@ class PlaybackActivity : SinemaActivity() {
      * favorites (falling back to unwatched recent scenes), skipping anything
      * already played this session. Stops cleanly when nothing is left.
      */
-    private fun extendEndlessMix() {
+    internal fun extendEndlessMix() {
         if (endlessJob?.isActive == true) return
         val app = SinemaApp.instance
         // lifecycleScope: extending requires this activity alive to continue
@@ -1262,79 +1107,6 @@ class PlaybackActivity : SinemaActivity() {
                 }
             }
         }
-    }
-
-    private fun showResumePrompt() {
-        if (resumePromptDialog.isShowing) return
-        val exo = player ?: return
-        val at = com.sinema.util.TimeFormat.formatMs(resumePositionMs)
-        resumePromptDialog.show(android.app.AlertDialog.Builder(this)
-            .setTitle("Resume playback")
-            .setMessage("Resume at $at or start over?")
-            .setPositiveButton("Resume") { _, _ ->
-                resumePromptResolved = true
-                resumeAwaitingChoice = false
-                exo.seekTo(resumePositionMs)
-                exo.playWhenReady = true
-            }
-            .setNeutralButton("Start over") { _, _ ->
-                resumePromptResolved = true
-                resumeAwaitingChoice = false
-                exo.seekTo(0L)
-                resumePositionMs = 0L
-                exo.playWhenReady = true
-            }
-            .setOnDismissListener {
-                // Back cancels: stay paused with controls shown; the choice
-                // stays unresolved so a later restart re-prompts instead of
-                // silently resuming. Lifecycle teardown dismissals are silent.
-                if (!suppressingPromptDismiss) playerView.showController()
-                playerView.requestFocus()
-            }
-        )
-    }
-
-    private fun showUpNextDialog() {
-        if (upNextDialog.isShowing) return
-        val remaining = PlaybackQueue.remaining()
-        if (remaining.isEmpty()) {
-            Toast.makeText(this, getString(R.string.up_next_empty), Toast.LENGTH_SHORT).show()
-            return
-        }
-        val adapter = UpNextAdapter(this) { target ->
-            // Resolve by stable id through the live queue.
-            if (PlaybackQueue.current()?.id == target.id) return@UpNextAdapter
-            PlaybackQueue.jumpToItem(target.id)?.let {
-                upNextDialog.dismiss()
-                playSceneNow(it.id, it.title, saveCurrent = true)
-            } ?: Toast.makeText(this, getString(R.string.up_next_not_in_queue), Toast.LENGTH_SHORT).show()
-        }
-        adapter.refresh()
-        upNextDialog.show(android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.up_next_title, remaining.size))
-            .setAdapter(adapter, null)
-            .setNegativeButton("Unwatched only") { _, _ ->
-                PlaybackQueue.filterRemainingUnwatched()
-                val after = PlaybackQueue.remainingCount()
-                if (after == 0) {
-                    Toast.makeText(this, getString(R.string.up_next_unwatched_emptied), Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, getString(R.string.up_next_unwatched_count, after), Toast.LENGTH_SHORT).show()
-                }
-                updatePlaybackText()
-            }
-            .setNeutralButton("Shuffle") { _, _ ->
-                if (PlaybackQueue.shuffleRemaining()) {
-                    Toast.makeText(this, getString(R.string.up_next_shuffled, PlaybackQueue.remainingCount()), Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setPositiveButton("Exit queue") { _, _ ->
-                PlaybackQueue.clear()
-                Toast.makeText(this, getString(R.string.up_next_cleared), Toast.LENGTH_SHORT).show()
-                updatePlaybackText()
-            }
-            .setOnDismissListener { playerView.requestFocus() }
-        )
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -1390,6 +1162,19 @@ internal fun resumeSave(positionMs: Long, durationMs: Long, folderDetour: Boolea
     if (!folderDetour && nearEnd) return ResumeSave(0.0, countAsFinished = true)
     if (positionMs <= 5_000L) return null
     return ResumeSave(positionMs / 1000.0, countAsFinished = false)
+}
+
+private val playbackHolder = java.util.concurrent.atomic.AtomicReference<java.lang.ref.WeakReference<PlaybackActivity>?>()
+
+private fun claimPlayback(activity: PlaybackActivity) {
+    val previous = playbackHolder.get()?.get()
+    if (previous != null && previous !== activity) previous.releaseHeldPlayer()
+    playbackHolder.set(java.lang.ref.WeakReference(activity))
+}
+
+private fun releasePlaybackClaim(activity: PlaybackActivity) {
+    val current = playbackHolder.get()
+    if (current?.get() === activity) playbackHolder.compareAndSet(current, null)
 }
 
 /** In-memory resume point after onStop. Same near-end rule as [resumeSave]. */

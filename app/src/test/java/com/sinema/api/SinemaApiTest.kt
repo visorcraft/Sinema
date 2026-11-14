@@ -595,17 +595,18 @@ class SinemaApiTest {
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"rating100\""))
             org.junit.Assert.assertTrue(favorites, favorites.contains("\"play_count\""))
             val resume = requests()[1]
-            // Continue Playing's default recency sort fetches the complete
-            // result and slices client-side (null-timestamp-safe ordering),
-            // mirroring Recently Played.
+            // Recency walks fixed-size pages and stops once the dated prefix
+            // for this page is in hand, instead of per_page -1.
             org.junit.Assert.assertTrue(resume, resume.contains("\"page\":1"))
-            org.junit.Assert.assertTrue(resume, resume.contains("\"per_page\":-1"))
+            org.junit.Assert.assertTrue(resume, resume.contains("\"per_page\":100"))
+            org.junit.Assert.assertFalse(resume, resume.contains("\"per_page\":-1"))
             org.junit.Assert.assertTrue(resume, resume.contains("\"resume_time\""))
             org.junit.Assert.assertTrue(resume, resume.contains("GREATER_THAN"))
             org.junit.Assert.assertTrue(resume, resume.contains("last_played_at"))
             val recentlyPlayed = requests()[2]
             org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"page\":1"))
-            org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"per_page\":-1"))
+            org.junit.Assert.assertTrue(recentlyPlayed, recentlyPlayed.contains("\"per_page\":100"))
+            org.junit.Assert.assertFalse(recentlyPlayed, recentlyPlayed.contains("\"per_page\":-1"))
         }
     }
 
@@ -627,7 +628,8 @@ class SinemaApiTest {
             assertEquals(25, result.size)
             assertEquals("30", result.first().id)
             org.junit.Assert.assertTrue(result.none { it.id == "2" })
-            org.junit.Assert.assertTrue(requestBody().contains("\"per_page\":-1"))
+            org.junit.Assert.assertTrue(requestBody().contains("\"per_page\":100"))
+            org.junit.Assert.assertFalse(requestBody().contains("\"per_page\":-1"))
         }
     }
 

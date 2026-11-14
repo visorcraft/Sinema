@@ -49,7 +49,7 @@ class PlaybackProfileSnapshotTest {
                 .get(controller.get()) as String
             assertTrue(currentScene == "scene")
 
-            PlaybackActivity::class.java.getDeclaredMethod("incrementOCount")
+            PlaybackActivity::class.java.declaredMethods.first { it.name.startsWith("incrementOCount") }
                 .apply { isAccessible = true }
                 .invoke(controller.get())
             SinemaApp.instance.prefs.serverUrl = "http://127.0.0.1:1"

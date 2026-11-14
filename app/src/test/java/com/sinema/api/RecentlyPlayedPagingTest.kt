@@ -4,6 +4,8 @@ import com.sinema.api.testScene
 
 import com.sinema.model.Scene
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecentlyPlayedPagingTest {
@@ -36,5 +38,21 @@ class RecentlyPlayedPagingTest {
 
         assertEquals(listOf("null", "dated"), recentlyPlayedPage(scenes, 1, 10, "ASC").map { it.id })
         assertEquals(emptyList<Scene>(), recentlyPlayedPage(scenes, 3, 1, "DESC"))
+    }
+
+    @Test
+    fun `desc scan stops once the dated prefix for the page is loaded`() {
+        assertEquals(25, recencyDatedTarget(page = 1, perPage = 25, direction = "DESC"))
+        assertEquals(50, recencyDatedTarget(page = 2, perPage = 25, direction = "DESC"))
+        assertEquals(Int.MAX_VALUE, recencyDatedTarget(page = 1, perPage = 25, direction = "ASC"))
+        assertTrue(recencyScanComplete(
+            datedCount = 25, datedTarget = 25, batchSize = 100, chunk = 100, collected = 100, serverCount = 4000
+        ))
+        assertFalse(recencyScanComplete(
+            datedCount = 10, datedTarget = 25, batchSize = 100, chunk = 100, collected = 100, serverCount = 4000
+        ))
+        assertTrue(recencyScanComplete(
+            datedCount = 0, datedTarget = 25, batchSize = 40, chunk = 100, collected = 40, serverCount = 40
+        ))
     }
 }

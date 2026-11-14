@@ -35,6 +35,8 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
     private val app get() = SinemaApp.instance
     private lateinit var gridAdapter: ArrayObjectAdapter
     private val discreetRebind = DiscreetRebind()
+    private val enrichGate = Semaphore(4)
+    private val enrichedPaths = mutableSetOf<String>()
 
     override fun onResume() {
         super.onResume()
@@ -62,6 +64,10 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
 
         gridAdapter = ArrayObjectAdapter(FolderCardPresenter())
         adapter = gridAdapter
+
+        setOnItemViewSelectedListener { _, item, _, _ ->
+            if (item is FolderItem) scheduleFolderEnrichment(item)
+        }
 
         setOnItemViewClickedListener { _, item, _, _ ->
             when (item) {
@@ -101,45 +107,7 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
                 }
                 title = "Browse Folders (${folders.size} folders)"
                 badgeDrawable = resources.getDrawable(R.drawable.sinema_logo, null)
-
-                // Lazily enrich each folder card, bounded so we don't flood
-                // the server. Each card is replaced in place as its data
-                // arrives; a per-folder failure just leaves the placeholder.
-                val gate = Semaphore(8)
-                folders.forEachIndexed { index, (name, fullPath) ->
-                    launch {
-                        gate.withPermit {
-                            try {
-                                val sceneCount = app.api.getSceneCountForPath(fullPath)
-                                val imageCount = app.api.getImageCountForPath(fullPath)
-                                val firstSceneId = app.api.getFirstSceneIdForPath(fullPath)
-                                val firstImageId = if (firstSceneId == null)
-                                    app.api.getFirstImageIdForPath(fullPath) else null
-                                val hasFavs = app.api.hasFavoritesInPath(fullPath)
-                                val enriched = FolderItem(
-                                    name = name,
-                                    fullPath = fullPath,
-                                    isFolder = true,
-                                    childCount = sceneCount + imageCount,
-                                    firstSceneId = firstSceneId,
-                                    firstImageId = firstImageId,
-                                    hasFavorites = hasFavs
-                                )
-                                // Replace only if the card is still the same
-                                // folder (loose files appended below shift
-                                // nothing before them, but guard anyway).
-                                if (index < gridAdapter.size() &&
-                                    (gridAdapter.get(index) as? FolderItem)?.fullPath == fullPath) {
-                                    gridAdapter.replace(index, enriched)
-                                }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                // Non-fatal: keep the name-only placeholder.
-                            }
-                        }
-                    }
-                }
+                if (gridAdapter.size() > 0) scheduleFolderEnrichment(gridAdapter.get(0) as FolderItem)
 
                 // Loose files and pictures directly in /data, appended after
                 // the folders (videos first, then pictures).
@@ -176,5 +144,46 @@ class BrowseFoldersGridFragment : VerticalGridSupportFragment() {
                 Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    /** Counts and thumbnails for the folders around the focused card, not the whole tree. */
+    private fun scheduleFolderEnrichment(focused: FolderItem) {
+        val center = (0 until gridAdapter.size()).firstOrNull { index ->
+            (gridAdapter.get(index) as? FolderItem)?.fullPath == focused.fullPath
+        } ?: return
+        val from = (center - 2).coerceAtLeast(0)
+        val to = (center + ENRICH_WINDOW).coerceAtMost(gridAdapter.size())
+        for (index in from until to) {
+            val item = gridAdapter.get(index) as? FolderItem ?: continue
+            if (!item.isFolder || !enrichedPaths.add(item.fullPath)) continue
+            val path = item.fullPath
+            lifecycleScope.launch {
+                enrichGate.withPermit {
+                    try {
+                        val summary = app.api.summarizeFolder(path)
+                        val slot = (0 until gridAdapter.size()).firstOrNull { candidate ->
+                            (gridAdapter.get(candidate) as? FolderItem)?.fullPath == path
+                        } ?: return@withPermit
+                        val current = gridAdapter.get(slot) as? FolderItem ?: return@withPermit
+                        gridAdapter.replace(slot, current.copy(
+                            childCount = summary.sceneCount + summary.imageCount,
+                            firstSceneId = summary.firstSceneId,
+                            firstImageId = summary.firstImageId,
+                            hasFavorites = summary.hasFavorites
+                        ))
+                    } catch (e: CancellationException) {
+                        enrichedPaths.remove(path)
+                        throw e
+                    } catch (_: Exception) {
+                        // Keep the name-only card. A later visit can try again.
+                        enrichedPaths.remove(path)
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        private const val ENRICH_WINDOW = 18
     }
 }

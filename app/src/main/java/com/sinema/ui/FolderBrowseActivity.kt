@@ -19,8 +19,12 @@ import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.FolderItem
 import com.sinema.model.SortOption
+import com.sinema.model.ImageItem
+import com.sinema.model.Scene
+import com.sinema.util.FolderGridChange
 import com.sinema.util.FolderHelper
 import com.sinema.util.SceneIntents
+import com.sinema.util.folderGridChange
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -209,29 +213,61 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         loadJob?.cancel()
         activity?.renderGridLoadState(GridLoadState.loading(gridAdapter.size() > 0)) { loadFolder() }
         loadJob = lifecycleScope.launch {
+            val scenes = mutableListOf<Scene>()
+            val images = mutableListOf<ImageItem>()
+            var scenesTruncated = false
+            var imagesTruncated = false
+            var scenePage = 1
+            var imagePage = 1
+            var scenesDone = false
+            var imagesDone = false
             try {
-                val scenesJob = async {
-                    // sort applies to scene queries only; image/folder queries keep their current order
-                    fetchAllPages { page ->
+                while (!scenesDone || !imagesDone) {
+                    val scenesBatch = if (!scenesDone) async {
                         app.api.findScenesByPath(
-                            currentPath, page, PAGE_SIZE,
+                            currentPath, scenePage, PAGE_SIZE,
                             sort = sort.apiSort(randomSeed),
                             direction = sort.direction,
                             filters = sceneFilter
                         )
+                    } else null
+                    val imagesBatch = if (!imagesDone) async {
+                        app.api.findImagesByPath(currentPath, imagePage, PAGE_SIZE)
+                    } else null
+                    if (scenesBatch != null) {
+                        val (count, batch) = scenesBatch.await()
+                        scenes.addAll(batch)
+                        if (scenes.size > MAX_ITEMS) {
+                            scenes.subList(MAX_ITEMS, scenes.size).clear()
+                            scenesTruncated = true
+                            scenesDone = true
+                        } else {
+                            scenesDone = scenes.size >= count || batch.isEmpty() || scenes.size >= MAX_ITEMS
+                            scenesTruncated = scenes.size >= MAX_ITEMS && scenes.size < count
+                        }
+                        if (!scenesDone) scenePage++
+                    }
+                    if (imagesBatch != null) {
+                        val (count, batch) = imagesBatch.await()
+                        images.addAll(batch)
+                        if (images.size > MAX_ITEMS) {
+                            images.subList(MAX_ITEMS, images.size).clear()
+                            imagesTruncated = true
+                            imagesDone = true
+                        } else {
+                            imagesDone = images.size >= count || batch.isEmpty() || images.size >= MAX_ITEMS
+                            imagesTruncated = images.size >= MAX_ITEMS && images.size < count
+                        }
+                        if (!imagesDone) imagePage++
+                    }
+                    val items = FolderHelper.buildFolderContents(scenes, images, currentPath)
+                    if (items.isNotEmpty() || (scenesDone && imagesDone)) {
+                        publishFolderItems(items)
+                        activity?.renderGridLoadState(
+                            GridLoadState.loaded(items.size, "This folder is empty")
+                        ) { loadFolder() }
                     }
                 }
-                val imagesJob = async {
-                    fetchAllPages { page -> app.api.findImagesByPath(currentPath, page, PAGE_SIZE) }
-                }
-                val (scenes, scenesTruncated) = scenesJob.await()
-                val (images, imagesTruncated) = imagesJob.await()
-                val items = FolderHelper.buildFolderContents(scenes, images, currentPath)
-                gridAdapter.clear()
-                items.forEach { gridAdapter.add(it) }
-                activity?.renderGridLoadState(
-                    GridLoadState.loaded(items.size, "This folder is empty")
-                ) { loadFolder() }
                 if (scenesTruncated || imagesTruncated) {
                     Toast.makeText(requireContext(),
                         "Large folder: showing the first $MAX_ITEMS videos/pictures",
@@ -250,21 +286,21 @@ class FolderGridFragment : VerticalGridSupportFragment(), SortableScreen {
         }
     }
 
-    /**
-     * Fetches every page of a (count, items) query up to MAX_ITEMS.
-     * Returns the items and whether the result was truncated.
-     */
-    private suspend fun <T> fetchAllPages(
-        fetch: suspend (page: Int) -> Pair<Int, List<T>>
-    ): Pair<List<T>, Boolean> {
-        val all = mutableListOf<T>()
-        var page = 1
-        while (true) {
-            val (count, batch) = fetch(page)
-            all.addAll(batch)
-            if (all.size >= MAX_ITEMS) return Pair(all.take(MAX_ITEMS), all.size > MAX_ITEMS || all.size < count)
-            if (all.size >= count || batch.isEmpty()) return Pair(all, false)
-            page++
+    /** First page paints immediately. Later pages patch the grid instead of clearing it. */
+    private fun publishFolderItems(items: List<FolderItem>) {
+        val previous = (0 until gridAdapter.size()).mapNotNull { gridAdapter.get(it) as? FolderItem }
+        when (val change = folderGridChange(previous, items)) {
+            is FolderGridChange.Reset -> {
+                gridAdapter.clear()
+                change.items.forEach { gridAdapter.add(it) }
+            }
+            is FolderGridChange.Patch -> {
+                change.replaced.forEach { (index, item) -> gridAdapter.replace(index, item) }
+                if (change.droppedTail > 0) {
+                    gridAdapter.removeItems(gridAdapter.size() - change.droppedTail, change.droppedTail)
+                }
+                change.appended.forEach { gridAdapter.add(it) }
+            }
         }
     }
 

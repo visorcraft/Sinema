@@ -76,3 +76,31 @@ object FolderHelper {
     }
 
 }
+
+/** How to apply a rebuilt folder list without redrawing rows that did not move. */
+internal sealed class FolderGridChange {
+    data class Reset(val items: List<FolderItem>) : FolderGridChange()
+    data class Patch(
+        val replaced: List<IndexedValue<FolderItem>>,
+        val droppedTail: Int,
+        val appended: List<FolderItem>
+    ) : FolderGridChange()
+}
+
+internal fun folderGridChange(previous: List<FolderItem>, next: List<FolderItem>): FolderGridChange {
+    var index = 0
+    val shared = minOf(previous.size, next.size)
+    while (index < shared && previous[index].sameSlot(next[index])) index++
+    if (index < shared) return FolderGridChange.Reset(next)
+    val replaced = (0 until index).mapNotNull { slot ->
+        if (previous[slot] != next[slot]) IndexedValue(slot, next[slot]) else null
+    }
+    return FolderGridChange.Patch(
+        replaced = replaced,
+        droppedTail = previous.size - index,
+        appended = next.drop(index)
+    )
+}
+
+private fun FolderItem.sameSlot(other: FolderItem): Boolean =
+    fullPath == other.fullPath && isFolder == other.isFolder

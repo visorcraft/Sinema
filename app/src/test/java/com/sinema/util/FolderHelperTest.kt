@@ -1,5 +1,6 @@
 package com.sinema.util
 
+import com.sinema.model.FolderItem
 import com.sinema.model.ImageItem
 import com.sinema.model.Scene
 import org.junit.Assert.assertEquals
@@ -116,5 +117,35 @@ class FolderHelperTest {
         val scenes = listOf(scene("s1", "/data/Movies2/v.mp4"))
         val items = FolderHelper.buildFolderContents(scenes, emptyList(), "/data/Movies")
         assertEquals(0, items.size)
+    }
+
+    @Test
+    fun `later folder page appends videos and updates a known subfolder count`() {
+        val first = listOf(
+            FolderItem("sub", "/data/root/sub", true, childCount = 1, firstSceneId = "s1"),
+            FolderItem("a.mp4", "/data/root/a.mp4", false)
+        )
+        val next = listOf(
+            FolderItem("sub", "/data/root/sub", true, childCount = 2, firstSceneId = "s1"),
+            FolderItem("a.mp4", "/data/root/a.mp4", false),
+            FolderItem("b.mp4", "/data/root/b.mp4", false)
+        )
+        val change = folderGridChange(first, next)
+        assertTrue(change is FolderGridChange.Patch)
+        val patch = change as FolderGridChange.Patch
+        assertEquals(1, patch.replaced.size)
+        assertEquals(2, patch.replaced[0].value.childCount)
+        assertEquals(0, patch.droppedTail)
+        assertEquals(listOf("b.mp4"), patch.appended.map { it.name })
+    }
+
+    @Test
+    fun `a new subfolder inserted in the middle resets the grid`() {
+        val first = listOf(FolderItem("b", "/data/root/b", true))
+        val next = listOf(
+            FolderItem("a", "/data/root/a", true),
+            FolderItem("b", "/data/root/b", true)
+        )
+        assertTrue(folderGridChange(first, next) is FolderGridChange.Reset)
     }
 }
