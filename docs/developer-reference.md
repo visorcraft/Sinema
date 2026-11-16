@@ -235,7 +235,7 @@ How it is wired:
 
 - `:baselineprofile` is a `com.android.test` module holding a UIAutomator-driven `BaselineProfileRule` generator (`baselineprofile/src/main/kotlin/.../BaselineProfileGenerator.kt`).
 - The app module applies the `androidx.baselineprofile` plugin, depends on `androidx.profileinstaller` (installs profiles on sideloaded updates), and commits the generated human-readable rules under `app/src/release/generated/baselineProfiles/baseline-prof.txt` (`baselineProfile { saveInSrc = true }`).
-- Because the rules are committed, release CI needs no emulator. Release builds run R8 (`isMinifyEnabled = true`). `proguard-rules.pro` keeps `com.sinema.**` so Gson field names and the baseline profile stay valid; library code still shrinks.
+- Because the rules are committed, release CI needs no emulator. Release builds run R8 (`isMinifyEnabled = true`). `proguard-rules.pro` keeps `com.sinema.**` so Gson field names and the baseline profile stay valid. It also keeps the coroutines Main dispatcher, OkHttp's Android platform, and `OkHttpGlideModule`'s constructor. Those are loaded by name. 1.45.5 shipped without the Glide constructor, so the home screen died while binding the first poster. Library code still shrinks.
 
 Regenerating (requires an emulator with KVM; a fresh emulator exercises the setup flow, a configured one the home rows):
 

@@ -699,7 +699,8 @@ class MainFragment : RowsSupportFragment() {
         val (launcherProfileId, launcherServerUrl, launcherApi) = com.sinema.util.TvChannels.withSyncLock {
             Triple(app.prefs.activeProfileId, app.prefs.serverUrl, app.api)
         }
-        lifecycleScope.launch {
+        try {
+            lifecycleScope.launch {
             try {
                 Log.d("Sinema", "loadContent starting")
                 var firstError: Exception? = null
@@ -848,23 +849,24 @@ class MainFragment : RowsSupportFragment() {
                     if (handleAuthOrShowError(e)) return@launch
                 }
 
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 if (e is CancellationException) throw e
-                Log.e("Sinema", "loadContent failed", e)
-                if (continueState.loading) continueState = continueState.failed(e)
-                if (recentlyPlayedState.loading) recentlyPlayedState = recentlyPlayedState.failed(e)
-                if (recentlyAddedState.loading) recentlyAddedState = recentlyAddedState.failed(e)
-                if (favoritesState.loading) favoritesState = favoritesState.failed(e)
-                if (unwatchedFavoritesState.loading) unwatchedFavoritesState = unwatchedFavoritesState.failed(e)
-                if (recentlyReleasedState.loading) recentlyReleasedState = recentlyReleasedState.failed(e)
-                if (savedFilterState.loading) savedFilterState = savedFilterState.failed(e)
-                if (groupsState.loading) groupsState = groupsState.failed(e)
-                if (discoveryState.loading) discoveryState = discoveryState.failed(e)
-                if (unwatchedPerformersState.loading) unwatchedPerformersState = unwatchedPerformersState.failed(e)
+                val failure = e as? Exception ?: RuntimeException(e.message ?: e.javaClass.simpleName, e)
+                Log.e("Sinema", "loadContent failed", failure)
+                if (continueState.loading) continueState = continueState.failed(failure)
+                if (recentlyPlayedState.loading) recentlyPlayedState = recentlyPlayedState.failed(failure)
+                if (recentlyAddedState.loading) recentlyAddedState = recentlyAddedState.failed(failure)
+                if (favoritesState.loading) favoritesState = favoritesState.failed(failure)
+                if (unwatchedFavoritesState.loading) unwatchedFavoritesState = unwatchedFavoritesState.failed(failure)
+                if (recentlyReleasedState.loading) recentlyReleasedState = recentlyReleasedState.failed(failure)
+                if (savedFilterState.loading) savedFilterState = savedFilterState.failed(failure)
+                if (groupsState.loading) groupsState = groupsState.failed(failure)
+                if (discoveryState.loading) discoveryState = discoveryState.failed(failure)
+                if (unwatchedPerformersState.loading) unwatchedPerformersState = unwatchedPerformersState.failed(failure)
                 serverErrorActive = shouldShowServerErrorRow(hadError = true, anyContentLoaded())
                 reconcileHomeRows()
                 if (!isAdded) return@launch
-                if (handleAuthOrShowError(e)) return@launch
+                if (handleAuthOrShowError(failure)) return@launch
             } finally {
                 isLoading = false
                 // Stamp even failures: a dead server should not be re-hit on
@@ -873,27 +875,34 @@ class MainFragment : RowsSupportFragment() {
             }
 
             // Restore focus to the same logical row/item after reconciliation.
-            if (focus.rowIndex < 0) {
-                scheduleInitialFocus()
-            } else {
-                val newRowIndex = FocusRestore.positionAfterReload(focus.rowKey, focus.rowIndex,
-                    (0 until rowsAdapter.size()).mapNotNull { i ->
-                        (rowsAdapter.get(i) as? ListRow)?.let { rowKey(it) }
-                    })
-                val restoredRow = if (newRowIndex >= 0) rowsAdapter.get(newRowIndex) as? ListRow else null
-                val rowAdapter = restoredRow?.adapter as? ArrayObjectAdapter
-                val itemKeys = (0 until (rowAdapter?.size() ?: 0))
-                    .map { FocusRestore.keyOf(rowAdapter!!.get(it)!!) }
-                val newItemIndex = HomeFocusPolicy.restoredItemIndex(focus.itemKey, focus.itemIndex, itemKeys)
-                if (restoredRow != null && newItemIndex >= 0) {
-                    focusRow(
-                        restoredRow,
-                        itemKeys[newItemIndex],
-                        onFailure = { focusSafeTarget() }
-                    )
+            try {
+                if (focus.rowIndex < 0) {
+                    scheduleInitialFocus()
                 } else {
-                    focusSafeTarget()
+                    val newRowIndex = FocusRestore.positionAfterReload(focus.rowKey, focus.rowIndex,
+                        (0 until rowsAdapter.size()).mapNotNull { i ->
+                            (rowsAdapter.get(i) as? ListRow)?.let { rowKey(it) }
+                        })
+                    val restoredRow = if (newRowIndex >= 0) rowsAdapter.get(newRowIndex) as? ListRow else null
+                    val rowAdapter = restoredRow?.adapter as? ArrayObjectAdapter
+                    val itemKeys = (0 until (rowAdapter?.size() ?: 0))
+                        .map { FocusRestore.keyOf(rowAdapter!!.get(it)!!) }
+                    val newItemIndex = HomeFocusPolicy.restoredItemIndex(focus.itemKey, focus.itemIndex, itemKeys)
+                    if (restoredRow != null && newItemIndex >= 0) {
+                        focusRow(
+                            restoredRow,
+                            itemKeys[newItemIndex],
+                            onFailure = { focusSafeTarget() }
+                        )
+                    } else {
+                        focusSafeTarget()
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                Log.e("Sinema", "Home focus restore failed", t)
+                if (isAdded) focusSafeTarget()
             }
 
             // Check for updates (once per session). Outside the finally so
@@ -912,6 +921,16 @@ class MainFragment : RowsSupportFragment() {
                 } catch (e: Exception) {
                     Log.e("Sinema", "Update check failed", e)
                 }
+            }
+        }
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            // launch() itself throws if the main dispatcher was stripped from
+            // the release build. Leave the dashboard up instead of dying.
+            isLoading = false
+            Log.e("Sinema", "Home load could not start", t)
+            if (isAdded) {
+                Toast.makeText(requireContext(), "Couldn't open the library", Toast.LENGTH_LONG).show()
             }
         }
     }
