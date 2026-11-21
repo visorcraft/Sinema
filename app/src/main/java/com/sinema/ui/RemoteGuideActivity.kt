@@ -41,16 +41,16 @@ class RemoteGuideActivity : SinemaActivity() {
             textSize = 21f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(0xFFFFFFFF.toInt())
-            setPadding(0, dp(20), 0, dp(6))
+            setPadding(0, dp(22), 0, dp(8))
         })
         content.addView(TextView(this).apply {
             text = getString(bodyRes)
             textSize = 17f
-            setTextColor(0xFFDDDDDD.toInt())
+            setTextColor(0xFFE6EDF3.toInt())
             setLineSpacing(0f, 1.25f)
-            setPadding(dp(16), dp(8), dp(16), dp(8))
+            setPadding(dp(20), dp(14), dp(20), dp(14))
             isFocusable = true
-            bindFocusBackground(normal = 0xFF20282D.toInt(), focused = 0xFF2AABE0.toInt())
+            setBackgroundResource(R.drawable.screens_polish_guide_card_background)
         })
     }
 

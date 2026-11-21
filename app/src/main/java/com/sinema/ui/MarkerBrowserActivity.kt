@@ -7,7 +7,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.leanback.widget.Presenter
-import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.api.SinemaApi
@@ -16,7 +15,6 @@ import com.sinema.model.MarkerSortOption
 import com.sinema.model.SceneMarkerItem
 import com.sinema.util.GlideAuth
 import com.sinema.util.SceneIntents
-import kotlinx.coroutines.launch
 
 /**
  * Library-wide scene markers ("chapters") with tag filtering. Selecting a
@@ -113,54 +111,52 @@ class MarkerBrowserFragment : SceneGridFragment() {
     }
 
     override fun showGridMenu() {
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Markers")
-            .setItems(arrayOf("Sort by…", "Filter by tag…")) { dialog, which ->
-                dialog.dismiss()
-                when (which) {
-                    0 -> showSortDialog()
-                    1 -> showTagFilterDialog()
-                }
-            }
-            .show()
+        Dialogs.showActions(
+            requireContext(),
+            "Markers",
+            listOf(
+                "Sort by…" to ::showSortDialog,
+                "Filter by tag…" to ::showTagFilterDialog,
+                "Search markers…" to ::showSearchDialog
+            )
+        )
     }
 
     override fun showFilterDialog() = showTagFilterDialog()
 
     private fun showTagFilterDialog() {
-        lifecycleScope.launch {
-            try {
-                val tags = loadAllTags()
-                if (!isAdded) return@launch
-                val names = listOf("All tags") + tags.map { it.name }
-                // Checked row follows the active filter ("All tags" = index 0).
-                val checked = tags.indexOfFirst { it.id == tagId }.let { if (it >= 0) it + 1 else 0 }
-                android.app.AlertDialog.Builder(requireContext())
-                    .setTitle("Filter by tag")
-                    .setSingleChoiceItems(names.toTypedArray(), checked) { dialog, which ->
-                        dialog.dismiss()
-                        if (which == 0) {
-                            tagId = null
-                            tagName = null
-                        } else {
-                            val tag = tags[which - 1]
-                            tagId = tag.id
-                            tagName = tag.name
-                        }
-                        activity?.refreshGridControls()
-                        reload()
-                    }
-                    .show()
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.w("Sinema", "Tag filter load failed", e)
+        launchSafely(
+            label = "Tag filter load",
+            onError = { e ->
                 if (isAdded) {
                     android.widget.Toast.makeText(
                         requireContext(), "Could not load tags: ${e.message}",
                         android.widget.Toast.LENGTH_LONG
                     ).show()
                 }
+            }
+        ) {
+            val tags = loadAllTags()
+            if (!isAdded) return@launchSafely
+            val names = listOf("All tags") + tags.map { it.name }
+            // Checked row follows the active filter ("All tags" = index 0).
+            val checked = tags.indexOfFirst { it.id == tagId }.let { if (it >= 0) it + 1 else 0 }
+            Dialogs.showSingleChoiceIndexDialog(
+                context = requireContext(),
+                title = "Filter by tag",
+                items = names,
+                checkedIndex = checked
+            ) { which ->
+                if (which == 0) {
+                    tagId = null
+                    tagName = null
+                } else {
+                    val tag = tags[which - 1]
+                    tagId = tag.id
+                    tagName = tag.name
+                }
+                activity?.refreshGridControls()
+                reload()
             }
         }
     }

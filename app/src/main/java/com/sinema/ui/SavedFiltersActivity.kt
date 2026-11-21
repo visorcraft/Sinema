@@ -1,21 +1,13 @@
 package com.sinema.ui
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.text.InputType
-import android.util.Log
-import android.widget.EditText
-import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.lifecycle.lifecycleScope
 import com.sinema.R
 import com.sinema.model.SavedSceneFilter
 import com.sinema.model.SortOption
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 
 class SavedFiltersActivity : GridActivity() {
     override fun createGridFragment(): SceneGridFragment =
@@ -55,55 +47,51 @@ class SavedFiltersFragment : SceneGridFragment() {
     }
 
     private fun promptRename(filter: SavedSceneFilter) {
-        val input = EditText(requireContext()).apply {
-            setText(filter.name)
-            setSelection(text.length)
-            hint = "Filter name"
-            inputType = InputType.TYPE_CLASS_TEXT
-            isFocusable = true
-        }
-        AlertDialog.Builder(requireContext())
-            .setTitle("Rename saved filter")
-            .setView(input)
-            .setPositiveButton("Rename") { _, _ ->
-                val name = input.text.toString().trim()
-                if (name.isBlank()) {
-                    Toast.makeText(requireContext(), "Enter a filter name", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                launchSafely(
-                    "Rename saved filter",
-                    onError = { e ->
-                        Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                ) {
-                    val renamed = app.api.renameSavedSceneFilter(filter, name)
-                    Toast.makeText(requireContext(), "Renamed to ‘${renamed.name}’", Toast.LENGTH_SHORT).show()
-                    reload()
-                }
+        Dialogs.showTextInputDialog(
+            context = requireContext(),
+            title = "Rename saved filter",
+            initialValue = filter.name,
+            hint = "Filter name",
+            positiveLabel = "Rename",
+            negativeLabel = "Cancel"
+        ) { name ->
+            if (name.isBlank()) {
+                Toast.makeText(requireContext(), "Enter a filter name", Toast.LENGTH_SHORT).show()
+                return@showTextInputDialog
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            launchSafely(
+                "Rename saved filter",
+                onError = { e ->
+                    Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            ) {
+                val renamed = app.api.renameSavedSceneFilter(filter, name)
+                Toast.makeText(requireContext(), "Renamed to ‘${renamed.name}’", Toast.LENGTH_SHORT).show()
+                reload()
+            }
+        }
     }
 
     private fun confirmDelete(filter: SavedSceneFilter) {
-        AlertDialog.Builder(requireContext())
-            .setTitle("Delete saved filter?")
-            .setMessage("Delete ‘${filter.name}’ from Stash? Scenes are not affected.")
-            .setPositiveButton("Delete") { _, _ ->
-                launchSafely(
-                    "Delete saved filter",
-                    onError = { e ->
-                        Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                ) {
-                    app.api.destroySavedSceneFilter(filter.id)
-                    Toast.makeText(requireContext(), "Deleted ‘${filter.name}’", Toast.LENGTH_SHORT).show()
-                    reload()
+        Dialogs.showConfirmDialog(
+            context = requireContext(),
+            title = "Delete saved filter?",
+            message = "Delete ‘${filter.name}’ from Stash? Scenes are not affected.",
+            positiveLabel = "Delete",
+            negativeLabel = "Cancel",
+            focusNegativeByDefault = true
+        ) {
+            launchSafely(
+                "Delete saved filter",
+                onError = { e ->
+                    Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
+            ) {
+                app.api.destroySavedSceneFilter(filter.id)
+                Toast.makeText(requireContext(), "Deleted ‘${filter.name}’", Toast.LENGTH_SHORT).show()
+                reload()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
 }
 
@@ -114,7 +102,7 @@ class SavedFilterCardPresenter(
         parent: android.view.ViewGroup
     ): androidx.leanback.widget.Presenter.ViewHolder {
         val view = android.view.LayoutInflater.from(parent.context)
-            .inflate(R.layout.view_folder_card, parent, false)
+            .inflate(R.layout.screens_polish_saved_filter_card, parent, false)
         return ViewHolder(view)
     }
 
@@ -123,15 +111,11 @@ class SavedFilterCardPresenter(
         item: Any?
     ) {
         val view = viewHolder.view
-        val title = view.findViewById<TextView>(R.id.card_title)
-        val content = view.findViewById<TextView>(R.id.card_content)
-        val image = view.findViewById<ImageView>(R.id.card_image)
+        val title = view.findViewById<TextView>(R.id.saved_filter_title)
+        val subtitle = view.findViewById<TextView>(R.id.saved_filter_subtitle)
         if (item is SavedSceneFilter) {
             title.text = item.name
-            content.text = "Scene filter  •  Hold OK to manage"
-            image.setImageResource(android.R.drawable.ic_menu_sort_by_size)
-            image.scaleType = ImageView.ScaleType.CENTER
-            image.setBackgroundColor(0xFF444444.toInt())
+            subtitle.setText(R.string.screens_polish_saved_filter_hint)
             view.setOnLongClickListener {
                 onItemLongClick(item)
                 true
@@ -141,6 +125,7 @@ class SavedFilterCardPresenter(
 
     override fun onUnbindViewHolder(viewHolder: androidx.leanback.widget.Presenter.ViewHolder) {
         viewHolder.view.setOnLongClickListener(null)
+        viewHolder.view.isLongClickable = false
     }
 }
 

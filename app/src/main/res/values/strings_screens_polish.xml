@@ -5,4 +5,5 @@
     <string name="screens_polish_image_hint_slideshow">Slideshow running  •  OK: show controls  •  Menu: options</string>
     <string name="screens_polish_synopsis_expand">Synopsis — press OK to expand</string>
     <string name="screens_polish_synopsis_collapse">Synopsis — press OK to collapse</string>
+    <string name="screens_polish_saved_filter_hint">Scene filter  •  Hold OK to manage</string>
 </resources>

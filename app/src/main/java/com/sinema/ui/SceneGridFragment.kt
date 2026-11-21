@@ -163,14 +163,12 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
     private fun showEntityActions(entity: com.sinema.model.EntityItem) {
         val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === entity } ?: return
         val favoriteLabel = if (entity.isFavorite) getString(R.string.card_unfavorite) else getString(R.string.card_favorite)
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle(entity.name)
-            .setItems(arrayOf(favoriteLabel)) { dialog, _ ->
-                dialog.dismiss()
-                toggleEntityFavorite(entity, index)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        Dialogs.showActions(
+            context = requireContext(),
+            title = entity.name,
+            actions = listOf(favoriteLabel to { toggleEntityFavorite(entity, index) }),
+            negativeLabel = getString(R.string.grid_cancel)
+        )
     }
 
     private fun toggleEntityFavorite(entity: com.sinema.model.EntityItem, index: Int) {
@@ -218,16 +216,17 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
             "0-9" -> letters.size - 1
             else -> letters.indexOf(alphaPrefix).takeIf { it > 0 } ?: 0
         }
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.grid_jump_title))
-            .setSingleChoiceItems(letters.toTypedArray(), currentIndex) { dialog, which ->
-                dialog.dismiss()
-                alphaPrefix = tokenAt(which)
-                updateTitle()
-                reload()
-            }
-            .setNegativeButton(R.string.grid_cancel, null)
-            .show()
+        Dialogs.showSingleChoiceIndexDialog(
+            context = requireContext(),
+            title = getString(R.string.grid_jump_title),
+            items = letters,
+            checkedIndex = currentIndex,
+            negativeLabel = getString(R.string.grid_cancel)
+        ) { which ->
+            alphaPrefix = tokenAt(which)
+            updateTitle()
+            reload()
+        }
     }
 
     /** Scenes currently visible in this grid (used by bulk actions). */
@@ -244,17 +243,18 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     private fun showRateAllDialog() {
         val options = (0..5).map { if (it == 0) getString(R.string.rate_all_no_rating) else "★".repeat(it) }
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.rate_all_title))
-            .setSingleChoiceItems(options.toTypedArray(), -1) { dialog, which ->
-                dialog.dismiss()
-                val rating100 = if (which == 0) null else which * 20
-                bulkEdit(getString(R.string.bulk_rate_all)) { scene ->
-                    app.api.setSceneRating(scene.id, rating100)
-                }
+        Dialogs.showSingleChoiceIndexDialog(
+            context = requireContext(),
+            title = getString(R.string.rate_all_title),
+            items = options,
+            checkedIndex = -1,
+            negativeLabel = getString(R.string.grid_cancel)
+        ) { which ->
+            val rating100 = if (which == 0) null else which * 20
+            bulkEdit(getString(R.string.bulk_rate_all)) { scene ->
+                app.api.setSceneRating(scene.id, rating100)
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
     }
 
     private var bulkJob: Job? = null
@@ -303,8 +303,8 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         val scene = item as? Scene ?: return
         val index = (0 until gridAdapter.size()).firstOrNull { gridAdapter.get(it) === scene } ?: return
         val playLabel = if (scene.resumeTime > 0.0) getString(R.string.card_resume) else getString(R.string.card_play)
-        val actions = buildList {
-            add(playLabel to Runnable {
+        val actions = buildList<Pair<String, () -> Unit>> {
+            add(playLabel to {
                 startActivity(
                     SceneIntents.playback(
                         requireContext(), scene.id,
@@ -314,83 +314,80 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                     )
                 )
             })
-            add(getString(R.string.card_play_from_here) to Runnable {
+            add(getString(R.string.card_play_from_here) to {
                 val rest = (index until gridAdapter.size())
                     .mapNotNull { gridAdapter.get(it) as? Scene }
                 SceneIntents.playAll(requireContext(), rest, startAt = 0)
             })
             if (scene.resumeTime > 0.0) {
-                add(getString(R.string.card_remove_continue) to Runnable { clearResume(scene, index) })
+                add(getString(R.string.card_remove_continue) to { clearResume(scene, index) })
             }
             if (canAssignTags) {
-                add(getString(R.string.untagged_assign_tags) to Runnable { showAssignTagsDialog(scene) })
+                add(getString(R.string.untagged_assign_tags) to { showAssignTagsDialog(scene) })
             }
-            add(WatchedToggle.buttonLabel(scene.isWatched) to Runnable { toggleWatched(scene, index) })
+            add(WatchedToggle.buttonLabel(scene.isWatched) to { toggleWatched(scene, index) })
             add(
                 (if (scene.isFavorite) getString(R.string.card_unfavorite) else getString(R.string.card_favorite)) to
-                    Runnable { toggleFavorite(scene, index) }
+                    { toggleFavorite(scene, index) }
             )
-            add(getString(R.string.card_details) to Runnable {
+            add(getString(R.string.card_details) to {
                 startActivity(SceneIntents.detail(requireContext(), scene))
             })
         }
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle(scene.displayTitle)
-            .setItems(actions.map { it.first }.toTypedArray()) { dialog, which ->
-                dialog.dismiss()
-                actions[which].second.run()
-            }
-            .show()
+        Dialogs.showActions(requireContext(), scene.displayTitle, actions)
     }
 
     /** Multi-select tag picker for the untagged triage grid. */
     private fun showAssignTagsDialog(scene: Scene) {
-        lifecycleScope.launch {
-            try {
-                val tags = app.api.findAllTags()
-                if (!isAdded) return@launch
-                if (tags.isEmpty()) {
-                    Toast.makeText(requireContext(), getString(R.string.untagged_no_tags), Toast.LENGTH_SHORT).show()
-                    return@launch
+        launchSafely(
+            label = "Tag list load",
+            onError = { e ->
+                if (isAdded) {
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.tags_load_failed, e.message ?: ""),
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
-                val checked = BooleanArray(tags.size)
-                android.app.AlertDialog.Builder(requireContext())
-                    .setTitle(getString(R.string.untagged_assign_title, scene.displayTitle))
-                    .setMultiChoiceItems(tags.map { it.name }.toTypedArray(), checked) { _, which, value ->
-                        checked[which] = value
-                    }
-                    .setPositiveButton("Assign") { dialog, _ ->
-                        dialog.dismiss()
-                        val selected = tags.filterIndexed { i, _ -> checked[i] }.map { it.id }
-                        if (selected.isEmpty()) return@setPositiveButton
-                        lifecycleScope.launch {
-                            try {
-                                app.api.sceneUpdateTags(scene.id, selected)
-                                if (isAdded) {
-                                    Toast.makeText(
-                                        requireContext(),
-                                        getString(R.string.untagged_assigned, selected.size), Toast.LENGTH_SHORT
-                                    ).show()
-                                    reload()
-                                }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                Log.e("Sinema", "Tag assign failed for ${scene.id}", e)
-                                if (isAdded) {
-                                    Toast.makeText(requireContext(), getString(R.string.action_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
-                                }
-                            }
+            }
+        ) {
+            val tags = app.api.findAllTags()
+            if (!isAdded) return@launchSafely
+            if (tags.isEmpty()) {
+                Toast.makeText(requireContext(), getString(R.string.untagged_no_tags), Toast.LENGTH_SHORT).show()
+                return@launchSafely
+            }
+            Dialogs.showMultiChoiceDialog(
+                context = requireContext(),
+                title = getString(R.string.untagged_assign_title, scene.displayTitle),
+                items = tags.map { it.name },
+                checked = BooleanArray(tags.size),
+                positiveLabel = "Assign",
+                negativeLabel = getString(R.string.grid_cancel)
+            ) { selection ->
+                val selected = tags.filterIndexed { i, _ -> selection[i] }.map { it.id }
+                if (selected.isEmpty()) return@showMultiChoiceDialog
+                launchSafely(
+                    label = "Tag assign for ${scene.id}",
+                    onError = { e ->
+                        if (isAdded) {
+                            Toast.makeText(
+                                requireContext(),
+                                getString(R.string.action_failed, e.message ?: ""),
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
-                    .setNegativeButton("Cancel", null)
-                    .show()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("Sinema", "Tag list load failed", e)
-                if (isAdded) {
-                    Toast.makeText(requireContext(), getString(R.string.tags_load_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
+                ) {
+                    app.api.sceneUpdateTags(scene.id, selected)
+                    if (isAdded) {
+                        Toast.makeText(
+                            requireContext(),
+                            getString(R.string.untagged_assigned, selected.size),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        reload()
+                    }
                 }
             }
         }
