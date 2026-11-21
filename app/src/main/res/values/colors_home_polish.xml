@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="home_polish_backdrop_top">#FF12181E</color>
+    <color name="home_polish_backdrop_mid">#FF181C20</color>
+    <color name="home_polish_backdrop_bottom">#FF141619</color>
+
+    <color name="card_polish_surface">#FF14191E</color>
+    <color name="card_polish_surface_focused">#FF18242A</color>
+    <color name="card_polish_border_unfocused">#24FFFFFF</color>
+    <color name="card_polish_accent">#FF2AABE0</color>
+    <color name="card_polish_accent_soft">#FF7AD7F7</color>
+    <color name="card_polish_title_focused">#FFFFFFFF</color>
+    <color name="card_polish_title_unfocused">#FFE8EEF2</color>
+    <color name="card_polish_meta_focused">#FFD6E2EA</color>
+    <color name="card_polish_meta_unfocused">#FF9AA6B0</color>
+    <color name="card_polish_badge_fill">#D90D1216</color>
+    <color name="card_polish_badge_stroke">#38FFFFFF</color>
+
+    <color name="home_polish_command_surface">#EB1B2127</color>
+    <color name="home_polish_command_focused">#FF1D303B</color>
+    <color name="home_polish_command_icon_unfocused">#FFB8C7D1</color>
+    <color name="home_polish_command_logout_focused">#FFFF9E7D</color>
+
+    <color name="home_polish_hero_eyebrow_fill">#CC101820</color>
+    <color name="home_polish_hero_eyebrow_stroke">#4D7AD7F7</color>
+    <color name="home_polish_hero_cta_unfocused">#332AABE0</color>
+    <color name="home_polish_hero_cta_text_focused">#FF0B1318</color>
+    <color name="home_polish_hero_cta_text_unfocused">#FF7AD7F7</color>
+</resources>

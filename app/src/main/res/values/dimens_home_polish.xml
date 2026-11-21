@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="card_polish_corner_radius">10dp</dimen>
+    <dimen name="card_polish_artwork_radius">6dp</dimen>
+    <dimen name="card_polish_badge_radius">6dp</dimen>
+    <dimen name="card_polish_badge_margin">6dp</dimen>
+    <dimen name="card_polish_badge_margin_above_progress">12dp</dimen>
+
+    <dimen name="home_polish_hero_corner_radius">8dp</dimen>
+    <dimen name="home_polish_command_corner_radius">8dp</dimen>
+    <dimen name="home_polish_command_min_width">164dp</dimen>
+    <dimen name="home_polish_command_min_height">64dp</dimen>
+    <dimen name="home_polish_control_corner_radius">8dp</dimen>
+</resources>
