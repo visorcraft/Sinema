@@ -11,8 +11,8 @@
 
     <ProgressBar
         android:id="@+id/grid_state_progress"
-        android:layout_width="48dp"
-        android:layout_height="48dp" />
+        android:layout_width="56dp"
+        android:layout_height="56dp" />
 
     <TextView
         android:id="@+id/grid_state_message"
@@ -20,18 +20,19 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:gravity="center"
-        android:maxWidth="640dp"
+        android:lineSpacingExtra="4dp"
+        android:maxWidth="720dp"
         android:textColor="@android:color/white"
-        android:textSize="18sp" />
+        android:textSize="20sp" />
 
     <Button
         android:id="@+id/grid_state_retry"
         android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:layout_marginTop="20dp"
-        android:background="@drawable/action_button_background"
+        android:background="@drawable/async_state_retry_background"
         android:focusable="true"
         android:minWidth="160dp"
         android:text="@string/grid_retry"
-        android:textColor="@android:color/white" />
+        android:textColor="#FF0E1A22" />
 </LinearLayout>

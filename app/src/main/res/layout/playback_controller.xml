@@ -7,7 +7,7 @@
         android:id="@id/exo_controls_background"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@color/exo_black_opacity_60" />
+        android:background="@drawable/playback_polish_scrim" />
 
     <LinearLayout
         android:id="@+id/playback_top_bar"
@@ -99,12 +99,12 @@
             android:id="@+id/playback_preview_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#CC000000"
+            android:background="@drawable/playback_polish_time_background"
             android:gravity="center"
             android:minWidth="96dp"
             android:padding="12dp"
             android:textColor="@android:color/white"
-            android:textSize="18sp" />
+            android:textSize="20sp" />
     </LinearLayout>
 
     <Button
@@ -176,14 +176,14 @@
             <TextView
                 android:id="@id/exo_position"
                 style="@style/ExoStyledControls.TimeText.Position"
-                android:textSize="20sp" />
+                android:textSize="22sp" />
 
             <TextView style="@style/ExoStyledControls.TimeText.Separator" />
 
             <TextView
                 android:id="@id/exo_duration"
                 style="@style/ExoStyledControls.TimeText.Duration"
-                android:textSize="20sp" />
+                android:textSize="22sp" />
 
             <Space
                 android:layout_width="0dp"
@@ -195,13 +195,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@android:color/white"
-                android:textSize="20sp" />
+                android:textSize="22sp" />
         </LinearLayout>
 
         <com.sinema.ui.MarkerTimeBar
             android:id="@id/exo_progress"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="52dp"
             android:focusable="true"
             android:focusableInTouchMode="true" />
 

@@ -126,7 +126,7 @@
                 <Button
                     android:id="@+id/btn_favorite"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -138,7 +138,7 @@
                 <Button
                     android:id="@+id/btn_mark_watched"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -150,7 +150,7 @@
                 <Button
                     android:id="@+id/btn_o_count"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -162,7 +162,7 @@
                 <Button
                     android:id="@+id/btn_folder"
                     android:layout_width="0dp"
-                    android:layout_height="46dp"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
                     android:focusable="true"
@@ -174,16 +174,17 @@
             <Button
                 android:id="@+id/btn_delete"
                 android:layout_width="wrap_content"
-                android:layout_height="46dp"
+                android:layout_height="48dp"
                 android:layout_marginBottom="14dp"
-                android:background="@drawable/bg_pill"
+                android:background="@drawable/scene_detail_delete_background"
                 android:focusable="true"
                 android:minWidth="140dp"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
                 android:text="Delete"
                 android:textColor="@android:color/white"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <!-- Rating -->
             <LinearLayout
@@ -207,7 +208,7 @@
                 <Button
                     android:id="@+id/btn_star_1"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -219,7 +220,7 @@
                 <Button
                     android:id="@+id/btn_star_2"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -231,7 +232,7 @@
                 <Button
                     android:id="@+id/btn_star_3"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -243,7 +244,7 @@
                 <Button
                     android:id="@+id/btn_star_4"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -255,7 +256,7 @@
                 <Button
                     android:id="@+id/btn_star_5"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="10dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
@@ -267,7 +268,7 @@
                 <Button
                     android:id="@+id/btn_rating_clear"
                     android:layout_width="0dp"
-                    android:layout_height="44dp"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_pill"
                     android:focusable="true"

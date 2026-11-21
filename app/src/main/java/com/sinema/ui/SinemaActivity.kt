@@ -2,6 +2,8 @@ package com.sinema.ui
 
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.drawable.Drawable
+import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import androidx.core.content.ContextCompat
@@ -58,11 +60,9 @@ abstract class SinemaActivity : FragmentActivity() {
     fun refreshAccessibilityFocus() {
         val view = currentFocus ?: return
         if (SinemaApp.instance.prefs.highContrastFocus) {
-            view.foreground = ContextCompat.getDrawable(this, R.drawable.accessibility_focus_ring)
-            view.setTag(R.id.accessibility_focus_ring, true)
-        } else if (view.getTag(R.id.accessibility_focus_ring) == true) {
-            view.foreground = null
-            view.setTag(R.id.accessibility_focus_ring, false)
+            applyFocusRing(view)
+        } else {
+            restoreFocusRing(view)
         }
     }
 
@@ -70,15 +70,9 @@ abstract class SinemaActivity : FragmentActivity() {
         val root = window.decorView.findViewById<ViewGroup>(android.R.id.content) ?: return
         if (focusRoot != null) return
         val listener = ViewTreeObserver.OnGlobalFocusChangeListener { oldFocus, newFocus ->
-            oldFocus?.let { view ->
-                if (view.getTag(R.id.accessibility_focus_ring) == true) {
-                    view.foreground = null
-                    view.setTag(R.id.accessibility_focus_ring, false)
-                }
-            }
+            oldFocus?.let(::restoreFocusRing)
             if (SinemaApp.instance.prefs.highContrastFocus && newFocus != null) {
-                newFocus.foreground = ContextCompat.getDrawable(this, R.drawable.accessibility_focus_ring)
-                newFocus.setTag(R.id.accessibility_focus_ring, true)
+                applyFocusRing(newFocus)
             }
         }
         root.viewTreeObserver.addOnGlobalFocusChangeListener(listener)
@@ -86,4 +80,18 @@ abstract class SinemaActivity : FragmentActivity() {
         focusListener = listener
         refreshAccessibilityFocus()
     }
+
+    private fun applyFocusRing(view: View) {
+        if (view.getTag(R.id.accessibility_focus_ring) is AppliedFocusRing) return
+        view.setTag(R.id.accessibility_focus_ring, AppliedFocusRing(view.foreground))
+        view.foreground = ContextCompat.getDrawable(this, R.drawable.accessibility_focus_ring)
+    }
+
+    private fun restoreFocusRing(view: View) {
+        val applied = view.getTag(R.id.accessibility_focus_ring) as? AppliedFocusRing ?: return
+        view.foreground = applied.originalForeground
+        view.setTag(R.id.accessibility_focus_ring, null)
+    }
+
+    private data class AppliedFocusRing(val originalForeground: Drawable?)
 }

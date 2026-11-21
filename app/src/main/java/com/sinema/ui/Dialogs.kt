@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.text.InputType
 import android.widget.EditText
+import com.sinema.R
 
 /** Shared TV dialog builders: single-choice pickers and text search. */
 object Dialogs {
@@ -16,25 +17,30 @@ object Dialogs {
         onChosen: (T) -> Unit
     ): AlertDialog {
         val index = options.indexOf(current).coerceAtLeast(0)
-        return AlertDialog.Builder(context)
+        val builder = AlertDialog.Builder(context)
             .setTitle(title)
             .setSingleChoiceItems(options.map(label).toTypedArray(), index) { dialog, which ->
                 dialog.dismiss()
                 onChosen(options[which])
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        return showDialog(builder) { dialog ->
+            dialog.listView.setSelection(index)
+            dialog.listView.requestFocus()
+        }
     }
 
     /** Label→action list menu: rows become data instead of when(which) indices. */
     fun showActions(context: Context, title: String, actions: List<Pair<String, () -> Unit>>) {
-        AlertDialog.Builder(context)
+        val builder = AlertDialog.Builder(context)
             .setTitle(title)
             .setItems(actions.map { it.first }.toTypedArray()) { dialog, which ->
                 dialog.dismiss()
                 actions[which].second()
             }
-            .show()
+        showDialog(builder) { dialog ->
+            dialog.listView.requestFocus()
+        }
     }
 
     /** Label→action pairs builder for [showActions]. */
@@ -54,6 +60,8 @@ object Dialogs {
             this.hint = hint
             inputType = InputType.TYPE_CLASS_TEXT
             isFocusable = true
+            val padding = (16 * context.resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding)
         }
         val builder = AlertDialog.Builder(context)
             .setTitle(title)
@@ -63,6 +71,21 @@ object Dialogs {
         if (onClear != null) {
             builder.setNeutralButton("Clear") { _, _ -> onClear() }
         }
-        builder.show()
+        showDialog(builder) {
+            input.requestFocus()
+        }
+    }
+
+    private fun showDialog(
+        builder: AlertDialog.Builder,
+        onShow: (AlertDialog) -> Unit = {}
+    ): AlertDialog {
+        val dialog = builder.create()
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawableResource(R.drawable.choice_dialog_background)
+            onShow(dialog)
+        }
+        dialog.show()
+        return dialog
     }
 }

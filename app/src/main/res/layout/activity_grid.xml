@@ -133,6 +133,7 @@
         android:paddingStart="48dp"
         android:paddingTop="12dp"
         android:paddingEnd="48dp"
+        android:paddingBottom="6dp"
         android:clipChildren="false">
 
         <Button
@@ -140,11 +141,12 @@
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/action_button_background"
+            android:background="@drawable/grid_control_background"
             android:focusable="true"
             android:minWidth="160dp"
             android:text="▶ Resume Group"
             android:textColor="@android:color/white"
+            android:textStyle="bold"
             android:visibility="gone" />
 
         <Button
@@ -152,11 +154,12 @@
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/action_button_background"
+            android:background="@drawable/grid_control_background"
             android:focusable="true"
             android:minWidth="160dp"
             android:text="Filter"
             android:textColor="@android:color/white"
+            android:textStyle="bold"
             android:visibility="gone" />
 
         <Button
@@ -164,11 +167,12 @@
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/action_button_background"
+            android:background="@drawable/grid_control_background"
             android:focusable="true"
             android:minWidth="140dp"
             android:text="All scenes"
             android:textColor="@android:color/white"
+            android:textStyle="bold"
             android:visibility="gone" />
 
         <Button
@@ -176,11 +180,12 @@
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/action_button_background"
+            android:background="@drawable/grid_control_background"
             android:focusable="true"
             android:minWidth="140dp"
             android:text="♡ Favorites"
             android:textColor="@android:color/white"
+            android:textStyle="bold"
             android:visibility="gone" />
 
         <Button
@@ -188,21 +193,23 @@
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:layout_marginEnd="12dp"
-            android:background="@drawable/action_button_background"
+            android:background="@drawable/grid_control_background"
             android:focusable="true"
             android:minWidth="120dp"
             android:text="Sort"
-            android:textColor="@android:color/white" />
+            android:textColor="@android:color/white"
+            android:textStyle="bold" />
 
         <Button
             android:id="@+id/btn_grid_search"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:background="@drawable/action_button_background"
+            android:background="@drawable/grid_control_background"
             android:focusable="true"
             android:minWidth="140dp"
             android:text="Search"
             android:textColor="@android:color/white"
+            android:textStyle="bold"
             android:visibility="gone" />
     </LinearLayout>
 

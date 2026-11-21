@@ -44,7 +44,8 @@ class CardPresenter(
             .inflate(R.layout.view_card, parent, false)
         val density = parent.resources.displayMetrics.density
         view.layoutParams.width = (cardSize.widthDp * density).toInt()
-        view.layoutParams.height = (cardSize.heightDp * density).toInt()
+        view.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+        view.minimumHeight = (cardSize.heightDp * density).toInt()
         (view.findViewById<ImageView>(R.id.card_image).parent as View).layoutParams.height =
             (cardSize.imageHeightDp * density).toInt()
         return ContentHolder(view).also { holder ->
