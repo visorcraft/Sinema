@@ -6,4 +6,10 @@
     <string name="playback_polish_marker_jump_next">▸ %1$s</string>
     <string name="playback_polish_marker_jump_prev">◂ %1$s</string>
     <string name="playback_polish_marker_fallback">Chapter</string>
+    <string name="playback_polish_up_next_eyebrow">UP NEXT</string>
+    <string name="playback_polish_up_next_countdown">Up next in %1$ds</string>
+    <string name="playback_polish_up_next_play_now">Play next</string>
+    <string name="playback_polish_up_next_hide">Hide</string>
+    <string name="playback_polish_queue_now">NOW</string>
+    <string name="playback_polish_queue_watched">Watched</string>
 </resources>

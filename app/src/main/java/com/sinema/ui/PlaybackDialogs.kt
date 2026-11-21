@@ -242,7 +242,18 @@ internal fun PlaybackActivity.showUpNextDialog() {
             Toast.makeText(this, getString(R.string.up_next_empty), Toast.LENGTH_SHORT).show()
             return
         }
-        val adapter = UpNextAdapter(this) { target ->
+        val adapter = UpNextAdapter(
+            context = this,
+            onQueueChanged = {
+                val count = PlaybackQueue.remainingCount()
+                if (count == 0) {
+                    upNextDialog.dismiss()
+                } else {
+                    upNextDialog.dialog?.setTitle(getString(R.string.up_next_title, count))
+                }
+                updatePlaybackText()
+            }
+        ) { target ->
             // Resolve by stable id through the live queue.
             if (PlaybackQueue.current()?.id == target.id) return@UpNextAdapter
             PlaybackQueue.jumpToItem(target.id)?.let {
@@ -267,6 +278,7 @@ internal fun PlaybackActivity.showUpNextDialog() {
             .setNeutralButton("Shuffle") { _, _ ->
                 if (PlaybackQueue.shuffleRemaining()) {
                     Toast.makeText(this, getString(R.string.up_next_shuffled, PlaybackQueue.remainingCount()), Toast.LENGTH_SHORT).show()
+                    updatePlaybackText()
                 }
             }
             .setPositiveButton("Exit queue") { _, _ ->

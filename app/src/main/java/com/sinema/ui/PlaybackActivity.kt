@@ -93,6 +93,8 @@ class PlaybackActivity : SinemaActivity() {
     /** playWhenReady captured before the player is paused for a covered activity. */
     internal var heldPlayWhenStopped = false
     internal var nextThumbSceneId = ""
+    internal var upNextBannerThumbSceneId = ""
+    internal var upNextBannerDismissedSceneId: String? = null
     internal var isControllerVisible = false
     internal val prefs by lazy { SinemaApp.instance.prefs }
     internal val renderersFactory by lazy { PlaybackRenderersFactory(this) }
@@ -242,6 +244,7 @@ class PlaybackActivity : SinemaActivity() {
         bindFolderButton()
         hideMarkerSkip()
         hideSeekFeedback()
+        hideUpNextBanner()
         if (::playerView.isInitialized) {
             playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress)
                 .setSceneMarkers(emptyList())
@@ -312,6 +315,7 @@ class PlaybackActivity : SinemaActivity() {
         savePlayback()
         hideSeekPreview()
         hideSeekFeedback()
+        hideUpNextBanner()
         dismissPlaybackDialogs()
     }
 
@@ -482,8 +486,9 @@ class PlaybackActivity : SinemaActivity() {
         existing?.let {
             it.player = null
             container.removeView(it)
-            // Fresh controller views: force the next-up thumbnail to reload.
+            // Fresh controller views: force the next-up thumbnails to reload.
             nextThumbSceneId = ""
+            upNextBannerThumbSceneId = ""
         }
         val layout = if (wantTexture) R.layout.playback_player_texture else R.layout.playback_player_surface
         playerView = layoutInflater.inflate(layout, container, false) as AspectRatioPlayerView
@@ -684,21 +689,31 @@ class PlaybackActivity : SinemaActivity() {
                 nextThumbSceneId = ""
             } else {
                 visibility = View.VISIBLE
+                val nextTitle = playbackDisplayTitle(next.title, next.id, discreet)
                 playerView.findViewById<android.widget.TextView>(R.id.playback_next_title).text =
-                    "▸ ${next.title}"
-                if (nextThumbSceneId != next.id) {
-                    nextThumbSceneId = next.id
-                    val image = playerView.findViewById<android.widget.ImageView>(R.id.playback_next_thumb)
-                    // Frame at ~25% beats a black 0-second screenshot.
-                    val frameSec = next.durationSec * 0.25
-                    Glide.with(image)
-                        .load(GlideAuth.url(SinemaApp.instance.api,
-                            SinemaApp.instance.api.getMarkerScreenshotUrl(next.id, frameSec)))
-                        .centerCrop()
-                        .into(image)
+                    nextTitle
+                playerView.findViewById<android.widget.TextView>(R.id.playback_next_duration)?.text =
+                    TimeFormat.formatSeconds(next.durationSec)
+                val image = playerView.findViewById<android.widget.ImageView>(R.id.playback_next_thumb)
+                if (discreet) {
+                    image.visibility = View.GONE
+                    nextThumbSceneId = ""
+                } else {
+                    image.visibility = View.VISIBLE
+                    if (nextThumbSceneId != next.id) {
+                        nextThumbSceneId = next.id
+                        // Frame at ~25% beats a black 0-second screenshot.
+                        val frameSec = next.durationSec * 0.25
+                        Glide.with(image)
+                            .load(GlideAuth.url(SinemaApp.instance.api,
+                                SinemaApp.instance.api.getMarkerScreenshotUrl(next.id, frameSec)))
+                            .centerCrop()
+                            .into(image)
+                    }
                 }
             }
         }
+        updateUpNextBanner()
         val hasMarkers = markers.isNotEmpty()
         playerView.findViewById<View>(R.id.playback_marker_button).apply {
             isEnabled = hasMarkers
@@ -1062,9 +1077,88 @@ class PlaybackActivity : SinemaActivity() {
         hideSeekPreview()
         hideMarkerSkip()
         hideSeekFeedback()
+        hideUpNextBanner()
         lastMarkerPositionMs = null
         player?.release()
         player = null
+    }
+
+    internal fun hideUpNextBanner() {
+        if (!::playerView.isInitialized) return
+        playerView.findViewById<View>(R.id.playback_up_next_banner)?.apply {
+            animate().cancel()
+            alpha = 1f
+            visibility = View.GONE
+        }
+    }
+
+    internal fun updateUpNextBanner() {
+        if (!::playerView.isInitialized) return
+        val exo = player
+        val next = PlaybackQueue.remaining().firstOrNull()
+        val discreet = prefs.discreetMode
+        val state = if (exo == null) null else computeUpNextBanner(
+            currentPositionMs = exo.currentPosition,
+            durationMs = exo.duration,
+            isPlaying = exo.isPlaying,
+            isScrubbing = scrubbing,
+            isLooping = exo.repeatMode == Player.REPEAT_MODE_ONE,
+            nextItem = next,
+            currentSceneId = sceneId,
+            dismissedForSceneId = upNextBannerDismissedSceneId,
+            discreetMode = discreet
+        )
+        val banner = playerView.findViewById<View>(R.id.playback_up_next_banner) ?: return
+        if (state == null || next == null) {
+            hideUpNextBanner()
+            return
+        }
+        val wasHidden = banner.visibility != View.VISIBLE
+        banner.visibility = View.VISIBLE
+        if (wasHidden) {
+            if (prefs.reduceMotion) {
+                banner.alpha = 1f
+            } else {
+                banner.animate().cancel()
+                banner.alpha = 0f
+                banner.animate().alpha(1f).setDuration(160L).start()
+            }
+            playerView.showController()
+        }
+        playerView.findViewById<android.widget.TextView>(R.id.playback_up_next_banner_countdown)?.text =
+            getString(R.string.playback_polish_up_next_countdown, state.countdownSeconds)
+        playerView.findViewById<android.widget.TextView>(R.id.playback_up_next_banner_title)?.text =
+            state.title
+        playerView.findViewById<android.widget.TextView>(R.id.playback_up_next_banner_duration)?.text =
+            state.durationText
+        val thumb = playerView.findViewById<android.widget.ImageView>(R.id.playback_up_next_banner_thumb)
+        if (thumb != null) {
+            if (discreet) {
+                thumb.visibility = View.GONE
+                upNextBannerThumbSceneId = ""
+            } else {
+                thumb.visibility = View.VISIBLE
+                if (upNextBannerThumbSceneId != next.id) {
+                    upNextBannerThumbSceneId = next.id
+                    val frameSec = next.durationSec * 0.25
+                    Glide.with(thumb)
+                        .load(GlideAuth.url(SinemaApp.instance.api,
+                            SinemaApp.instance.api.getMarkerScreenshotUrl(next.id, frameSec)))
+                        .centerCrop()
+                        .into(thumb)
+                }
+            }
+        }
+        playerView.findViewById<View>(R.id.playback_up_next_play_now)?.setOnClickListener {
+            PlaybackQueue.jumpToItem(state.itemId)?.let { target ->
+                hideUpNextBanner()
+                playSceneNow(target.id, target.title, saveCurrent = true)
+            }
+        }
+        playerView.findViewById<View>(R.id.playback_up_next_dismiss)?.setOnClickListener {
+            upNextBannerDismissedSceneId = sceneId
+            hideUpNextBanner()
+        }
     }
 
     internal fun recoverPlayback(temporaryQuality: PlaybackStreamQuality? = null) {
@@ -1177,6 +1271,7 @@ class PlaybackActivity : SinemaActivity() {
             incognitoLatchSceneId = if (SinemaApp.instance.prefs.incognitoMode) nextId else null
             sceneTitle = nextTitle
             sceneId = nextId
+            upNextBannerDismissedSceneId = null
             videoWidth = nextWidth
             videoHeight = nextHeight
             val quality = qualityAfterRecoveredScene(streamQuality, recoveryQualityRestore)
