@@ -12,4 +12,9 @@
     <string name="playback_polish_up_next_hide">Hide</string>
     <string name="playback_polish_queue_now">NOW</string>
     <string name="playback_polish_queue_watched">Watched</string>
+    <string name="playback_polish_speed_title">Playback speed</string>
+    <string name="playback_polish_speed_button">Speed: %1$s</string>
+    <string name="playback_polish_speed_changed">Speed %1$s</string>
+    <string name="playback_polish_chapters_title">Chapters (%1$d)</string>
+    <string name="playback_polish_subtitles_generic">Subtitles</string>
 </resources>

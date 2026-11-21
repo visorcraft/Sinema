@@ -1,11 +1,11 @@
 package com.sinema.ui
 
 import android.app.AlertDialog
+import com.sinema.R
 
 /**
- * One managed playback dialog slot: identity-safe dismiss, show-time
- * tracking, and lifecycle teardown. Replaces the seven nullable
- * AlertDialog fields plus their repeated dismiss/null/identity dances.
+ * One managed playback dialog slot: identity-safe dismiss, unified TV dialog
+ * chrome, D-pad focus initialization, and lifecycle teardown.
  */
 class DialogSlot {
     var dialog: AlertDialog? = null
@@ -13,9 +13,31 @@ class DialogSlot {
 
     val isShowing: Boolean get() = dialog?.isShowing == true
 
-    fun show(builder: AlertDialog.Builder) {
+    fun show(
+        builder: AlertDialog.Builder,
+        onDismiss: (() -> Unit)? = null,
+        onShow: (AlertDialog) -> Unit = {}
+    ): AlertDialog {
         dismiss()
-        dialog = builder.show()
+        val created = builder.create()
+        created.setOnShowListener {
+            created.window?.setBackgroundDrawableResource(R.drawable.playback_polish_dialog_background)
+            if (created.listView != null) {
+                created.listView.requestFocus()
+            } else {
+                created.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+            }
+            onShow(created)
+        }
+        if (onDismiss != null) {
+            created.setOnDismissListener {
+                dismissIf(created)
+                onDismiss()
+            }
+        }
+        dialog = created
+        created.show()
+        return created
     }
 
     fun dismiss() {

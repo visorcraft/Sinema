@@ -2,18 +2,19 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/playback_polish_chapter_item_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="16dp"
-    android:paddingTop="8dp"
-    android:paddingEnd="16dp"
-    android:paddingBottom="8dp">
+    android:paddingStart="14dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="10dp">
 
     <ImageView
         android:id="@+id/chapter_thumb"
         android:layout_width="160dp"
         android:layout_height="90dp"
-        android:background="#333333"
+        android:background="#26333A"
         android:importantForAccessibility="no"
         android:scaleType="centerCrop" />
 
@@ -29,16 +30,23 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
             android:textColor="@android:color/white"
-            android:textSize="16sp" />
+            android:textSize="17sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/chapter_time"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textColor="#AAAAAA"
-            android:textSize="13sp" />
+            android:layout_marginTop="6dp"
+            android:background="@drawable/playback_polish_status_badge_bg"
+            android:paddingStart="8dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="2dp"
+            android:textColor="@color/playback_polish_accent_bright"
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

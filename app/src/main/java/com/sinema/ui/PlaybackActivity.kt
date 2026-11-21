@@ -63,6 +63,7 @@ class PlaybackActivity : SinemaActivity() {
     internal val streamQualityDialog = DialogSlot()
     internal val resumePromptDialog = DialogSlot()
     internal val upNextDialog = DialogSlot()
+    internal val speedDialog = DialogSlot()
     /** Scenes already played in the current Endless Mix session. */
     internal val endlessPlayedIds = mutableSetOf<String>()
     internal var endlessJob: kotlinx.coroutines.Job? = null
@@ -81,6 +82,7 @@ class PlaybackActivity : SinemaActivity() {
     internal var streamQuality = PlaybackStreamQuality.AUTO
     internal var recoveryQualityRestore: PlaybackStreamQuality? = null
     internal var seekPreset = SeekPreset.TEN_THIRTY
+    internal var playbackSpeed = PlaybackSpeedPreset.NORMAL
     internal var sceneTitle = ""
     /**
      * Parent directory once lookup has settled. Null while the current scene's
@@ -324,7 +326,7 @@ class PlaybackActivity : SinemaActivity() {
     internal fun dismissPlaybackDialogs() {
         listOf(
             aspectRatioDialog, chaptersDialog, settingsMenuDialog, personalizationMenuDialog,
-            rateDialog, streamQualityDialog, upNextDialog, playbackErrorDialog
+            rateDialog, streamQualityDialog, upNextDialog, speedDialog, playbackErrorDialog
         ).forEach { it.dismiss() }
         rateFetchJob?.cancel()
         rateFetchJob = null
@@ -455,7 +457,11 @@ class PlaybackActivity : SinemaActivity() {
             "Stream selection ${streamQuality.name} -> $streamUrl for ${videoWidth}x$videoHeight"
         )
         // Subtitle HTTP requests reuse the same dataSourceFactory → same auth headers automatically (both auth modes)
-        val subs = captions.map { c ->
+        val subtitleLabels = formatSubtitleTrackLabels(
+            captions,
+            getString(R.string.playback_polish_subtitles_generic)
+        )
+        val subs = captions.mapIndexed { idx, c ->
             val mime = when (c.captionType.lowercase()) {
                 "vtt" -> MimeTypes.TEXT_VTT
                 "ass", "ssa" -> MimeTypes.TEXT_SSA
@@ -464,7 +470,7 @@ class PlaybackActivity : SinemaActivity() {
             MediaItem.SubtitleConfiguration.Builder(Uri.parse(app.api.getCaptionUrl(sceneId, c)))
                 .setMimeType(mime)
                 .setLanguage(c.languageCode.takeIf { it.isNotBlank() })
-                .setLabel("${c.languageCode.uppercase().ifBlank { "UNKNOWN" }} (${c.captionType})")
+                .setLabel(subtitleLabels[idx])
                 .build()
         }
         return MediaItem.Builder()
@@ -604,6 +610,10 @@ class PlaybackActivity : SinemaActivity() {
             text = "Seek: ${seekPreset.label}"
             setOnClickListener { cycleSeekPreset() }
         }
+        playerView.findViewById<android.widget.Button>(R.id.playback_speed_button)?.apply {
+            text = getString(R.string.playback_polish_speed_button, playbackSpeed.label)
+            setOnClickListener { showSpeedDialog() }
+        }
         playerView.findViewById<View>(androidx.media3.ui.R.id.exo_rew_with_amount).apply {
             contentDescription = "Rewind ${seekPreset.backwardMs / 1000} seconds"
             setOnClickListener { seekRelative(-seekPreset.backwardMs) }
@@ -671,6 +681,8 @@ class PlaybackActivity : SinemaActivity() {
             if (currentChapter.isNotEmpty() || badges.isNotEmpty()) View.VISIBLE else View.GONE
         playerView.findViewById<android.widget.Button>(R.id.playback_quality_button)?.text =
             qualityButtonText(getString(R.string.playback_quality), streamQuality)
+        playerView.findViewById<android.widget.Button>(R.id.playback_speed_button)?.text =
+            getString(R.string.playback_polish_speed_button, playbackSpeed.label)
         playerView.findViewById<android.widget.TextView>(R.id.playback_remaining).text =
             if (exo == null) "" else formatRemainingMs(exo.currentPosition, exo.duration)
         playerView.findViewById<android.widget.TextView>(R.id.playback_queue_chip).apply {
@@ -757,6 +769,13 @@ class PlaybackActivity : SinemaActivity() {
         applySeekPreset()
         bindPlaybackControls()
         Toast.makeText(this, "Seek buttons ${seekPreset.label}", Toast.LENGTH_SHORT).show()
+    }
+
+    internal fun applyPlaybackSpeed(chosen: PlaybackSpeedPreset) {
+        playbackSpeed = chosen
+        player?.setPlaybackSpeed(chosen.speed)
+        showSeekFeedback(getString(R.string.playback_polish_speed_changed, chosen.label))
+        updatePlaybackText()
     }
 
     internal fun applySeekPreset(target: ExoPlayer? = player) {
@@ -919,6 +938,7 @@ class PlaybackActivity : SinemaActivity() {
                 }
                 exo.playWhenReady = !startPaused
                 exo.repeatMode = if (prefs.loopEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                exo.setPlaybackSpeed(playbackSpeed.speed)
                 scheduleVideoOutputTimeout()
                 exo.addListener(object : Player.Listener {
                     override fun onVideoSizeChanged(videoSize: VideoSize) {

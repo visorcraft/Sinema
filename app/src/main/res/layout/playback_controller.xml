@@ -554,6 +554,18 @@
                     android:paddingEnd="16dp"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white" />
+
+                <Button
+                    android:id="@+id/playback_speed_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/playback_polish_control_bg"
+                    android:minWidth="96dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white" />
             </LinearLayout>
         </HorizontalScrollView>
     </LinearLayout>
