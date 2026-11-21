@@ -5,9 +5,11 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.KeyEvent
+import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.TimeBar
+import com.sinema.R
 
 @androidx.annotation.OptIn(UnstableApi::class)
 class MarkerTimeBar @JvmOverloads constructor(
@@ -24,15 +26,33 @@ class MarkerTimeBar @JvmOverloads constructor(
     var scrubPreviewListener: ScrubPreviewListener? = null
     private var sceneMarkers: List<Pair<String, Double>> = emptyList()
     private var markerPositions: List<Float> = emptyList()
+    internal var activeMarkerPos: Float? = null
+        private set
     private var timelineDurationMs = 0L
+    internal val knownDurationMs: Long get() = timelineDurationMs
     private var timelinePositionMs = 0L
     private var keyBackwardMs = 0L
     private var keyForwardMs = 0L
     private var keyScrubbing = false
     private var keyScrubPositionMs = 0L
     private val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF54C7EC.toInt()
-        strokeWidth = 4f * resources.displayMetrics.density
+        color = ContextCompat.getColor(context, R.color.playback_polish_marker_tick)
+        strokeWidth = 3.5f * resources.displayMetrics.density
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val activeMarkerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(context, R.color.playback_polish_marker_active)
+        strokeWidth = 5f * resources.displayMetrics.density
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val activeMarkerHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x552AABE0
+        strokeWidth = 10f * resources.displayMetrics.density
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val focusTrackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x442AABE0
+        strokeWidth = 12f * resources.displayMetrics.density
         strokeCap = Paint.Cap.ROUND
     }
 
@@ -75,6 +95,7 @@ class MarkerTimeBar @JvmOverloads constructor(
                 .coerceIn(0L, timelineDurationMs.coerceAtLeast(0L))
             timelinePositionMs = keyScrubPositionMs
             super.setPosition(keyScrubPositionMs)
+            updateActiveMarker()
             scrubPreviewListener?.onPreviewMove(keyScrubPositionMs)
             return true
         }
@@ -86,6 +107,15 @@ class MarkerTimeBar @JvmOverloads constructor(
             return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onFocusChanged(
+        gainFocus: Boolean,
+        direction: Int,
+        previouslyFocusedRect: android.graphics.Rect?
+    ) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        invalidate()
     }
 
     fun cancelKeyScrub() {
@@ -101,6 +131,7 @@ class MarkerTimeBar @JvmOverloads constructor(
         if (keyScrubbing) return
         timelinePositionMs = position
         super.setPosition(position)
+        updateActiveMarker()
     }
 
     override fun setDuration(duration: Long) {
@@ -110,19 +141,45 @@ class MarkerTimeBar @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
         val usableWidth = width - paddingLeft - paddingRight
-        if (usableWidth <= 0) return
         val centerY = height / 2f
-        val halfTick = 8f * resources.displayMetrics.density
+        if (usableWidth > 0 && isFocused) {
+            canvas.drawLine(
+                paddingLeft.toFloat(),
+                centerY,
+                (width - paddingRight).toFloat(),
+                centerY,
+                focusTrackPaint
+            )
+        }
+        super.onDraw(canvas)
+        if (usableWidth <= 0) return
+        val density = resources.displayMetrics.density
+        val halfTick = 8f * density
+        val activeHalfTick = 12f * density
+        val active = activeMarkerPos
         markerPositions.forEach { fraction ->
             val x = paddingLeft + usableWidth * fraction
-            canvas.drawLine(x, centerY - halfTick, x, centerY + halfTick, markerPaint)
+            val isActive = active != null && kotlin.math.abs(fraction - active) < 0.0005f
+            if (isActive) {
+                canvas.drawLine(x, centerY - activeHalfTick, x, centerY + activeHalfTick, activeMarkerHaloPaint)
+                canvas.drawLine(x, centerY - activeHalfTick, x, centerY + activeHalfTick, activeMarkerPaint)
+            } else {
+                canvas.drawLine(x, centerY - halfTick, x, centerY + halfTick, markerPaint)
+            }
         }
     }
 
     private fun updateMarkerPositions() {
         markerPositions = markerFractions(sceneMarkers, timelineDurationMs)
+        updateActiveMarker()
+    }
+
+    private fun updateActiveMarker() {
+        val nextActive = activeMarkerFraction(timelinePositionMs, sceneMarkers, timelineDurationMs)
+        if (nextActive != activeMarkerPos) {
+            activeMarkerPos = nextActive
+        }
         invalidate()
     }
 }

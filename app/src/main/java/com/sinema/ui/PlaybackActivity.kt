@@ -98,6 +98,7 @@ class PlaybackActivity : SinemaActivity() {
     internal val renderersFactory by lazy { PlaybackRenderersFactory(this) }
     internal var isPaused = false
     internal var scrubbing = false
+    internal var scrubOriginMs: Long? = null
     internal var lastMarkerPositionMs: Long? = null
     internal val handler = Handler(Looper.getMainLooper())
     internal val seekDwell by lazy {
@@ -110,6 +111,7 @@ class PlaybackActivity : SinemaActivity() {
     }
     internal val hideRunnable = Runnable { playerView.hideController() }
     internal val hideMarkerSkipRunnable = Runnable { hideMarkerSkip() }
+    internal val hideSeekFeedbackRunnable = Runnable { hideSeekFeedback() }
     internal val progressRunnable = object : Runnable {
         override fun run() {
             updatePlaybackText()
@@ -239,6 +241,7 @@ class PlaybackActivity : SinemaActivity() {
         sceneFolder = null
         bindFolderButton()
         hideMarkerSkip()
+        hideSeekFeedback()
         if (::playerView.isInitialized) {
             playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress)
                 .setSceneMarkers(emptyList())
@@ -308,6 +311,7 @@ class PlaybackActivity : SinemaActivity() {
         persistPlaybackSession()
         savePlayback()
         hideSeekPreview()
+        hideSeekFeedback()
         dismissPlaybackDialogs()
     }
 
@@ -330,6 +334,7 @@ class PlaybackActivity : SinemaActivity() {
     override fun onStop() {
         handler.removeCallbacks(hideRunnable)
         handler.removeCallbacks(progressRunnable)
+        handler.removeCallbacks(hideSeekFeedbackRunnable)
         super.onStop()
         dismissPlaybackDialogs()
         // Keep the in-session position so a restart resumes where the user
@@ -359,6 +364,7 @@ class PlaybackActivity : SinemaActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(hideRunnable)
         handler.removeCallbacks(progressRunnable)
+        handler.removeCallbacks(hideSeekFeedbackRunnable)
         releasePlayer()
         releasePlaybackClaim(this)
         saveQueue.close()
@@ -540,7 +546,9 @@ class PlaybackActivity : SinemaActivity() {
             scrubPreviewListener = object : MarkerTimeBar.ScrubPreviewListener {
                 override fun onPreviewStart(positionMs: Long) {
                     scrubbing = true
+                    scrubOriginMs = player?.currentPosition ?: positionMs
                     hideMarkerSkip()
+                    hideSeekFeedback()
                     showSeekPreview(positionMs)
                 }
                 override fun onPreviewMove(positionMs: Long) = showSeekPreview(positionMs)
@@ -658,9 +666,18 @@ class PlaybackActivity : SinemaActivity() {
                 }
             }
         }
+        val hasMarkers = markers.isNotEmpty()
         playerView.findViewById<View>(R.id.playback_marker_button).apply {
-            isEnabled = markers.isNotEmpty()
-            alpha = if (markers.isEmpty()) 0.5f else 1.0f
+            isEnabled = hasMarkers
+            alpha = if (hasMarkers) 1.0f else 0.5f
+        }
+        playerView.findViewById<View>(R.id.playback_prev_marker_button)?.apply {
+            isEnabled = hasMarkers
+            alpha = if (hasMarkers) 1.0f else 0.4f
+        }
+        playerView.findViewById<View>(R.id.playback_next_marker_button)?.apply {
+            isEnabled = hasMarkers
+            alpha = if (hasMarkers) 1.0f else 0.4f
         }
     }
 
@@ -673,6 +690,16 @@ class PlaybackActivity : SinemaActivity() {
         )
         exo.seekTo(target)
         playerView.showController()
+        val sec = (kotlin.math.abs(deltaMs) / 1000L).toInt()
+        if (sec > 0) {
+            showSeekFeedback(
+                getString(
+                    if (deltaMs >= 0L) R.string.playback_polish_seek_feedback_forward
+                    else R.string.playback_polish_seek_feedback_backward,
+                    sec
+                )
+            )
+        }
         updatePlaybackText()
     }
 
@@ -692,19 +719,82 @@ class PlaybackActivity : SinemaActivity() {
     internal fun showSeekPreview(positionMs: Long) {
         if (!::playerView.isInitialized) return
         val exo = player ?: return
-        val target = clampSeekPositionMs(positionMs, exo.duration)
-        playerView.findViewById<View>(R.id.playback_preview_container).visibility = View.VISIBLE
+        val timeBar = playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress)
+        val previewDuration = exo.duration.takeIf { it > 0L } ?: timeBar?.knownDurationMs ?: 0L
+        val preview = buildScrubPreview(
+            targetMs = positionMs,
+            originMs = scrubOriginMs,
+            durationMs = previewDuration,
+            isPaused = !exo.playWhenReady,
+            markers = markers
+        )
+        val playerTarget = clampSeekPositionMs(positionMs, exo.duration)
+        val container = playerView.findViewById<View>(R.id.playback_preview_container)
+        val wasHidden = container.visibility != View.VISIBLE
+        container.visibility = View.VISIBLE
+        if (wasHidden) {
+            if (prefs.reduceMotion) {
+                container.alpha = 1f
+            } else {
+                container.animate().cancel()
+                container.alpha = 0f
+                container.animate().alpha(1f).setDuration(120L).start()
+            }
+        }
         playerView.findViewById<android.widget.TextView>(R.id.playback_preview_time).text =
-            TimeFormat.formatMs(target)
-        seekDwell.onPositionChanged(target)
+            preview.timestampText
+        playerView.findViewById<android.widget.TextView>(R.id.playback_preview_delta)?.apply {
+            text = preview.deltaText
+            visibility = if (preview.deltaText.isNotEmpty()) View.VISIBLE else View.GONE
+        }
+        playerView.findViewById<android.widget.TextView>(R.id.playback_preview_chapter)?.apply {
+            text = preview.chapterTitle
+            visibility = if (preview.chapterTitle.isNotEmpty()) View.VISIBLE else View.GONE
+        }
+        playerView.findViewById<View>(R.id.playback_preview_hint)?.visibility =
+            if (preview.showPausedDwellHint) View.VISIBLE else View.GONE
+        seekDwell.onPositionChanged(playerTarget)
     }
 
     internal fun hideSeekPreview() {
         scrubbing = false
+        scrubOriginMs = null
         seekDwell.cancel()
         if (!::playerView.isInitialized) return
         playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).cancelKeyScrub()
-        playerView.findViewById<View>(R.id.playback_preview_container).visibility = View.GONE
+        val container = playerView.findViewById<View>(R.id.playback_preview_container)
+        container.animate().cancel()
+        container.alpha = 1f
+        container.visibility = View.GONE
+    }
+
+    internal fun showSeekFeedback(label: String) {
+        if (!::playerView.isInitialized || label.isBlank()) return
+        val badge = playerView.findViewById<android.widget.TextView>(R.id.playback_seek_feedback) ?: return
+        badge.text = label
+        val wasHidden = badge.visibility != View.VISIBLE
+        badge.visibility = View.VISIBLE
+        if (wasHidden) {
+            if (prefs.reduceMotion) {
+                badge.alpha = 1f
+            } else {
+                badge.animate().cancel()
+                badge.alpha = 0f
+                badge.animate().alpha(1f).setDuration(120L).start()
+            }
+        }
+        handler.removeCallbacks(hideSeekFeedbackRunnable)
+        handler.postDelayed(hideSeekFeedbackRunnable, 1_500L)
+    }
+
+    internal fun hideSeekFeedback() {
+        handler.removeCallbacks(hideSeekFeedbackRunnable)
+        if (!::playerView.isInitialized) return
+        playerView.findViewById<View>(R.id.playback_seek_feedback)?.apply {
+            animate().cancel()
+            alpha = 1f
+            visibility = View.GONE
+        }
     }
 
     internal fun scheduleVideoOutputTimeout() {
@@ -934,6 +1024,7 @@ class PlaybackActivity : SinemaActivity() {
         handler.removeCallbacks(videoOutputTimeout)
         hideSeekPreview()
         hideMarkerSkip()
+        hideSeekFeedback()
         lastMarkerPositionMs = null
         player?.release()
         player = null
@@ -991,12 +1082,18 @@ class PlaybackActivity : SinemaActivity() {
 
     internal fun seekToAdjacentMarker(forward: Boolean) {
         val exo = player ?: return
-        val posSec = exo.currentPosition / 1000.0
-        val target = if (forward)
-            markers.firstOrNull { it.second > posSec + 3 }
-        else
-            markers.lastOrNull { it.second < posSec - 3 }
-        target?.let { exo.seekTo((it.second * 1000).toLong()) }
+        val target = adjacentMarker(exo.currentPosition, markers, forward) ?: return
+        exo.seekTo((target.second * 1000).toLong())
+        playerView.showController()
+        val label = target.first.ifBlank { getString(R.string.playback_polish_marker_fallback) }
+        showSeekFeedback(
+            getString(
+                if (forward) R.string.playback_polish_marker_jump_next
+                else R.string.playback_polish_marker_jump_prev,
+                label
+            )
+        )
+        updatePlaybackText()
     }
 
     /** Swap the player to [nextId] (queue advance or Up Next jump). */

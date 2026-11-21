@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="playback_polish_control_radius">10dp</dimen>
+    <dimen name="playback_polish_pill_radius">20dp</dimen>
+    <dimen name="playback_polish_dialog_radius">16dp</dimen>
+    <dimen name="playback_polish_focus_stroke">3dp</dimen>
+    <dimen name="playback_polish_timebar_height">6dp</dimen>
+    <dimen name="playback_polish_scrubber_enabled_size">18dp</dimen>
+    <dimen name="playback_polish_scrubber_dragged_size">24dp</dimen>
+</resources>

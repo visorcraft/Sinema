@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="playback_polish_dwell_hint">Hold 2s to preview · OK to play</string>
+    <string name="playback_polish_seek_feedback_forward">+%1$ds</string>
+    <string name="playback_polish_seek_feedback_backward">−%1$ds</string>
+    <string name="playback_polish_marker_jump_next">▸ %1$s</string>
+    <string name="playback_polish_marker_jump_prev">◂ %1$s</string>
+    <string name="playback_polish_marker_fallback">Chapter</string>
+</resources>

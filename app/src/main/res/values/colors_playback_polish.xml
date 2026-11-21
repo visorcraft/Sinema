@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="playback_polish_accent">#FF2AABE0</color>
+    <color name="playback_polish_accent_bright">#FF80E5FF</color>
+    <color name="playback_polish_marker_tick">#FF54C7EC</color>
+    <color name="playback_polish_marker_active">#FF9BEAFF</color>
+    <color name="playback_polish_track_buffered">#80FFFFFF</color>
+    <color name="playback_polish_track_unplayed">#40FFFFFF</color>
+    <color name="playback_polish_surface">#CC12171C</color>
+    <color name="playback_polish_surface_focused">#FF1B3340</color>
+    <color name="playback_polish_surface_pressed">#FF244354</color>
+    <color name="playback_polish_surface_disabled">#6612171C</color>
+    <color name="playback_polish_border_subtle">#33FFFFFF</color>
+    <color name="playback_polish_dialog_surface">#F5161B20</color>
+    <color name="playback_polish_text_secondary">#FFB8C7D1</color>
+    <color name="playback_polish_text_muted">#80FFFFFF</color>
+    <color name="playback_polish_danger_focused">#FF5A1F26</color>
+    <color name="playback_polish_danger_stroke">#FFE55365</color>
+</resources>

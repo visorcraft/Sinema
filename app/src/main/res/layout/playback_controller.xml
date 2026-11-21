@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="ContentDescription,PrivateResource">
 
@@ -92,20 +93,84 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="174dp"
+        android:background="@drawable/playback_polish_time_background"
+        android:gravity="center_horizontal"
+        android:minWidth="148dp"
         android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="10dp"
         android:visibility="gone">
 
-        <TextView
-            android:id="@+id/playback_preview_time"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/playback_polish_time_background"
-            android:gravity="center"
-            android:minWidth="96dp"
-            android:padding="12dp"
-            android:textColor="@android:color/white"
-            android:textSize="20sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/playback_preview_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/playback_preview_delta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:textColor="@color/playback_polish_accent_bright"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/playback_preview_chapter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxWidth="360dp"
+            android:maxLines="1"
+            android:textColor="@color/playback_polish_text_secondary"
+            android:textSize="15sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/playback_preview_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/playback_polish_dwell_hint"
+            android:textColor="@color/playback_polish_text_muted"
+            android:textSize="12sp"
+            android:visibility="gone" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/playback_seek_feedback"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="108dp"
+        android:background="@drawable/playback_polish_feedback_background"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxWidth="420dp"
+        android:maxLines="1"
+        android:paddingStart="20dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="8dp"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <Button
         android:id="@+id/playback_skip_marker"
@@ -203,7 +268,14 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:focusable="true"
-            android:focusableInTouchMode="true" />
+            android:focusableInTouchMode="true"
+            app:bar_height="@dimen/playback_polish_timebar_height"
+            app:buffered_color="@color/playback_polish_track_buffered"
+            app:played_color="@color/playback_polish_accent"
+            app:scrubber_color="@color/playback_polish_accent_bright"
+            app:scrubber_dragged_size="@dimen/playback_polish_scrubber_dragged_size"
+            app:scrubber_enabled_size="@dimen/playback_polish_scrubber_enabled_size"
+            app:unplayed_color="@color/playback_polish_track_unplayed" />
 
         <HorizontalScrollView
             android:layout_width="match_parent"
