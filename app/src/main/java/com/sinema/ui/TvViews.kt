@@ -17,13 +17,12 @@ private const val INPUT_COLOR = 0xFF232A30.toInt()
 private const val FOCUS_COLOR = 0xFF2AABE0.toInt()
 private const val UNFOCUSED_STROKE_COLOR = 0x26FFFFFF
 private const val FOCUSED_STROKE_COLOR = 0xFF7AD7F7.toInt()
-private const val CONTROL_CORNER_DP = 8f
 
 private fun View.controlBackground(fillColor: Int, focused: Boolean): GradientDrawable {
     val density = resources.displayMetrics.density
     return GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
-        cornerRadius = CONTROL_CORNER_DP * density
+        cornerRadius = resources.getDimension(com.sinema.R.dimen.home_polish_control_corner_radius)
         setColor(fillColor)
         setStroke(
             ((if (focused) 2f else 1f) * density).toInt().coerceAtLeast(1),

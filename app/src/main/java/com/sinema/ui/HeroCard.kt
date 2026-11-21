@@ -107,7 +107,10 @@ class HeroPresenter(
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.view_hero_card, parent, false)
-        TvMotion.clipRoundedCorners(view, HERO_CORNER_RADIUS_DP)
+        TvMotion.clipRoundedCornersPx(
+            view,
+            view.resources.getDimension(R.dimen.home_polish_hero_corner_radius)
+        )
         return ViewHolder(view)
     }
 
@@ -179,13 +182,11 @@ class HeroPresenter(
         view.contentDescription = HeroCard.accessibilitySummary(item.scene, item.resumeMs)
 
         val image = view.findViewById<ImageView>(R.id.hero_image)
+        val fadeMs = TvMotion.imageCrossfadeMs()
         val request = Glide.with(view.context.applicationContext)
             .load(GlideAuth.url(api, api.getScreenshotUrl(item.scene.id)))
             .centerCrop()
-        val fadeMs = TvMotion.imageCrossfadeMs()
-        if (fadeMs > 0) {
-            request.transition(DrawableTransitionOptions.withCrossFade(fadeMs))
-        }
+            .let { if (fadeMs > 0) it.transition(DrawableTransitionOptions.withCrossFade(fadeMs)) else it }
         request.into(image)
     }
 
@@ -207,9 +208,5 @@ class HeroPresenter(
             contentDescription = null
             visibility = View.GONE
         }
-    }
-
-    companion object {
-        private const val HERO_CORNER_RADIUS_DP = 8f
     }
 }

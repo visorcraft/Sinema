@@ -110,7 +110,11 @@ internal object TvMotion {
 
     /** Clips a view's outline to [radiusDp] rounded corners so artwork matches focus borders. */
     fun clipRoundedCorners(view: View, radiusDp: Float) {
-        val radiusPx = radiusDp * view.resources.displayMetrics.density
+        clipRoundedCornersPx(view, radiusDp * view.resources.displayMetrics.density)
+    }
+
+    /** Clips a view's outline to [radiusPx] rounded corners from a dimension resource. */
+    fun clipRoundedCornersPx(view: View, radiusPx: Float) {
         view.outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(target: View, outline: Outline) {
                 outline.setRoundRect(0, 0, target.width, target.height, radiusPx)

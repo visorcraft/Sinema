@@ -1,10 +1,13 @@
 package com.sinema.ui
 
+import android.graphics.Typeface
 import android.os.Bundle
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import com.sinema.R
 import com.sinema.SinemaApp
 import com.sinema.model.HomeContentRow
 import com.sinema.model.HomeShortcut
@@ -53,18 +56,25 @@ class HomeOrderActivity : SinemaActivity() {
         val outer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)
-            setBackgroundColor(0xFF1B1B1B.toInt())
+            setBackgroundResource(R.drawable.home_backdrop_gradient)
         }
         outer.addView(TextView(this).apply {
             text = if (shortcutsMode) "Customize Shortcuts" else "Customize Content Rows"
             textSize = 28f
+            setTypeface(null, Typeface.BOLD)
             setTextColor(0xFFFFFFFF.toInt())
+            setPadding(0, 0, 0, 8)
+        })
+        outer.addView(TextView(this).apply {
+            text = getString(R.string.home_polish_order_hint)
+            textSize = 15f
+            setTextColor(ContextCompat.getColor(this@HomeOrderActivity, R.color.card_polish_meta_unfocused))
             setPadding(0, 0, 0, 20)
         })
         listLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         outer.addView(listLayout)
         setContentView(ScrollView(this).apply {
-            setBackgroundColor(0xFF1B1B1B.toInt())
+            setBackgroundResource(R.drawable.home_backdrop_gradient)
             addView(outer)
         })
         render()
@@ -85,7 +95,7 @@ class HomeOrderActivity : SinemaActivity() {
         val focusedTag = (currentFocus as? Button)?.tag as? String
 
         listLayout.removeAllViews()
-        items.forEach { item ->
+        items.forEachIndexed { index, item ->
             val views = rowViews.getOrPut(item.name) { buildRowViews(item) }
             val visible = when (item) {
                 is Item.Shortcut -> item.shortcut !in settings.hiddenShortcuts.orEmpty()
@@ -96,7 +106,15 @@ class HomeOrderActivity : SinemaActivity() {
                     settings.savedFilterName.isNotBlank()
                 ) "${item.row.label}: ${settings.savedFilterName}" else item.displayLabel
             views.label.text = "$labelText — ${if (visible) "Shown" else "Hidden"}"
+            views.label.setTextColor(
+                ContextCompat.getColor(
+                    this,
+                    if (visible) R.color.card_polish_title_focused else R.color.card_polish_meta_unfocused
+                )
+            )
             views.toggleButton.text = if (visible) "Hide" else "Show"
+            views.upButton.alpha = if (index == 0) BOUNDARY_ALPHA else 1f
+            views.downButton.alpha = if (index == items.lastIndex) BOUNDARY_ALPHA else 1f
             listLayout.addView(views.label)
             listLayout.addView(views.buttonRow)
         }
@@ -107,13 +125,17 @@ class HomeOrderActivity : SinemaActivity() {
     private fun buildRowViews(item: Item): RowViews {
         val label = TextView(this).apply {
             textSize = 18f
+            setTypeface(null, Typeface.BOLD)
             setTextColor(0xFFFFFFFF.toInt())
-            setPadding(0, 16, 0, 4)
+            setPadding(0, 18, 0, 6)
         }
         val buttonRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         fun button(tag: String, text: String, action: () -> Unit) = Button(this).apply {
             this.text = text
             this.tag = tag
+            isFocusable = true
+            isFocusableInTouchMode = true
+            isAllCaps = false
             setTextColor(android.graphics.Color.WHITE)
             bindFocusBackground()
             setOnClickListener { action() }
@@ -123,7 +145,7 @@ class HomeOrderActivity : SinemaActivity() {
         val toggle = button("toggle:${item.name}", "Hide") { toggle(item) }
         listOf(up, down, toggle).forEach { btn ->
             buttonRow.addView(btn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = 8
+                marginEnd = 10
                 bottomMargin = 8
             })
         }
@@ -150,5 +172,6 @@ class HomeOrderActivity : SinemaActivity() {
         const val EXTRA_MODE = "mode"
         const val MODE_SHORTCUTS = "shortcuts"
         const val MODE_ROWS = "rows"
+        private const val BOUNDARY_ALPHA = 0.55f
     }
 }

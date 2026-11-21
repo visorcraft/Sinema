@@ -36,18 +36,19 @@ class HomeSettingsActivity : SinemaActivity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)
-            setBackgroundColor(0xFF1B1B1B.toInt())
+            setBackgroundResource(com.sinema.R.drawable.home_backdrop_gradient)
         }
         layout.addView(TextView(this).apply {
             text = "Home Settings"
             textSize = 28f
+            setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(0xFFFFFFFF.toInt())
         })
         layout.addView(TextView(this).apply {
             text = "Personalize shortcuts, rows, and artwork. Changes apply when you return home."
-            textSize = 16f
-            setTextColor(0xFFCCCCCC.toInt())
-            setPadding(0, 12, 0, 12)
+            textSize = 15f
+            setTextColor(androidx.core.content.ContextCompat.getColor(this@HomeSettingsActivity, com.sinema.R.color.card_polish_meta_unfocused))
+            setPadding(0, 8, 0, 20)
         })
 
         artworkButton = addButton(layout, "Artwork") {
@@ -83,7 +84,7 @@ class HomeSettingsActivity : SinemaActivity() {
         filterButton = addButton(layout, "Saved Filter home row") { chooseSavedFilter() }
 
         return ScrollView(this).apply {
-            setBackgroundColor(0xFF1B1B1B.toInt())
+            setBackgroundResource(com.sinema.R.drawable.home_backdrop_gradient)
             addView(layout)
         }
     }

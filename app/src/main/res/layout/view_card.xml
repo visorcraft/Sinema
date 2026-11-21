@@ -9,10 +9,11 @@
     android:background="@drawable/card_focus_border"
     android:layout_marginStart="8dp"
     android:layout_marginEnd="8dp"
-    android:padding="4dp"
+    android:padding="5dp"
     android:clipChildren="false">
 
     <FrameLayout
+        android:id="@+id/card_artwork_frame"
         android:layout_width="match_parent"
         android:layout_height="158dp">
 
@@ -21,8 +22,33 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="centerCrop"
-            android:background="#333333"
+            android:background="#262D33"
             android:importantForAccessibility="no" />
+
+        <View
+            android:id="@+id/card_artwork_scrim"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/card_artwork_scrim"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/card_quality_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="6dp"
+            android:background="@drawable/card_polish_badge"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/card_heart"
@@ -33,8 +59,28 @@
             android:background="@drawable/card_polish_badge"
             android:contentDescription="@string/accessibility_favorite"
             android:text="❤️"
-            android:textSize="18sp"
-            android:padding="4dp"
+            android:textSize="16sp"
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/card_duration_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="6dp"
+            android:background="@drawable/card_polish_badge"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:maxLines="1"
             android:visibility="gone" />
 
         <TextView
@@ -46,8 +92,11 @@
             android:background="@drawable/card_polish_badge"
             android:contentDescription="@string/accessibility_watched"
             android:text="✅"
-            android:textSize="18sp"
-            android:padding="4dp"
+            android:textSize="16sp"
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
             android:visibility="gone" />
 
         <ProgressBar
@@ -68,11 +117,11 @@
         android:layout_height="wrap_content"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="@android:color/white"
+        android:textColor="@color/card_polish_title_unfocused"
         android:textSize="15sp"
-        android:paddingTop="4dp"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp" />
+        android:paddingTop="6dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp" />
 
     <TextView
         android:id="@+id/card_content"
@@ -80,9 +129,9 @@
         android:layout_height="wrap_content"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="#AAAAAA"
+        android:textColor="@color/card_polish_meta_unfocused"
         android:textSize="13sp"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
         android:paddingBottom="4dp" />
 </LinearLayout>
