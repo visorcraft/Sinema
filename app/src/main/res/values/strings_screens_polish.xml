@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screens_polish_image_hint_browse">◀ / ▶: navigate  •  OK: toggle controls  •  Menu: options</string>
+    <string name="screens_polish_image_hint_zoomed">D-pad: pan  •  OK: toggle controls  •  Menu: reset &amp; options</string>
+    <string name="screens_polish_image_hint_slideshow">Slideshow running  •  OK: show controls  •  Menu: options</string>
+    <string name="screens_polish_synopsis_expand">Synopsis — press OK to expand</string>
+    <string name="screens_polish_synopsis_collapse">Synopsis — press OK to collapse</string>
+</resources>

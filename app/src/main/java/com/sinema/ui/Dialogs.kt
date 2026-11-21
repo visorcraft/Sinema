@@ -46,6 +46,30 @@ object Dialogs {
     /** Label→action pairs builder for [showActions]. */
     fun <T> action(label: String, run: () -> Unit): Pair<String, () -> Unit> = label to run
 
+    fun showConfirmDialog(
+        context: Context,
+        title: String,
+        message: String,
+        positiveLabel: String,
+        negativeLabel: String = context.getString(android.R.string.cancel),
+        focusNegativeByDefault: Boolean = false,
+        onConfirm: () -> Unit
+    ): AlertDialog {
+        val builder = AlertDialog.Builder(context)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(positiveLabel) { _, _ -> onConfirm() }
+            .setNegativeButton(negativeLabel, null)
+        return showDialog(builder) { dialog ->
+            val targetButton = if (focusNegativeByDefault) {
+                AlertDialog.BUTTON_NEGATIVE
+            } else {
+                AlertDialog.BUTTON_POSITIVE
+            }
+            dialog.getButton(targetButton)?.requestFocus()
+        }
+    }
+
     fun showTextSearchDialog(
         context: Context,
         title: String,

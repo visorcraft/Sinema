@@ -9,6 +9,8 @@ private val slideshowDelays = longArrayOf(3_000L, 5_000L, 10_000L, 30_000L)
 
 enum class ImageDisplayMode { FIT, FILL }
 
+enum class ImageViewerHintMode { BROWSE, ZOOMED, SLIDESHOW }
+
 data class ImageViewerState(
     val position: Int = 0,
     val zoom: Float = MIN_ZOOM,
@@ -16,6 +18,8 @@ data class ImageViewerState(
     val panY: Float = 0f,
     val displayMode: ImageDisplayMode = ImageDisplayMode.FIT
 ) {
+    val isZoomed: Boolean get() = zoom > MIN_ZOOM
+
     fun zoomIn(): ImageViewerState = copy(zoom = (zoom + ZOOM_STEP).coerceAtMost(MAX_ZOOM))
 
     fun zoomOut(): ImageViewerState {
@@ -44,6 +48,30 @@ data class ImageViewerState(
 
     fun previous(size: Int): ImageViewerState =
         if (size > 0 && position > 0) copy(position = position - 1).resetTransform() else this
+
+    /** 0..1000 gallery position progress for the HUD bar; 0 when only a single image is shown. */
+    fun progressPermille(totalCount: Int): Int {
+        if (totalCount <= 1) return 0
+        val current = (position + 1).coerceIn(1, totalCount)
+        return (current * 1000) / totalCount
+    }
+
+    fun statusSummary(
+        shuffleEnabled: Boolean,
+        slideshowEnabled: Boolean,
+        slideshowDelayMs: Long
+    ): String = buildString {
+        append(if (displayMode == ImageDisplayMode.FIT) "Fit screen" else "Fill screen")
+        append("  •  ${(zoom * 100).toInt()}%")
+        if (shuffleEnabled) append("  •  Shuffle")
+        if (slideshowEnabled) append("  •  Slideshow ${slideshowDelayMs / 1000}s")
+    }
+
+    fun hintMode(slideshowEnabled: Boolean): ImageViewerHintMode = when {
+        slideshowEnabled -> ImageViewerHintMode.SLIDESHOW
+        isZoomed -> ImageViewerHintMode.ZOOMED
+        else -> ImageViewerHintMode.BROWSE
+    }
 }
 
 fun shuffledImageOrder(size: Int, currentIndex: Int, seed: Long = 0L): List<Int> {

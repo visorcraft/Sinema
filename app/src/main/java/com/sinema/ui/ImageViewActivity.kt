@@ -1,6 +1,5 @@
 package com.sinema.ui
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -10,8 +9,10 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.sinema.R
@@ -33,10 +34,20 @@ class ImageViewActivity : SinemaActivity() {
     private var autoStartSlideshow = false
     private var loadJob: Job? = null
     private lateinit var imageView: ImageView
+    private lateinit var loadingProgress: ProgressBar
     private lateinit var caption: TextView
     private lateinit var status: TextView
+    private lateinit var progressBar: ProgressBar
+    private lateinit var hintView: TextView
     private lateinit var controls: View
+    private lateinit var controlsScrim: View
     private val handler = Handler(Looper.getMainLooper())
+
+    private val autoHideControls = Runnable {
+        if (!state.isZoomed) {
+            setControlsVisible(false)
+        }
+    }
 
     private val slideshowTick = object : Runnable {
         override fun run() {
@@ -57,9 +68,13 @@ class ImageViewActivity : SinemaActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_image_view)
         imageView = findViewById(R.id.fullscreen_image)
+        loadingProgress = findViewById(R.id.image_loading_progress)
         caption = findViewById(R.id.image_caption)
         status = findViewById(R.id.image_status)
+        progressBar = findViewById(R.id.image_progress_bar)
+        hintView = findViewById(R.id.image_hint)
         controls = findViewById(R.id.image_controls)
+        controlsScrim = findViewById(R.id.image_controls_scrim)
 
         galleryId = intent.getStringExtra("gallery_id").orEmpty()
         autoStartSlideshow = intent.getBooleanExtra("auto_start_slideshow", false)
@@ -99,12 +114,15 @@ class ImageViewActivity : SinemaActivity() {
 
     override fun onPause() {
         stopSlideshow()
+        handler.removeCallbacks(autoHideControls)
         super.onPause()
     }
 
     override fun onDestroy() {
         loadJob?.cancel()
         handler.removeCallbacksAndMessages(null)
+        controls.animate().cancel()
+        controlsScrim.animate().cancel()
         super.onDestroy()
     }
 
@@ -115,7 +133,11 @@ class ImageViewActivity : SinemaActivity() {
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (controls.visibility == View.VISIBLE) controls.visibility = View.GONE else showControls()
+                if (controls.isVisible) {
+                    setControlsVisible(false)
+                } else {
+                    showControls()
+                }
                 return true
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
@@ -133,16 +155,18 @@ class ImageViewActivity : SinemaActivity() {
             KeyEvent.KEYCODE_ZOOM_IN, KeyEvent.KEYCODE_PLUS, KeyEvent.KEYCODE_NUMPAD_ADD -> {
                 state = state.zoomIn()
                 applyTransform()
+                showControls()
                 return true
             }
             KeyEvent.KEYCODE_ZOOM_OUT, KeyEvent.KEYCODE_MINUS, KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> {
                 state = state.zoomOut()
                 applyTransform()
+                showControls()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_UP -> {
-                if (state.zoom > 1f) {
+                if (state.isZoomed) {
                     val step = 80f
                     val (dx, dy) = when (keyCode) {
                         KeyEvent.KEYCODE_DPAD_RIGHT -> -step to 0f
@@ -164,6 +188,8 @@ class ImageViewActivity : SinemaActivity() {
     }
 
     private fun loadGallery() {
+        loadingProgress.visibility = View.VISIBLE
+        progressBar.visibility = View.GONE
         caption.text = "Loading gallery…"
         status.text = ""
         loadJob = lifecycleScope.launch {
@@ -178,6 +204,7 @@ class ImageViewActivity : SinemaActivity() {
                     loaded.addAll(result.second)
                     page++
                 }
+                loadingProgress.visibility = View.GONE
                 images = loaded.take(MAX_GALLERY_IMAGES)
                 prepareImages()
                 if (loaded.size < count) {
@@ -190,6 +217,7 @@ class ImageViewActivity : SinemaActivity() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                loadingProgress.visibility = View.GONE
                 Log.e("Sinema", "Failed to load gallery $galleryId", e)
                 Toast.makeText(this@ImageViewActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 finish()
@@ -213,6 +241,8 @@ class ImageViewActivity : SinemaActivity() {
         if (autoStartSlideshow) {
             autoStartSlideshow = false
             startSlideshow()
+        } else {
+            scheduleAutoHide()
         }
     }
 
@@ -221,7 +251,7 @@ class ImageViewActivity : SinemaActivity() {
         if (next == state) return
         state = next
         showImage()
-        if (slideshowEnabled) scheduleSlideshow()
+        if (slideshowEnabled) scheduleSlideshow() else if (controls.isVisible) scheduleAutoHide()
     }
 
     private fun movePrevious() {
@@ -229,7 +259,7 @@ class ImageViewActivity : SinemaActivity() {
         if (previous == state) return
         state = previous
         showImage()
-        if (slideshowEnabled) scheduleSlideshow()
+        if (slideshowEnabled) scheduleSlideshow() else if (controls.isVisible) scheduleAutoHide()
     }
 
     private fun showImage() {
@@ -251,62 +281,99 @@ class ImageViewActivity : SinemaActivity() {
         imageView.scaleY = state.zoom
         imageView.translationX = state.panX
         imageView.translationY = state.panY
-        status.text = buildString {
-            append(if (state.displayMode == ImageDisplayMode.FIT) "Fit screen" else "Fill screen")
-            append("  •  ${(state.zoom * 100).toInt()}%")
-            if (shuffleEnabled) append("  •  Shuffle")
-            if (slideshowEnabled) append("  •  Slideshow ${slideshowDelayMs / 1000}s")
+        status.text = state.statusSummary(shuffleEnabled, slideshowEnabled, slideshowDelayMs)
+        val permille = state.progressPermille(order.size)
+        if (order.size > 1) {
+            progressBar.visibility = View.VISIBLE
+            progressBar.progress = permille
+        } else {
+            progressBar.visibility = View.GONE
         }
+        hintView.setText(
+            when (state.hintMode(slideshowEnabled)) {
+                ImageViewerHintMode.BROWSE -> R.string.screens_polish_image_hint_browse
+                ImageViewerHintMode.ZOOMED -> R.string.screens_polish_image_hint_zoomed
+                ImageViewerHintMode.SLIDESHOW -> R.string.screens_polish_image_hint_slideshow
+            }
+        )
     }
 
     private fun showControls() {
         applyTransform()
-        controls.visibility = View.VISIBLE
+        setControlsVisible(true)
+        scheduleAutoHide()
+    }
+
+    private fun setControlsVisible(visible: Boolean) {
+        handler.removeCallbacks(autoHideControls)
+        val reduceMotion = SinemaApp.instance.prefs.reduceMotion
+        listOf(controls, controlsScrim).forEach { panel ->
+            panel.animate().cancel()
+            if (reduceMotion) {
+                panel.alpha = 1f
+                panel.isVisible = visible
+            } else if (visible) {
+                if (!panel.isVisible) {
+                    panel.alpha = 0f
+                    panel.isVisible = true
+                }
+                panel.animate().alpha(1f).setDuration(180L).start()
+            } else if (panel.isVisible) {
+                panel.animate()
+                    .alpha(0f)
+                    .setDuration(180L)
+                    .withEndAction {
+                        panel.isVisible = false
+                        panel.alpha = 1f
+                    }
+                    .start()
+            }
+        }
+    }
+
+    private fun scheduleAutoHide() {
+        handler.removeCallbacks(autoHideControls)
+        if (!state.isZoomed && !slideshowEnabled && controls.isVisible) {
+            handler.postDelayed(autoHideControls, HUD_AUTO_HIDE_MS)
+        }
     }
 
     private fun showOptions() {
         stopSlideshow()
-        val items = arrayOf(
-            if (slideshowEnabled) "Pause slideshow" else "Start slideshow",
-            "Slideshow speed: ${slideshowDelayMs / 1000}s",
-            if (shuffleEnabled) "Shuffle: On" else "Shuffle: Off",
-            if (state.displayMode == ImageDisplayMode.FIT) "Display: Fit screen" else "Display: Fill screen",
-            "Zoom in",
-            "Zoom out",
-            "Reset zoom"
-        )
-        AlertDialog.Builder(this)
-            .setTitle("Image viewer")
-            .setItems(items) { dialog, which ->
-                when (which) {
-                    0 -> toggleSlideshow()
-                    1 -> {
-                        slideshowDelayMs = nextSlideshowDelay(slideshowDelayMs)
-                        if (slideshowEnabled) scheduleSlideshow()
-                        showControls()
-                    }
-                    2 -> toggleShuffle()
-                    3 -> {
-                        state = state.toggleDisplayMode()
-                        showImage()
-                        showControls()
-                    }
-                    4 -> {
-                        state = state.zoomIn()
-                        applyTransform()
-                    }
-                    5 -> {
-                        state = state.zoomOut()
-                        applyTransform()
-                    }
-                    6 -> {
-                        state = state.resetTransform()
-                        applyTransform()
-                    }
+        handler.removeCallbacks(autoHideControls)
+        Dialogs.showActions(
+            this,
+            "Image viewer",
+            listOf(
+                (if (slideshowEnabled) "Pause slideshow" else "Start slideshow") to ::toggleSlideshow,
+                "Slideshow speed: ${slideshowDelayMs / 1000}s" to {
+                    slideshowDelayMs = nextSlideshowDelay(slideshowDelayMs)
+                    if (slideshowEnabled) scheduleSlideshow()
+                    showControls()
+                },
+                (if (shuffleEnabled) "Shuffle: On" else "Shuffle: Off") to ::toggleShuffle,
+                (if (state.displayMode == ImageDisplayMode.FIT) "Display: Fit screen" else "Display: Fill screen") to {
+                    state = state.toggleDisplayMode()
+                    showImage()
+                    showControls()
+                },
+                "Zoom in" to {
+                    state = state.zoomIn()
+                    applyTransform()
+                    showControls()
+                },
+                "Zoom out" to {
+                    state = state.zoomOut()
+                    applyTransform()
+                    showControls()
+                },
+                "Reset zoom" to {
+                    state = state.resetTransform()
+                    applyTransform()
+                    showControls()
                 }
-                dialog.dismiss()
-            }
-            .show()
+            )
+        )
     }
 
     private fun toggleShuffle() {
@@ -337,7 +404,7 @@ class ImageViewActivity : SinemaActivity() {
             return
         }
         slideshowEnabled = true
-        controls.visibility = View.GONE
+        setControlsVisible(false)
         scheduleSlideshow()
     }
 
@@ -354,6 +421,7 @@ class ImageViewActivity : SinemaActivity() {
     companion object {
         private const val GALLERY_PAGE_SIZE = 500
         private const val MAX_GALLERY_IMAGES = 10_000
+        private const val HUD_AUTO_HIDE_MS = 4_500L
         var pendingImages: List<ImageItem> = emptyList()
 
         fun intentFor(context: Context, images: List<ImageItem>, startIndex: Int): Intent {

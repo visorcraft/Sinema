@@ -36,7 +36,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/hero_scrim"
+                android:background="@drawable/scene_detail_hero_scrim"
                 android:importantForAccessibility="no" />
 
             <LinearLayout
@@ -129,11 +129,12 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="♡ Favorite"
                     android:textColor="@android:color/white"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <Button
                     android:id="@+id/btn_mark_watched"
@@ -141,11 +142,12 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="👁️ Mark Watched"
                     android:textColor="@android:color/white"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <Button
                     android:id="@+id/btn_o_count"
@@ -153,22 +155,24 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="🔥 O +1"
                     android:textColor="@android:color/white"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <Button
                     android:id="@+id/btn_folder"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="📁 Folder"
                     android:textColor="@android:color/white"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <Button
@@ -211,11 +215,11 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="☆"
-                    android:textColor="@android:color/white"
-                    android:textSize="19sp" />
+                    android:textColor="@color/screens_polish_star_empty"
+                    android:textSize="20sp" />
 
                 <Button
                     android:id="@+id/btn_star_2"
@@ -223,11 +227,11 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="☆"
-                    android:textColor="@android:color/white"
-                    android:textSize="19sp" />
+                    android:textColor="@color/screens_polish_star_empty"
+                    android:textSize="20sp" />
 
                 <Button
                     android:id="@+id/btn_star_3"
@@ -235,11 +239,11 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="☆"
-                    android:textColor="@android:color/white"
-                    android:textSize="19sp" />
+                    android:textColor="@color/screens_polish_star_empty"
+                    android:textSize="20sp" />
 
                 <Button
                     android:id="@+id/btn_star_4"
@@ -247,11 +251,11 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="☆"
-                    android:textColor="@android:color/white"
-                    android:textSize="19sp" />
+                    android:textColor="@color/screens_polish_star_empty"
+                    android:textSize="20sp" />
 
                 <Button
                     android:id="@+id/btn_star_5"
@@ -259,29 +263,30 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="10dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="☆"
-                    android:textColor="@android:color/white"
-                    android:textSize="19sp" />
+                    android:textColor="@color/screens_polish_star_empty"
+                    android:textSize="20sp" />
 
                 <Button
                     android:id="@+id/btn_rating_clear"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/scene_detail_pill_background"
                     android:focusable="true"
                     android:text="Clear"
                     android:textColor="@android:color/white"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/detail_meta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
+                android:layout_marginBottom="8dp"
                 android:textColor="#8FC7E8"
                 android:textSize="14sp"
                 android:visibility="gone" />
@@ -291,15 +296,16 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
-                android:background="@drawable/bg_pill"
+                android:background="@drawable/scene_detail_synopsis_background"
                 android:ellipsize="end"
                 android:focusable="true"
+                android:lineSpacingMultiplier="1.2"
                 android:maxLines="3"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-                android:textColor="#CFCFCF"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="12dp"
+                android:textColor="#DCDCDC"
                 android:textSize="15sp"
                 android:visibility="gone" />
 
@@ -336,21 +342,26 @@
             <Button
                 android:id="@+id/btn_technical"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_marginBottom="10dp"
-                android:background="@drawable/action_button_background"
+                android:background="@drawable/scene_detail_pill_background"
                 android:focusable="true"
-                android:minWidth="170dp"
+                android:minWidth="180dp"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
                 android:text="Technical details"
                 android:textColor="@android:color/white"
-                android:textSize="12sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:id="@+id/technical_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
+                android:background="@drawable/screens_polish_header_image_background"
                 android:orientation="vertical"
+                android:padding="14dp"
                 android:visibility="gone">
 
                 <TextView

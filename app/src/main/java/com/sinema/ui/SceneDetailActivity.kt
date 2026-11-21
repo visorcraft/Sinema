@@ -1,6 +1,5 @@
 package com.sinema.ui
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.util.Log
 import android.os.Bundle
@@ -11,6 +10,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.sinema.R
@@ -91,12 +91,19 @@ class SceneDetailActivity : SinemaActivity() {
         btnTechnical.setOnClickListener {
             val show = technicalContainer.visibility != View.VISIBLE
             technicalContainer.visibility = if (show) View.VISIBLE else View.GONE
+            btnTechnical.isActivated = show
             btnTechnical.text = if (show) "Hide technical details" else "Technical details"
             if (show) {
                 // Reveal the freshly expanded block: it renders below the
                 // fold, so scroll it into view once laid out.
                 val scroll = findViewById<android.widget.ScrollView>(R.id.detail_scroll)
-                technicalContainer.post { scroll.smoothScrollTo(0, technicalContainer.bottom) }
+                technicalContainer.post {
+                    if (app.prefs.reduceMotion) {
+                        scroll.scrollTo(0, technicalContainer.bottom)
+                    } else {
+                        scroll.smoothScrollTo(0, technicalContainer.bottom)
+                    }
+                }
             }
         }
 
@@ -128,21 +135,16 @@ class SceneDetailActivity : SinemaActivity() {
         Log.d("Sinema", "SceneDetail: id=${scene.id} playCount=${scene.playCount} isWatched=${scene.isWatched} rating100=${scene.rating100}")
         bindWatchedButton()
         btnMarkWatched.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    val wasWatched = scene.isWatched
-                    app.api.setSceneWatched(scene.id, !wasWatched)
-                    detailState.applyWatchedToggle(wasWatched)
-                    bindWatchedButton()
-                    Toast.makeText(this@SceneDetailActivity,
-                        if (wasWatched) "Marked as unwatched" else "Marked as watched",
-                        Toast.LENGTH_SHORT).show()
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.e("Sinema", "Mark Watched/Unwatched FAILED for scene ${scene.id}", e)
-                    Toast.makeText(this@SceneDetailActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+            launchSafely("Mark Watched/Unwatched for scene ${scene.id}") {
+                val wasWatched = scene.isWatched
+                app.api.setSceneWatched(scene.id, !wasWatched)
+                detailState.applyWatchedToggle(wasWatched)
+                bindWatchedButton()
+                Toast.makeText(
+                    this@SceneDetailActivity,
+                    if (wasWatched) "Marked as unwatched" else "Marked as watched",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
 
@@ -150,57 +152,54 @@ class SceneDetailActivity : SinemaActivity() {
         // favorite, so unfavoriting clears the rating (★★★★★ by default).
         bindFavoriteButton()
         btnFavorite.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    val wasFavorite = scene.isFavorite
-                    if (wasFavorite) {
-                        app.api.setSceneRating(scene.id, null)
-                        detailState.applyRating(0)
-                        bindStars()
-                        bindMeta(scene)
-                        bindFavoriteButton()
-                        Toast.makeText(this@SceneDetailActivity,
-                            "Rating cleared — removed from favorites", Toast.LENGTH_SHORT).show()
-                    } else {
-                        app.api.setSceneRating(scene.id, 100)
-                        detailState.applyRating(5)
-                        bindStars()
-                        bindMeta(scene)
-                        bindFavoriteButton()
-                        Toast.makeText(this@SceneDetailActivity,
-                            "Added to favorites (★★★★★)", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.e("Sinema", "Favorite toggle failed for ${scene.id}", e)
-                    Toast.makeText(this@SceneDetailActivity,
-                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+            launchSafely("Favorite toggle for ${scene.id}") {
+                val wasFavorite = scene.isFavorite
+                if (wasFavorite) {
+                    app.api.setSceneRating(scene.id, null)
+                    detailState.applyRating(0)
+                    bindStars()
+                    bindMeta(scene)
+                    bindFavoriteButton()
+                    Toast.makeText(
+                        this@SceneDetailActivity,
+                        "Rating cleared — removed from favorites", Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    app.api.setSceneRating(scene.id, 100)
+                    detailState.applyRating(5)
+                    bindStars()
+                    bindMeta(scene)
+                    bindFavoriteButton()
+                    Toast.makeText(
+                        this@SceneDetailActivity,
+                        "Added to favorites (★★★★★)", Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
 
-        // Synopsis: tap to expand/collapse long text.
+        // Synopsis: tap to expand/collapse long text with clear state cues.
+        detailsView.contentDescription = getString(R.string.screens_polish_synopsis_expand)
         detailsView.setOnClickListener {
-            detailsView.maxLines = if (detailsView.maxLines == 3) Int.MAX_VALUE else 3
+            val expand = detailsView.maxLines == 3
+            detailsView.maxLines = if (expand) Int.MAX_VALUE else 3
+            detailsView.isActivated = expand
+            detailsView.contentDescription = getString(
+                if (expand) R.string.screens_polish_synopsis_collapse
+                else R.string.screens_polish_synopsis_expand
+            )
         }
 
         // O counter: one tap = one O, mirrors Stash's sceneIncrementO
         btnOCount.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    app.api.sceneIncrementO(scene.id)
-                    detailState.applyOIncrement()
-                    bindMeta(scene)
-                    Toast.makeText(this@SceneDetailActivity,
-                        "O × ${scene.oCounter}", Toast.LENGTH_SHORT).show()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.e("Sinema", "O count failed for ${scene.id}", e)
-                    Toast.makeText(this@SceneDetailActivity,
-                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+            launchSafely("O count for ${scene.id}") {
+                app.api.sceneIncrementO(scene.id)
+                detailState.applyOIncrement()
+                bindMeta(scene)
+                Toast.makeText(
+                    this@SceneDetailActivity,
+                    "O × ${scene.oCounter}", Toast.LENGTH_SHORT
+                ).show()
             }
         }
 
@@ -227,7 +226,7 @@ class SceneDetailActivity : SinemaActivity() {
             if (event.action == android.view.KeyEvent.ACTION_DOWN &&
                 keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP
             ) {
-                scrollView.smoothScrollTo(0, 0)
+                if (app.prefs.reduceMotion) scrollView.scrollTo(0, 0) else scrollView.smoothScrollTo(0, 0)
                 true
             } else false
         }
@@ -284,40 +283,47 @@ class SceneDetailActivity : SinemaActivity() {
     private fun bindWatchedButton() {
         // Short label: the pill row is narrow on 1080p panels.
         btnMarkWatched.text = WatchedToggle.shortButtonLabel(scene.isWatched)
+        btnMarkWatched.isActivated = scene.isWatched
     }
 
     private fun bindFavoriteButton() {
         btnFavorite.text = if (scene.isFavorite) "♥ Favorited" else "♡ Favorite"
+        btnFavorite.isActivated = scene.isFavorite
     }
 
-    /** Render ☆/★ states for the 1-5 star picker from the current rating. */
+    /** Render ☆/★ states and amber/muted tint for the 1-5 star picker from the current rating. */
     private fun bindStars() {
         val stars = scene.starCount
+        val filledColor = ContextCompat.getColor(this, R.color.screens_polish_star_filled)
+        val emptyColor = ContextCompat.getColor(this, R.color.screens_polish_star_empty)
         starButtons.forEachIndexed { index, button ->
-            button.text = if (index < stars) "★" else "☆"
+            val filled = index < stars
+            button.text = if (filled) "★" else "☆"
+            button.isActivated = filled
+            button.setTextColor(if (filled) filledColor else emptyColor)
         }
     }
 
     private fun setRating(stars: Int) {
-        lifecycleScope.launch {
-            try {
-                app.api.setSceneRating(scene.id, StarRating.toRating100(stars))
-                detailState.applyRating(stars)
-                bindStars()
-                bindFavoriteButton()
-                bindMeta(scene)
+        launchSafely(
+            label = "Set rating for ${scene.id}",
+            onError = { e ->
                 Toast.makeText(
                     this@SceneDetailActivity,
-                    if (stars > 0) "Rated ${StarRating.glyphs(stars)}" else "Rating cleared",
-                    Toast.LENGTH_SHORT
+                    "Failed to set rating: ${e.message}", Toast.LENGTH_LONG
                 ).show()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("Sinema", "Failed to set rating for ${scene.id}", e)
-                Toast.makeText(this@SceneDetailActivity,
-                    "Failed to set rating: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        ) {
+            app.api.setSceneRating(scene.id, StarRating.toRating100(stars))
+            detailState.applyRating(stars)
+            bindStars()
+            bindFavoriteButton()
+            bindMeta(scene)
+            Toast.makeText(
+                this@SceneDetailActivity,
+                if (stars > 0) "Rated ${StarRating.glyphs(stars)}" else "Rating cleared",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -577,19 +583,16 @@ class SceneDetailActivity : SinemaActivity() {
     }
 
     private fun confirmDelete() {
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Delete video?")
-            .setMessage(
-                "Permanently delete ‘${scene.displayTitle}’ and its video file on disk? " +
-                    "This cannot be undone."
-            )
-            .setPositiveButton("Delete") { _, _ -> deleteScene() }
-            .setNegativeButton("Cancel", null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus()
-        }
-        dialog.show()
+        Dialogs.showConfirmDialog(
+            context = this,
+            title = "Delete video?",
+            message = "Permanently delete ‘${scene.displayTitle}’ and its video file on disk? " +
+                "This cannot be undone.",
+            positiveLabel = "Delete",
+            negativeLabel = "Cancel",
+            focusNegativeByDefault = true,
+            onConfirm = ::deleteScene
+        )
     }
 
     private fun deleteScene() {
