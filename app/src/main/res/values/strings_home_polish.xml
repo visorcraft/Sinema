@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_polish_hero_continue_watching">CONTINUE WATCHING</string>
+    <string name="home_polish_hero_featured">FEATURED</string>
+    <string name="home_polish_hero_remaining_hours_minutes">%1$dh %2$dm left</string>
+    <string name="home_polish_hero_remaining_minutes">%1$dm left</string>
+    <string name="home_polish_hero_remaining_under_minute">&lt;1m left</string>
+    <string name="home_polish_order_hint">Reorder items or toggle visibility. D-pad focus stays on your selected action.</string>
+</resources>
