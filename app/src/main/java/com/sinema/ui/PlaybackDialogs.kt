@@ -19,6 +19,7 @@ internal fun PlaybackActivity.showAspectRatioDialog() {
             aspectRatio = chosen
             prefs.playbackAspectRatio = chosen.name
             playerView.playbackAspectRatio = chosen
+            updatePlaybackText()
         }
         aspectRatioDialog.dialog = dialog
         dialog.setOnDismissListener {
@@ -103,6 +104,7 @@ internal fun PlaybackActivity.showPersonalizationMenu() {
                         incognitoLatchSceneId = sceneId
                         Toast.makeText(this@showPersonalizationMenu, "Incognito on — watch history paused", Toast.LENGTH_SHORT).show()
                     }
+                    updatePlaybackText()
                 }
             )
             add(
@@ -114,6 +116,7 @@ internal fun PlaybackActivity.showPersonalizationMenu() {
                         getString(if (enable) R.string.endless_on_toast else R.string.endless_off_toast),
                         Toast.LENGTH_SHORT
                     ).show()
+                    updatePlaybackText()
                 }
             )
         }

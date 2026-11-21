@@ -7,5 +7,6 @@
     app:controller_layout_id="@layout/playback_controller"
     app:repeat_toggle_modes="one"
     app:resize_mode="fit"
+    app:show_buffering="when_playing"
     app:show_subtitle_button="true"
     app:surface_type="texture_view" />

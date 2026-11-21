@@ -539,7 +539,8 @@ class PlaybackActivity : SinemaActivity() {
     internal fun bindPlaybackControls() {
         if (!::playerView.isInitialized) return
         SubtitleAppearance.apply(playerView, prefs)
-        playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
+        playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text =
+            playbackDisplayTitle(sceneTitle, sceneId, prefs.discreetMode)
         playerView.findViewById<MarkerTimeBar>(androidx.media3.ui.R.id.exo_progress).apply {
             setSceneMarkers(markers)
             setKeyTimeIncrements(seekPreset.backwardMs, seekPreset.forwardMs)
@@ -631,8 +632,40 @@ class PlaybackActivity : SinemaActivity() {
 
     internal fun updatePlaybackText() {
         if (!::playerView.isInitialized) return
-        playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text = sceneTitle
+        val discreet = prefs.discreetMode
+        playerView.findViewById<android.widget.TextView>(R.id.playback_scene_title).text =
+            playbackDisplayTitle(sceneTitle, sceneId, discreet)
         val exo = player
+        val currentChapter = if (discreet || exo == null) {
+            ""
+        } else {
+            activeMarkerAt(exo.currentPosition, markers)?.first?.trim().orEmpty()
+        }
+        val badges = buildPlaybackStatusBadges(
+            isBuffering = exo != null && exo.playbackState == Player.STATE_BUFFERING,
+            isPaused = exo != null && !exo.playWhenReady && exo.playbackState != Player.STATE_ENDED,
+            isLooping = exo?.repeatMode == Player.REPEAT_MODE_ONE,
+            isIncognito = prefs.incognitoMode || incognitoLatchSceneId == sceneId,
+            isEndlessMix = prefs.endlessMix,
+            streamQuality = streamQuality,
+            forceAlignedHls = forceAlignedHls,
+            aspectRatio = aspectRatio,
+            playbackSpeed = exo?.playbackParameters?.speed ?: 1.0f
+        )
+        val chapterView = playerView.findViewById<android.widget.TextView>(R.id.playback_chapter_now)
+        val badgesView = playerView.findViewById<android.widget.TextView>(R.id.playback_status_badges)
+        chapterView?.apply {
+            text = currentChapter
+            visibility = if (currentChapter.isNotEmpty()) View.VISIBLE else View.GONE
+        }
+        badgesView?.apply {
+            text = badges.joinToString(" · ")
+            visibility = if (badges.isNotEmpty()) View.VISIBLE else View.GONE
+        }
+        playerView.findViewById<View>(R.id.playback_meta_row)?.visibility =
+            if (currentChapter.isNotEmpty() || badges.isNotEmpty()) View.VISIBLE else View.GONE
+        playerView.findViewById<android.widget.Button>(R.id.playback_quality_button)?.text =
+            qualityButtonText(getString(R.string.playback_quality), streamQuality)
         playerView.findViewById<android.widget.TextView>(R.id.playback_remaining).text =
             if (exo == null) "" else formatRemainingMs(exo.currentPosition, exo.duration)
         playerView.findViewById<android.widget.TextView>(R.id.playback_queue_chip).apply {
@@ -892,10 +925,12 @@ class PlaybackActivity : SinemaActivity() {
 
                     override fun onRepeatModeChanged(repeatMode: Int) {
                         prefs.loopEnabled = repeatMode == Player.REPEAT_MODE_ONE
+                        updatePlaybackText()
                     }
 
                     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                         if (playWhenReady) hideSeekPreview()
+                        updatePlaybackText()
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -920,6 +955,7 @@ class PlaybackActivity : SinemaActivity() {
                         } else {
                             handler.removeCallbacks(hideRunnable)
                         }
+                        updatePlaybackText()
                     }
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -948,6 +984,7 @@ class PlaybackActivity : SinemaActivity() {
                     }
 
                     override fun onPlaybackStateChanged(state: Int) {
+                        updatePlaybackText()
                         if (state != Player.STATE_ENDED) return
                         handler.removeCallbacks(videoOutputTimeout)
                         handler.removeCallbacks(hideRunnable)

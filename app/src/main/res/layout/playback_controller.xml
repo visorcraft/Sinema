@@ -17,20 +17,65 @@
         android:layout_gravity="top"
         android:orientation="horizontal"
         android:paddingStart="48dp"
-        android:paddingTop="20dp"
+        android:paddingTop="24dp"
         android:paddingEnd="48dp"
-        android:paddingBottom="20dp"
-        android:background="#66000000">
+        android:paddingBottom="28dp"
+        android:background="@drawable/playback_polish_top_bar">
 
-        <TextView
-            android:id="@+id/playback_scene_title"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@android:color/white"
-            android:textSize="22sp" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/playback_scene_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@android:color/white"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/playback_meta_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/playback_chapter_now"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    android:ellipsize="end"
+                    android:maxWidth="360dp"
+                    android:maxLines="1"
+                    android:textColor="@color/playback_polish_accent_bright"
+                    android:textSize="15sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/playback_status_badges"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/playback_polish_status_badge_bg"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:textColor="@color/playback_polish_text_secondary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/playback_queue_chip"
@@ -190,9 +235,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="#55000000"
+        android:background="@drawable/playback_polish_center_controls_bg"
         android:gravity="center"
-        android:padding="12dp"
+        android:paddingStart="18dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="12dp"
         android:clipToPadding="false"
         android:layoutDirection="ltr">
 
@@ -203,17 +251,22 @@
         <ImageButton
             android:id="@+id/playback_prev_marker_button"
             style="@style/ExoStyledControls.Button.Center.Previous"
+            android:background="@drawable/playback_polish_icon_button_bg"
             android:contentDescription="@string/playback_previous_marker" />
 
         <include layout="@layout/exo_player_control_rewind_button" />
 
-        <ImageButton android:id="@id/exo_play_pause" style="@style/ExoStyledControls.Button.Center.PlayPause" />
+        <ImageButton
+            android:id="@id/exo_play_pause"
+            style="@style/ExoStyledControls.Button.Center.PlayPause"
+            android:background="@drawable/playback_polish_icon_button_bg" />
 
         <include layout="@layout/exo_player_control_ffwd_button" />
 
         <ImageButton
             android:id="@+id/playback_next_marker_button"
             style="@style/ExoStyledControls.Button.Center.Next"
+            android:background="@drawable/playback_polish_icon_button_bg"
             android:contentDescription="@string/playback_next_marker" />
     </LinearLayout>
 
@@ -224,10 +277,10 @@
         android:layout_gravity="bottom"
         android:orientation="vertical"
         android:paddingStart="48dp"
-        android:paddingTop="10dp"
+        android:paddingTop="24dp"
         android:paddingEnd="48dp"
-        android:paddingBottom="14dp"
-        android:background="#C0000000"
+        android:paddingBottom="16dp"
+        android:background="@drawable/playback_polish_bottom_bar"
         android:layoutDirection="ltr">
 
         <LinearLayout
@@ -288,25 +341,44 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
                 android:layoutDirection="ltr">
 
-                <ImageButton android:id="@id/exo_repeat_toggle" style="@style/ExoStyledControls.Button.Bottom.RepeatToggle" />
-                <ImageButton android:id="@id/exo_subtitle" style="@style/ExoStyledControls.Button.Bottom.CC" />
+                <ImageButton
+                    android:id="@id/exo_repeat_toggle"
+                    style="@style/ExoStyledControls.Button.Bottom.RepeatToggle"
+                    android:background="@drawable/playback_polish_icon_button_bg" />
+                <ImageButton
+                    android:id="@id/exo_subtitle"
+                    style="@style/ExoStyledControls.Button.Bottom.CC"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/playback_polish_icon_button_bg" />
                 <ImageButton
                     android:id="@+id/playback_folder_button"
                     style="@style/ExoStyledControls.Button.Bottom"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/playback_polish_icon_button_bg"
                     android:contentDescription="@string/playback_open_folder"
                     android:enabled="false"
                     android:src="@drawable/ic_folder" />
                 <ImageButton
                     android:id="@+id/playback_personalization_button"
                     style="@style/ExoStyledControls.Button.Bottom"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/playback_polish_icon_button_bg"
                     android:contentDescription="@string/playback_personalization"
                     android:src="@drawable/ic_person" />
-                <ImageButton android:id="@+id/playback_settings_button" style="@style/ExoStyledControls.Button.Bottom.Settings" />
+                <ImageButton
+                    android:id="@+id/playback_settings_button"
+                    style="@style/ExoStyledControls.Button.Bottom.Settings"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/playback_polish_icon_button_bg" />
                 <ImageButton
                     android:id="@+id/aspect_ratio_button"
                     style="@style/ExoStyledControls.Button.Bottom"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/playback_polish_icon_button_bg"
                     android:contentDescription="@string/playback_aspect_ratio"
                     android:src="@drawable/ic_aspect_ratio" />
 
@@ -314,9 +386,13 @@
                     android:id="@+id/playback_quality_button"
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/card_focus_border"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/playback_polish_control_bg"
+                    android:minWidth="88dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
                     android:text="@string/playback_quality"
+                    android:textAllCaps="false"
                     android:textColor="@android:color/white" />
 
                 <Button
@@ -324,8 +400,12 @@
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
-                    android:background="@drawable/card_focus_border"
+                    android:background="@drawable/playback_polish_control_bg"
+                    android:minWidth="80dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
                     android:text="@string/playback_rate"
+                    android:textAllCaps="false"
                     android:textColor="@android:color/white" />
 
                 <Button
@@ -333,8 +413,12 @@
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
-                    android:background="@drawable/card_focus_border"
+                    android:background="@drawable/playback_polish_control_bg"
+                    android:minWidth="108dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
                     android:text="@string/playback_next_marker"
+                    android:textAllCaps="false"
                     android:textColor="@android:color/white" />
 
                 <Button
@@ -342,7 +426,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
                     android:layout_marginStart="8dp"
-                    android:background="@drawable/card_focus_border"
+                    android:background="@drawable/playback_polish_control_bg"
+                    android:minWidth="112dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:textAllCaps="false"
                     android:textColor="@android:color/white" />
             </LinearLayout>
         </HorizontalScrollView>
