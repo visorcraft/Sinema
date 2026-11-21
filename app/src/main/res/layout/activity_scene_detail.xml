@@ -171,6 +171,20 @@
                     android:textSize="13sp" />
             </LinearLayout>
 
+            <Button
+                android:id="@+id/btn_delete"
+                android:layout_width="wrap_content"
+                android:layout_height="46dp"
+                android:layout_marginBottom="14dp"
+                android:background="@drawable/bg_pill"
+                android:focusable="true"
+                android:minWidth="140dp"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:text="Delete"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
             <!-- Rating -->
             <LinearLayout
                 android:layout_width="match_parent"

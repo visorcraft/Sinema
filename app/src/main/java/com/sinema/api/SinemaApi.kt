@@ -507,6 +507,21 @@ class SinemaApi(
         }
     }
 
+    suspend fun destroyScene(sceneId: String) {
+        val query = """
+            mutation(${"$"}input: SceneDestroyInput!) {
+                sceneDestroy(input: ${"$"}input)
+            }
+        """.trimIndent()
+        val result = graphql(
+            query,
+            mapOf("input" to mapOf("id" to sceneId, "delete_file" to true))
+        )
+        if (result.optObject("data")?.optBoolean("sceneDestroy") != true) {
+            throw java.io.IOException("Stash could not delete the scene")
+        }
+    }
+
     suspend fun setSceneRating(sceneId: String, rating: Int?): Boolean {
         val query = """
             mutation(${"$"}input: SceneUpdateInput!) {

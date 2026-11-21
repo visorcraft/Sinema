@@ -85,6 +85,8 @@ Full details include:
 - Captions.
 - Scene markers.
 
+The details page also exposes a separate Delete button. Its confirmation initially focuses Cancel and explicitly warns that both the Stash scene and the original video file on disk will be permanently deleted. Confirmation calls `SinemaApi.destroyScene` (`sceneDestroy` with `delete_file: true`), closes the page only after a true response, and leaves the action available for retry after failures; generated artifacts are not explicitly deleted.
+
 ### Folder browsing
 
 `BrowseFoldersActivity` lists top-level folders under `/data`, then fills counts and thumbnails only for the folders around the focused card (`summarizeFolder`: one scene query, one image query, and a favorite count, together).

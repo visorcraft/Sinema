@@ -1,5 +1,6 @@
 package com.sinema.ui
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.util.Log
 import android.os.Bundle
@@ -37,6 +38,7 @@ class SceneDetailActivity : SinemaActivity() {
     private lateinit var btnMarkWatched: Button
     private lateinit var btnFavorite: Button
     private lateinit var btnOCount: Button
+    private lateinit var btnDelete: Button
     private var btnFolder: Button? = null
     private lateinit var metaView: TextView
     private lateinit var detailsView: TextView
@@ -74,6 +76,7 @@ class SceneDetailActivity : SinemaActivity() {
         btnMarkWatched = findViewById(R.id.btn_mark_watched)
         btnFavorite = findViewById(R.id.btn_favorite)
         btnOCount = findViewById(R.id.btn_o_count)
+        btnDelete = findViewById(R.id.btn_delete)
         btnFolder = findViewById(R.id.btn_folder)
         metaView = findViewById(R.id.detail_meta)
         detailsView = findViewById(R.id.detail_details)
@@ -211,6 +214,8 @@ class SceneDetailActivity : SinemaActivity() {
             }
             startActivity(Intent(this, FolderBrowseActivity::class.java).putExtra("path", folder))
         }
+
+        btnDelete.setOnClickListener { confirmDelete() }
 
         // Initial focus
         btnPlay.requestFocus()
@@ -567,6 +572,43 @@ class SceneDetailActivity : SinemaActivity() {
                 throw e
             } catch (e: Exception) {
                 Log.w("Sinema", "Failed to load related scenes for ${source.id}", e)
+            }
+        }
+    }
+
+    private fun confirmDelete() {
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Delete video?")
+            .setMessage(
+                "Permanently delete ‘${scene.displayTitle}’ and its video file on disk? " +
+                    "This cannot be undone."
+            )
+            .setPositiveButton("Delete") { _, _ -> deleteScene() }
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus()
+        }
+        dialog.show()
+    }
+
+    private fun deleteScene() {
+        btnDelete.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                app.api.destroyScene(scene.id)
+                Toast.makeText(this@SceneDetailActivity, "Video deleted", Toast.LENGTH_SHORT).show()
+                finish()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Sinema", "Failed to delete scene ${scene.id}", e)
+                btnDelete.isEnabled = true
+                Toast.makeText(
+                    this@SceneDetailActivity,
+                    "Could not delete video: ${UiErrorMessage.forException(e)}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }

@@ -30,3 +30,6 @@ fun JsonObject.optNullableString(key: String): String? =
 
 fun JsonObject.optNullableInt(key: String): Int? =
     get(key)?.takeIf { !it.isJsonNull }?.asInt
+
+fun JsonObject.optBoolean(key: String, default: Boolean = false): Boolean =
+    get(key)?.takeIf { !it.isJsonNull }?.asBoolean ?: default
