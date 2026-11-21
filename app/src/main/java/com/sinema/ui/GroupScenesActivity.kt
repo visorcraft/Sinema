@@ -89,9 +89,10 @@ class GroupScenesActivity : SinemaActivity() {
         }
         val imagePath = intent.getStringExtra(EXTRA_IMAGE)
         val image = findViewById<ImageView>(R.id.entity_header_image)
-        if (imagePath.isNullOrBlank()) {
+        if (SinemaApp.instance.prefs.discreetMode || imagePath.isNullOrBlank()) {
             image.visibility = View.INVISIBLE
         } else {
+            image.clipToOutline = true
             image.loadAuth(SinemaApp.instance.api, imagePath)
         }
     }

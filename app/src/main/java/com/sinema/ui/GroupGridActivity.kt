@@ -40,6 +40,7 @@ class GroupGridFragment : SceneGridFragment() {
 
     private var groupSort = GroupSortOption.UPDATED_DESC
     private var searchQuery = ""
+    override val activeSearchQuery: String get() = searchQuery
 
     override fun onCreate(savedInstanceState: Bundle?) {
         groupSort = GroupSortOption.fromName(app.prefs.sortFor("group_grid"))

@@ -47,6 +47,12 @@ class MarkerBrowserFragment : SceneGridFragment() {
         get() = tagName ?: "All tags"
 
     override val canSearch = true
+    override val activeSearchQuery: String get() = searchQuery
+
+    override fun gridControlVisualState(): GridControlVisualState = GridControlVisualState(
+        filterActive = tagId != null,
+        searchQuery = searchQuery.trim()
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         sortOption = MarkerSortOption.fromName(app.prefs.sortFor("marker_browser"))

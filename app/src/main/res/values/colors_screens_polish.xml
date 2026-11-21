@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="screens_polish_surface">#FF1B1B1B</color>
+    <color name="screens_polish_surface_elevated">#FF22282E</color>
+    <color name="screens_polish_card_surface">#FF20262C</color>
+    <color name="screens_polish_card_focused">#FF213642</color>
+    <color name="screens_polish_control_active">#FF1B3A48</color>
+    <color name="screens_polish_accent">#FF2AABE0</color>
+    <color name="screens_polish_accent_soft">#662AABE0</color>
+    <color name="screens_polish_hairline">#26FFFFFF</color>
+    <color name="screens_polish_border_subtle">#38FFFFFF</color>
+    <color name="screens_polish_star_filled">#FFFFD54F</color>
+    <color name="screens_polish_star_empty">#FF9EAAB5</color>
+    <color name="screens_polish_text_muted">#FF9EAAB5</color>
+    <color name="screens_polish_trend_up">#FF66BB6A</color>
+    <color name="screens_polish_trend_down">#FFEF7B73</color>
+</resources>

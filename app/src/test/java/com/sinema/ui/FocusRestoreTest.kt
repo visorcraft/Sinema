@@ -1,6 +1,10 @@
 package com.sinema.ui
 
+import com.sinema.model.GalleryItem
+import com.sinema.model.ImageItem
+import com.sinema.model.SavedSceneFilter
 import com.sinema.model.Scene
+import com.sinema.model.SceneMarkerItem
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -49,5 +53,20 @@ class FocusRestoreTest {
     fun `string items have stable keys`() {
         assertEquals(FocusRestore.keyOf("Settings"), FocusRestore.keyOf("Settings"))
         assertEquals(false, FocusRestore.keyOf("Settings") == FocusRestore.keyOf("Search"))
+    }
+
+    @Test
+    fun `gallery image marker and saved filter keys stay stable across field edits`() {
+        val gallery = GalleryItem(id = "g1", title = "Old", imageCount = 3)
+        assertEquals(FocusRestore.keyOf(gallery), FocusRestore.keyOf(gallery.copy(title = "New", imageCount = 9)))
+
+        val image = ImageItem(id = "img1", title = "A", path = "/a.jpg")
+        assertEquals(FocusRestore.keyOf(image), FocusRestore.keyOf(image.copy(title = "B", rating100 = 100)))
+
+        val marker = SceneMarkerItem("m1", "Intro", 12.0, "s1", "Scene", 1920, 1080, "t1", "Tag")
+        assertEquals(FocusRestore.keyOf(marker), FocusRestore.keyOf(marker.copy(title = "Renamed")))
+
+        val filter = SavedSceneFilter(id = "f1", name = "Favorites")
+        assertEquals(FocusRestore.keyOf(filter), FocusRestore.keyOf(filter.copy(name = "Top Favorites")))
     }
 }

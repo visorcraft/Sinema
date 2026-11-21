@@ -41,6 +41,7 @@ class GalleryGridFragment : SceneGridFragment() {
 
     private var gallerySort = GallerySortOption.UPDATED_DESC
     private var searchQuery = ""
+    override val activeSearchQuery: String get() = searchQuery
 
     override fun onCreate(savedInstanceState: Bundle?) {
         gallerySort = GallerySortOption.fromName(app.prefs.sortFor("gallery_grid"))

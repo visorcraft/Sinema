@@ -82,9 +82,10 @@ class GalleryImagesActivity : GridActivity() {
         }
         val coverId = intent.getStringExtra(EXTRA_COVER)
         val image = findViewById<ImageView>(R.id.entity_header_image)
-        if (coverId.isNullOrBlank()) {
+        if (SinemaApp.instance.prefs.discreetMode || coverId.isNullOrBlank()) {
             image.visibility = View.INVISIBLE
         } else {
+            image.clipToOutline = true
             val api = SinemaApp.instance.api
             Glide.with(this)
                 .load(GlideAuth.url(api, api.getImageThumbnailUrl(coverId)))

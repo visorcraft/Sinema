@@ -81,8 +81,28 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         get() = if (::filterController.isInitialized) filterController.favoritesLabel
         else super<SortableScreen>.quickFavoritesLabel
 
-    override fun toggleQuickWatch() = filterController.toggleWatch()
-    override fun toggleQuickFavorites() = filterController.toggleFavorites()
+    override fun toggleQuickWatch() {
+        filterController.toggleWatch()
+        syncGridControlVisuals()
+    }
+
+    override fun toggleQuickFavorites() {
+        filterController.toggleFavorites()
+        syncGridControlVisuals()
+    }
+
+    protected open val activeSearchQuery: String get() = ""
+
+    internal open fun gridControlVisualState(): GridControlVisualState =
+        if (::filterController.isInitialized) {
+            GridControlVisualState.fromSceneFilter(filterController.value, activeSearchQuery)
+        } else {
+            GridControlVisualState(searchQuery = activeSearchQuery.trim())
+        }
+
+    protected fun syncGridControlVisuals() {
+        activity?.applyGridControlVisuals(gridControlVisualState())
+    }
 
     private lateinit var filterController: SceneFilterController
 
@@ -468,7 +488,10 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
                 prefs = app.prefs,
                 screenKey = key,
                 initial = app.prefs.sceneFilterFor(key),
-                refreshControls = { activity?.refreshGridControls() },
+                refreshControls = {
+                    activity?.refreshGridControls()
+                    syncGridControlVisuals()
+                },
                 reload = { reload() }
             )
         }
@@ -494,6 +517,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         view.setPadding(hPad, vPad, hPad, vPad)
         (view as? ViewGroup)?.clipToPadding = false
         activity?.refreshGridControls()
+        syncGridControlVisuals()
         view.viewTreeObserver.addOnGlobalLayoutListener {
             findGridView(view as? ViewGroup)?.let { grid ->
                 if (grid.paddingLeft != hPad) {
@@ -507,12 +531,30 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     private val positionHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val hidePosition = Runnable {
-        activity?.findViewById<View>(R.id.grid_position)?.visibility = View.GONE
+        val positionView = activity?.findViewById<View>(R.id.grid_position) ?: return@Runnable
+        positionView.animate().cancel()
+        if (app.prefs.reduceMotion) {
+            positionView.visibility = View.GONE
+            positionView.alpha = 1f
+        } else {
+            positionView.animate()
+                .alpha(0f)
+                .setDuration(180L)
+                .withEndAction {
+                    positionView.visibility = View.GONE
+                    positionView.alpha = 1f
+                }
+                .start()
+        }
     }
 
     override fun onDestroyView() {
         positionHandler.removeCallbacks(hidePosition)
-        activity?.findViewById<View>(R.id.grid_position)?.visibility = View.GONE
+        activity?.findViewById<View>(R.id.grid_position)?.apply {
+            animate().cancel()
+            visibility = View.GONE
+            alpha = 1f
+        }
         pagingGrid = null
         super.onDestroyView()
     }
@@ -539,6 +581,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         val grid = gridView ?: return false
         if (gridAdapter.size() == 0) return false
         setSelectedPosition(0)
+        CollapsingHeader.expand(grid)
         grid.post { showGridPosition(grid) }
         return true
     }
@@ -554,7 +597,18 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
         )
         val positionView = activity?.findViewById<android.widget.TextView>(R.id.grid_position) ?: return
         positionView.text = label
-        positionView.visibility = View.VISIBLE
+        positionView.animate().cancel()
+        if (positionView.visibility != View.VISIBLE) {
+            positionView.visibility = View.VISIBLE
+            if (app.prefs.reduceMotion) {
+                positionView.alpha = 1f
+            } else {
+                positionView.alpha = 0f
+                positionView.animate().alpha(1f).setDuration(140L).start()
+            }
+        } else {
+            positionView.alpha = 1f
+        }
         positionHandler.removeCallbacks(hidePosition)
         positionHandler.postDelayed(hidePosition, 1_500L)
     }
@@ -581,6 +635,7 @@ abstract class SceneGridFragment : VerticalGridSupportFragment(), SortableScreen
 
     protected fun reload(): Job? {
         updateTitle()
+        syncGridControlVisuals()
         loadJob?.cancel()
         val generation = ++loadGeneration
         pageState.reset()

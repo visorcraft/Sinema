@@ -1,8 +1,12 @@
 package com.sinema.ui
 
 import com.sinema.model.EntityItem
+import com.sinema.model.GalleryItem
 import com.sinema.model.GroupItem
+import com.sinema.model.ImageItem
+import com.sinema.model.SavedSceneFilter
 import com.sinema.model.Scene
+import com.sinema.model.SceneMarkerItem
 
 /** Restores focus to the same logical item after a grid/row reload, or the
  * nearest surviving position if that item was removed (e.g. unfavorited). */
@@ -11,6 +15,10 @@ object FocusRestore {
         is Scene -> "scene:${item.id}"
         is EntityItem -> "entity:${item.kind}:${item.id}"
         is GroupItem -> "group:${item.id}"
+        is GalleryItem -> "gallery:${item.id}"
+        is ImageItem -> "image:${item.id}"
+        is SceneMarkerItem -> "marker:${item.id}"
+        is SavedSceneFilter -> "saved_filter:${item.id}"
         is String -> "string:$item"
         is HomeViewAll -> item.key
         else -> "obj:$item"

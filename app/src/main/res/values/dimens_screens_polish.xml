@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="screens_polish_pill_radius">999dp</dimen>
+    <dimen name="screens_polish_control_radius">10dp</dimen>
+    <dimen name="screens_polish_card_radius">12dp</dimen>
+    <dimen name="screens_polish_dialog_radius">16dp</dimen>
+</resources>
