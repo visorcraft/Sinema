@@ -20,8 +20,8 @@ android {
         applicationId = "com.sinema"
         minSdk = 24
         targetSdk = 36
-        versionCode = 65
-        versionName = "1.45.6"
+        versionCode = 66
+        versionName = "1.45.7"
     }
 
     buildTypes {
